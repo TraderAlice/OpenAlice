@@ -46,12 +46,31 @@ describe('withHubCalendars', () => {
   })
 
   it('falls back to local on hub failure and opens the breaker', async () => {
-    fetchSpy.mockResolvedValue(new Response('down', { status: 502 }))
-    const local = fakeClient([{ symbol: 'LOCAL' }])
-    const wrapped = withHubCalendars(local, HUB)
-    expect(await wrapped.getCalendarIpo(params)).toEqual([{ symbol: 'LOCAL' }])
-    expect(await wrapped.getCalendarIpo(params)).toEqual([{ symbol: 'LOCAL' }])
-    expect(fetchSpy).toHaveBeenCalledTimes(1) // breaker open on the second call
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      fetchSpy.mockResolvedValue(new Response('down', { status: 502 }))
+      const local = fakeClient([{ symbol: 'LOCAL' }])
+      const wrapped = withHubCalendars(local, HUB)
+      expect(await wrapped.getCalendarIpo(params)).toEqual([{ symbol: 'LOCAL' }])
+      expect(await wrapped.getCalendarIpo(params)).toEqual([{ symbol: 'LOCAL' }])
+      expect(fetchSpy).toHaveBeenCalledTimes(1) // breaker open on the second call
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('hub.test'))
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+
+  it('attributes target host and Bun error code when hub fetch throws', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      fetchSpy.mockRejectedValue(Object.assign(new Error('Unable to connect'), { code: 'ConnectionRefused' }))
+      const local = fakeClient([{ symbol: 'LOCAL' }])
+      const wrapped = withHubCalendars(local, HUB)
+      expect(await wrapped.getCalendarEarnings(params)).toEqual([{ symbol: 'LOCAL' }])
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/hub\.test.*ConnectionRefused.*Unable to connect/))
+    } finally {
+      warnSpy.mockRestore()
+    }
   })
 
   it('leaves non-calendar methods untouched (bound to the real client)', async () => {

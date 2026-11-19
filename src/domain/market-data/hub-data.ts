@@ -25,9 +25,25 @@ const KNOWN_PARAMS = new Set(['provider', 'start_date', 'end_date'])
 const TIMEOUT_MS = 5_000
 const BREAKER_MS = 60_000
 
+function safeHost(rawUrl: string): string {
+  try {
+    return new URL(rawUrl).host
+  } catch {
+    return rawUrl
+  }
+}
+
+function describeError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err)
+  const code = (err as Error & { code?: unknown }).code
+  const base = err.message || err.name
+  return typeof code === 'string' && code && !base.includes(code) ? `${code}: ${base}` : base
+}
+
 export function withHubCalendars(client: EquityClientLike, hub: HubConfig | undefined): EquityClientLike {
   if (!hub?.enabled || !hub.baseUrl) return client
   const base = hub.baseUrl.replace(/\/+$/, '')
+  const host = safeHost(base)
   let downUntil = 0
 
   const wrap = (method: keyof EquityClientLike, dataset: string) =>
@@ -45,12 +61,13 @@ export function withHubCalendars(client: EquityClientLike, hub: HubConfig | unde
           signal: AbortSignal.timeout(TIMEOUT_MS),
           headers: { Accept: 'application/json' },
         })
-        if (!res.ok) throw new Error(`hub returned ${res.status}`)
+        if (!res.ok) throw new Error(`hub (${host}) returned ${res.status}`)
         const rows: unknown = await res.json()
-        if (!Array.isArray(rows)) throw new Error('hub returned a non-array shape')
+        if (!Array.isArray(rows)) throw new Error(`hub (${host}) returned a non-array shape`)
         return rows
-      } catch {
+      } catch (err) {
         downUntil = Date.now() + BREAKER_MS
+        console.warn(`[hub-data] ${host} (${dataset}) failed: ${describeError(err)}; falling back to local`)
         return local()
       }
     }

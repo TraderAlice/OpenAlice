@@ -5,28 +5,41 @@
 
 import { OpenBBError, NetworkUnreachableError } from './errors.js'
 
+const NETWORK_ERROR_CODE_RE = /^(?:ConnectionRefused|FailedToOpenSocket|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|EHOSTUNREACH|ENETUNREACH|ECONNABORTED)$/i
+const NETWORK_ERROR_MSG_RE = /fetch failed|unable to connect|connectionrefused|failedtoopensocket/i
+
 /**
  * Identify a fetch failure before an HTTP response was received. This
  * includes network failures and connections closed by the remote service.
  *
  * Node 18+ wraps low-level network errors in TypeError("fetch failed")
- * with the underlying cause attached as `.cause`. Common cause codes
- * we want to flag specifically: ENOTFOUND (DNS), ECONNREFUSED, ETIMEDOUT,
- * EHOSTUNREACH, ENETUNREACH, EAI_AGAIN, plus TLS handshake failures
- * (UNABLE_TO_VERIFY_LEAF_SIGNATURE, SELF_SIGNED_CERT_IN_CHAIN, etc.).
+ * with the underlying cause attached as `.cause`. Bun throws Error/TypeError
+ * with messages like "Unable to connect..." and codes like ConnectionRefused
+ * or FailedToOpenSocket directly on the error.
  */
 function isFetchNetworkFailure(error: unknown): boolean {
-  if (!(error instanceof TypeError)) return false
-  if (!/fetch failed/i.test(error.message)) return false
-  return true
+  if (!(error instanceof Error)) return false
+  const code = (error as Error & { code?: unknown }).code
+  if (typeof code === 'string' && NETWORK_ERROR_CODE_RE.test(code)) return true
+  const cause = (error as Error & { cause?: unknown }).cause
+  const causeCode = cause instanceof Error ? (cause as Error & { code?: unknown }).code : undefined
+  if (typeof causeCode === 'string' && NETWORK_ERROR_CODE_RE.test(causeCode)) return true
+  if (NETWORK_ERROR_MSG_RE.test(error.message)) return true
+  return false
 }
 
 function describeFetchCause(error: unknown): string {
   if (!(error instanceof Error)) return String(error)
   const cause = (error as Error & { cause?: unknown }).cause
   if (cause instanceof Error) {
-    const code = (cause as Error & { code?: string }).code
-    return code ? `${code}: ${cause.message}` : cause.message
+    const causeCode = (cause as Error & { code?: unknown }).code
+    return typeof causeCode === 'string' && causeCode && !cause.message.includes(causeCode)
+      ? `${causeCode}: ${cause.message}`
+      : cause.message
+  }
+  const code = (error as Error & { code?: unknown }).code
+  if (typeof code === 'string' && code && !error.message.includes(code)) {
+    return `${code}: ${error.message}`
   }
   return error.message
 }

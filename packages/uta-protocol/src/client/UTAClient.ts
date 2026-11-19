@@ -62,6 +62,7 @@ export function createUTAClient(options: UTAClientOptions): UTAClient {
 
   async function request<T>(method: string, path: string, opts: RequestOpts = {}): Promise<T> {
     const url = buildUrl(path, opts.params)
+    const safeUrl = formatSafeUrl(url, path)
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeoutMs)
     const signal = opts.signal ?? controller.signal
@@ -72,7 +73,15 @@ export function createUTAClient(options: UTAClientOptions): UTAClient {
     }
     if (opts.body !== undefined) init.body = JSON.stringify(opts.body)
     try {
-      const res = await fetchImpl(url, init)
+      let res: Response
+      try {
+        res = await fetchImpl(url, init)
+      } catch (err) {
+        if (controller.signal.aborted || isAbortOrTimeoutError(err)) {
+          throw new Error(`UTA ${method} ${safeUrl} timed out after ${timeoutMs}ms`, { cause: err })
+        }
+        throw new Error(`UTA ${method} ${safeUrl} failed: ${describeTransportError(err)}`, { cause: err })
+      }
       const text = await res.text()
       const body = text ? safeJSON(text) : undefined
       if (!res.ok) {
@@ -96,6 +105,39 @@ export function createUTAClient(options: UTAClientOptions): UTAClient {
     put: <T>(path: string, body?: unknown) => request<T>('PUT', path, { body }),
     delete: <T>(path: string) => request<T>('DELETE', path),
   }
+}
+
+function formatSafeUrl(rawUrl: string, fallbackPath: string): string {
+  try {
+    const parsed = new URL(rawUrl)
+    return `${parsed.protocol}//${parsed.host}${parsed.pathname}`
+  } catch {
+    return fallbackPath
+  }
+}
+
+function isAbortOrTimeoutError(err: unknown): boolean {
+  return err instanceof Error && (err.name === 'AbortError' || err.name === 'TimeoutError')
+}
+
+function describeTransportError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err)
+  const parts: string[] = []
+  const code = (err as Error & { code?: unknown }).code
+  if (typeof code === 'string' && code && !err.message.includes(code)) {
+    parts.push(code)
+  }
+  if (err.message) parts.push(err.message)
+  const cause = (err as Error & { cause?: unknown }).cause
+  if (cause instanceof Error) {
+    const causeCode = (cause as Error & { code?: unknown }).code
+    const causeParts = [
+      typeof causeCode === 'string' && causeCode && !cause.message.includes(causeCode) ? causeCode : '',
+      cause.message,
+    ].filter(Boolean)
+    if (causeParts.length > 0) parts.push(`cause: ${causeParts.join(': ')}`)
+  }
+  return parts.join(': ') || err.name
 }
 
 function safeJSON(text: string): unknown {
