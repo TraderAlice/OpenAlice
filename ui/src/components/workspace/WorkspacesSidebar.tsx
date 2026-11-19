@@ -55,6 +55,7 @@ export function WorkspacesSidebar() {
         onChanged={() => void ctx.refresh()}
         onRenameWorkspace={(wsId, displayName) => void ctx.renameWorkspace(wsId, displayName)}
         onConfigureWorkspace={(wsId) => ctx.openAgentConfig(wsId)}
+        onActivateWorkspace={ctx.requestActivateWorkspace ? (wsId) => void ctx.requestActivateWorkspace?.(wsId) : undefined}
         onOpenOverview={() => openOrFocus({ kind: 'workspace-list', params: {} })}
         overviewActive={overviewActive}
         onOpenTemplates={() => openOrFocus({ kind: 'template-catalog', params: {} })}

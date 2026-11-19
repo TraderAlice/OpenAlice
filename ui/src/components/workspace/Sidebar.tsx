@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatRelativeTime } from '../../lib/intl';
 import type { ReactElement } from 'react';
-import { Info, Archive, ChevronDown, ChevronRight, LayoutGrid, Library, LoaderCircle, Pencil, Play, Plus, RotateCcw, Settings as SettingsIcon, Square, Terminal, Trash2, type LucideIcon } from 'lucide-react';
+import { Info, Archive, ChevronDown, ChevronRight, LayoutGrid, Library, LoaderCircle, Pencil, Play, Plus, RotateCcw, Settings as SettingsIcon, Square, Terminal, Trash2, Zap, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { headlessApi, type HeadlessTaskRecord } from '../../api/headless';
 import {
+  isStandbyWorkspace,
   type AgentInfo,
   type SessionRecord,
   type TemplateInfo,
   type Workspace,
 } from './api';
+import { WorkspaceActivationBadge } from './WorkspaceActivationBadge';
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog';
 import { WorkspaceOffboardingDialog } from './WorkspaceOffboardingDialog';
 import { Skeleton } from '../StateViews';
@@ -76,6 +78,8 @@ export interface SidebarProps {
   readonly onRenameWorkspace?: (wsId: string, displayName: string) => void;
   /** Optional: open the per-workspace AI-provider config modal. */
   readonly onConfigureWorkspace?: (wsId: string) => void;
+  /** Optional: trigger preview + activation for a standby workspace. */
+  readonly onActivateWorkspace?: (wsId: string) => void;
   /** Open the Workspaces Overview dashboard tab (card view of all workspaces). */
   readonly onOpenOverview?: () => void;
   /** True when the Workspaces Overview tab is currently focused — highlights the pinned row. */
@@ -230,6 +234,7 @@ export function Sidebar(props: SidebarProps): ReactElement {
             onDelete={onDelete}
             onRenameWorkspace={props.onRenameWorkspace}
             onConfigureWorkspace={props.onConfigureWorkspace}
+            onActivateWorkspace={props.onActivateWorkspace}
           />
         ))}
       </div>
@@ -277,6 +282,7 @@ export interface WorkspaceRowProps {
   readonly onDelete: (id: string) => Promise<void>;
   readonly onRenameWorkspace?: (wsId: string, displayName: string) => void;
   readonly onConfigureWorkspace?: (wsId: string) => void;
+  readonly onActivateWorkspace?: (wsId: string) => void;
 }
 
 function agentLabel(id: string, agents: readonly AgentInfo[]): string {
@@ -400,6 +406,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
             title={hasRunning ? t('workspace.runningCount', { count: runningCount }) : t('workspace.idle')}
           />
           <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
+          <WorkspaceActivationBadge workspace={w} size="xs" />
           <span
             className="text-[10px] leading-[14px] text-muted-foreground/50 tabular-nums shrink-0"
             title={activityLabel}
@@ -479,6 +486,11 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
         <SidebarActionMenu
           label={t('common.moreActions', { target: label })}
           items={[
+            ...(isStandbyWorkspace(w) && props.onActivateWorkspace ? [{
+              label: t('workspace.activation.activate'),
+              icon: <Zap size={13} strokeWidth={2} />,
+              onSelect: () => props.onActivateWorkspace?.(w.id),
+            }] : []),
             ...(props.onRenameWorkspace ? [{
               label: t('workspace.rename'),
               icon: <Pencil size={13} strokeWidth={2} />,

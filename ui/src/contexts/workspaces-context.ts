@@ -35,6 +35,10 @@ export interface WorkspacesContextValue {
   readonly autoPredictionDefaultWorkspaceId?: string | null
   readonly autoPredictionPreferenceLoaded?: boolean
   readonly autoPredictionPreferenceError?: string | null
+  /** Workspace ID currently fetching activation preview or activating. */
+  readonly activatingWorkspaceId?: string | null
+  /** Preview and activate a standby workspace (with confirmation when needed). */
+  requestActivateWorkspace?(wsId: string): Promise<boolean>
   refresh(): Promise<void>
   refreshTemplates(): Promise<void>
   refreshAutoQuantPreference(): Promise<void>
@@ -91,7 +95,12 @@ export interface WorkspacesContextValue {
     sessionId: string,
     update: import('../components/workspace/api').PausedSessionRuntimeUpdate,
   ): Promise<void>
-  openAgentConfig(wsId: string, agent?: AgentId, section?: 'general' | 'launch' | 'ai' | 'template' | 'absorb'): void
+  openAgentConfig(
+    wsId: string,
+    agent?: AgentId,
+    section?: 'general' | 'launch' | 'ai' | 'template' | 'absorb',
+    absorbSourceWsId?: string,
+  ): void
   saveWorkspaceMetadata(
     wsId: string,
     metadata: { displayName?: string | null; description?: string | null },
