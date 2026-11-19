@@ -181,6 +181,28 @@ function computeFreshness(
   return { asOf: anchor, isLatestActual: gap === 0, staleTradingDays: gap, freshness }
 }
 
+function matchesVendorCatalogHit(
+  sourceId: string,
+  nativeSymbol: string,
+  hit: { symbol?: string; id?: string; assetClass: AssetClass; sourceId?: string },
+  vendorProviders: Record<AssetClass, string>,
+): boolean {
+  if ((hit.sourceId ?? vendorProviders[hit.assetClass]) !== sourceId) return false
+  const hitSymbol = String(hit.symbol ?? hit.id ?? '')
+  if (hitSymbol === nativeSymbol) return true
+  if (sourceId !== 'yfinance') return false
+  // Yahoo crypto search strips '-' (BTC-USD -> BTCUSD), while historical accepts both.
+  if (hit.assetClass === 'crypto' && nativeSymbol.includes('-')) {
+    return hitSymbol.toUpperCase() === nativeSymbol.replace(/-/g, '').toUpperCase()
+  }
+  // Yahoo currency search strips '=X' and expands 3-letter USD-base pairs (JPY=X -> USDJPY).
+  if (hit.assetClass === 'currency' && /=X$/i.test(nativeSymbol)) {
+    const normalizedFx = nativeSymbol.toUpperCase().replace(/=X$/, '').replace(/^([A-Z]{3})$/, 'USD$1')
+    return hitSymbol.toUpperCase() === normalizedFx
+  }
+  return false
+}
+
 /** Sort ascending, cap to MAX_BARS (keep most-recent), then truncate to `count`. */
 function finalize(data: OhlcvBar[], count?: number): OhlcvBar[] {
   data.sort((a, b) => a.date.localeCompare(b.date))
@@ -428,20 +450,29 @@ export function createBarService(deps: BarServiceDeps): BarService {
       // References carry source identity only. Resolve an exact catalog match,
       // never a fuzzy hit or an equity fallback. Explicit hints remain supported.
       let assetClass = ref.assetClass
+      // Fast-path Yahoo index syntax (e.g. ^N225, ^GSPC) directly to equity
+      // without needing a catalog round-trip.
+      if (!assetClass && parsed.sourceId === 'yfinance' && parsed.nativeSymbol.startsWith('^') && parsed.nativeSymbol.length > 1) {
+        assetClass = 'equity'
+      }
       if (!assetClass) {
         // Search providers sometimes accept the base symbol but not their own
-        // normalized pair/secid (BTCUSD -> BTC, 1.600519 -> 600519). Broaden
-        // only the lookup query; the returned identity must still match exactly.
+        // normalized pair/secid (BTCUSD -> BTC, 1.600519 -> 600519, JPY=X -> JPY).
+        // Broaden only the lookup query; the returned identity must still match exactly.
         const queries = [...new Set([parsed.nativeSymbol,
-          ...parsed.nativeSymbol.split(/[.\/-]/).filter(part => part.length >= 3),
+          ...parsed.nativeSymbol.split(/[.\/=-]/).filter(part => part.length >= 3),
           ...(/^[A-Z0-9]{6,}$/.test(parsed.nativeSymbol) ? [parsed.nativeSymbol.slice(0, -3)] : []),
         ])].slice(0, 4)
         const matches = (await Promise.all(queries.map(query => aggregateSymbolSearch(deps.marketSearch, query, 100)))).flat()
         const classes = new Set(matches.filter(hit =>
-          String(hit.symbol ?? hit.id ?? '') === parsed.nativeSymbol &&
-          (hit.sourceId ?? deps.vendorProviders[hit.assetClass]) === parsed.sourceId,
+          matchesVendorCatalogHit(parsed.sourceId, parsed.nativeSymbol, hit, deps.vendorProviders),
         ).map(hit => hit.assetClass))
-        if (classes.size !== 1) throw new Error(`Cannot uniquely resolve asset class for "${ref.barId}". Use market search-bars and an exact barId, or pass assetClass explicitly.`)
+        if (classes.size !== 1) {
+          throw new Error(
+            `Cannot uniquely resolve asset class for "${ref.barId}". ` +
+            `Use market search-bars for an exact barId, or pass --asset-class (equity|crypto|currency|commodity) / assetClass explicitly.`,
+          )
+        }
         assetClass = [...classes][0]
       }
       return getVendorBars(parsed.sourceId, assetClass!, parsed.nativeSymbol, opts)

@@ -54,7 +54,10 @@ export class BrokerError extends Error {
       && BROKER_ERROR_CODES.has((err as { code: string }).code)
       ? (err as { code: BrokerErrorCode }).code
       : null
-    const code = structuredCode ?? BrokerError.classifyMessage(msg) ?? fallbackCode
+    const rawCode = err && typeof err === 'object' && typeof (err as { code?: unknown }).code === 'string'
+      ? (err as { code: string }).code
+      : ''
+    const code = structuredCode ?? BrokerError.classifyMessage(rawCode ? `${msg} ${rawCode}` : msg) ?? fallbackCode
     const be = new BrokerError(code, msg)
     if (err instanceof Error) be.cause = err
     return be
@@ -66,7 +69,7 @@ export class BrokerError extends Error {
     // Market closed — check before AUTH to avoid 403 misclassification
     if (/market.?closed|not.?open|trading.?halt|outside.?trading.?hours/i.test(m)) return 'MARKET_CLOSED'
     // Network / infrastructure
-    if (/timeout|etimedout|econnrefused|econnreset|socket hang up|enotfound|fetch failed/i.test(m)) return 'NETWORK'
+    if (/timeout|timed out|etimedout|econnrefused|econnreset|socket hang up|enotfound|fetch failed|unable to connect|connectionrefused|failedtoopensocket/i.test(m)) return 'NETWORK'
     if (/429|rate.?limit|too many requests/i.test(m)) return 'NETWORK'
     if (/502|503|504|service.?unavailable|bad.?gateway/i.test(m)) return 'NETWORK'
     // Authentication (401 only — 403 can mean market closed or permission denied)

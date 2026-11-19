@@ -56,6 +56,21 @@ describe('classifyYahooFetchError (issue #375)', () => {
     expect(classifyYahooFetchError('AAPL', net)).toBeInstanceOf(NetworkUnreachableError)
   })
 
+  it('maps Bun fetch errors and error codes (ConnectionRefused, FailedToOpenSocket, ECONNABORTED) to NetworkUnreachableError', () => {
+    const bunMsg = new Error('Unable to connect. Is the computer able to access the url?')
+    const res1 = classifyYahooFetchError('AAPL', bunMsg)
+    expect(res1).toBeInstanceOf(NetworkUnreachableError)
+    expect(res1.message).toContain('finance.yahoo.com')
+
+    for (const code of ['ConnectionRefused', 'FailedToOpenSocket', 'ECONNABORTED']) {
+      const err = Object.assign(new Error('socket error'), { code })
+      const classified = classifyYahooFetchError('AAPL', err)
+      expect(classified).toBeInstanceOf(NetworkUnreachableError)
+      expect(classified.message).toContain('finance.yahoo.com')
+      expect(classified.message).toContain(code)
+    }
+  })
+
   it('passes an unrecognized error through unchanged (never masks)', () => {
     const weird = new Error('something totally different')
     expect(classifyYahooFetchError('AAPL', weird)).toBe(weird)
