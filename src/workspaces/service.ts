@@ -30,10 +30,20 @@ import {
   type ArtifactOrigin,
 } from '@/core/provenance-store.js';
 import {
+  readAutoPredictionPreferences,
+  readAutoQuantPreferences,
   readHarnessPreferences,
   readQuickChatPreferences,
   rememberRecentChatWorkspace,
 } from '@/core/preferences.js';
+import {
+  OrchestrationDelivery,
+  OrchestrationError,
+  OrchestrationManager,
+  OrchestrationStore,
+  type OrchestrationReplyRoute,
+  type OrchestrationReplySurface,
+} from './orchestration/index.js';
 
 import { createBuiltinAdapterRegistry } from './adapters/index.js';
 import { piAdapter } from './adapters/pi.js';
@@ -439,6 +449,7 @@ export interface WorkspaceService {
   readonly sessionRegistry: SessionRegistry;
   readonly sessionMailbox: SessionMailbox;
   readonly sessionWakeDelivery: SessionWakeDelivery;
+  readonly orchestration: OrchestrationManager;
   readonly sessionCoordinator: ProductSessionCoordinator;
   readonly scrollbackStore: ScrollbackStore;
   readonly templates: TemplateRegistry;
@@ -745,6 +756,20 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     join(config.launcherRoot, 'state', 'headless-tasks.json'),
     launcherLogger.child({ scope: 'headless-registry' }),
   );
+  const orchestrationStore = await OrchestrationStore.load(
+    join(config.launcherRoot, 'state', 'orchestration-state.json'),
+    { logger: launcherLogger.child({ scope: 'orchestration-store' }) },
+  );
+  const startupOrchestrationReconcile = await orchestrationStore.reconcileOnStartup(
+    (headlessTaskId) => headlessTasks.get(headlessTaskId)?.status === 'running',
+  );
+  if (startupOrchestrationReconcile.lostTasks.length > 0) {
+    launcherLogger.warn('orchestration.reconciled_lost_workers', {
+      count: startupOrchestrationReconcile.lostTasks.length,
+      dispatchIds: startupOrchestrationReconcile.lostTasks.map((task) => task.dispatchId),
+    });
+  }
+  let orchestration!: OrchestrationManager;
   const dispatchDelivery = new DispatchDelivery(headlessTasks, (message, detail) => launcherLogger.warn(message, detail));
   let reconcilingDelivery = false;
   const reconcileDelivery = async () => {
@@ -2140,6 +2165,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     // failures and terminal in-band runtime errors fail the task; retryable
     // errors followed by a later assistant reply remain visible in Activity
     // without turning a recovered run into a false failure.
+    let settledForOrchestration:
+      | { status: 'done' | 'failed' | 'interrupted'; assistantPreview: string | null; error?: string }
+      | null = null;
     const completion = runHeadlessTaskMethod(ws, adapter, prompt, timeoutMs, {
       origin,
       taskId: rec.taskId,
@@ -2189,6 +2217,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             toolFailures: r.structured.metrics.toolFailures,
           },
         });
+        settledForOrchestration = {
+          status,
+          assistantPreview: r.structured.assistantText?.slice(0, 2000) ?? null,
+          ...(failure ? { error: failure } : {}),
+        };
         if (conversation?.source.kind === 'session') {
           await sessionWakeDelivery.notifyTaskCompleted({
             recipientResumeId: conversation.source.resumeId,
@@ -2299,6 +2332,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           finishedAt: Date.now(),
           error: message,
         });
+        settledForOrchestration = {
+          status,
+          assistantPreview: null,
+          error: message,
+        };
         if (conversation?.source.kind === 'session') {
           await sessionWakeDelivery.notifyTaskCompleted({
             recipientResumeId: conversation.source.resumeId,
@@ -2384,6 +2422,25 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         releaseTakeover();
         void sessionWakeDelivery.onSessionSettled(rec.resumeId).catch((err) =>
           launcherLogger.warn('session_wake.headless_settlement_failed', { resumeId: rec.resumeId, err }),
+        );
+        const settled = settledForOrchestration;
+        void (async () => {
+          if (settled) {
+            await orchestration.onWorkerHeadlessSettled({
+              headlessTaskId: rec.taskId,
+              workerResumeId: rec.resumeId,
+              status: settled.status,
+              assistantPreview: settled.assistantPreview,
+              ...(settled.error ? { error: settled.error } : {}),
+            });
+          }
+          await orchestration.onSessionSettled(rec.resumeId);
+        })().catch((err) =>
+          launcherLogger.warn('orchestration.headless_settlement_failed', {
+            taskId: rec.taskId,
+            resumeId: rec.resumeId,
+            err,
+          }),
         );
       });
     headlessDispatchCompletions.add(completion);
@@ -2534,6 +2591,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       } catch (err) {
         launcherLogger.warn('resume_registry.runtime_binding_reconcile_failed', { err })
       }
+      await orchestration.tick(Date.now()).catch((err) =>
+        launcherLogger.warn('orchestration.watchdog_tick_failed', { err }),
+      )
     },
     markers: scheduleMarkers,
     logger: launcherLogger.child({ scope: 'schedule' }),
@@ -3111,6 +3171,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       void sessionWakeDelivery.onSessionSettled(productSession.resumeId).catch((err) =>
         launcherLogger.warn('session_wake.pty_settlement_failed', { resumeId: productSession.resumeId, err }),
       );
+      void orchestration.onSessionSettled(productSession.resumeId).catch((err) =>
+        launcherLogger.warn('orchestration.pty_settlement_failed', { resumeId: productSession.resumeId, err }),
+      );
     },
   );
 
@@ -3309,6 +3372,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
               void sessionWakeDelivery.onSessionSettled(record.resumeId).catch((err) =>
                 launcherLogger.warn('session_wake.web_settlement_failed', { resumeId: record.resumeId, err }),
               );
+              void orchestration.onSessionSettled(record.resumeId).catch((err) =>
+                launcherLogger.warn('orchestration.web_settlement_failed', { resumeId: record.resumeId, err }),
+              );
             }
           },
           recordId: record.id,
@@ -3375,12 +3441,189 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           interruptionReason: execution?.reason ?? 'interrupted', error: 'Session execution was interrupted.' });
         await dispatchDelivery.finish(task, null);
         await completeIssueCommentInquiry({ task, status: 'interrupted', error: task.error });
+        await orchestration.onWorkerHeadlessSettled({
+          headlessTaskId: task.taskId,
+          workerResumeId: resumeId,
+          status: 'interrupted',
+          assistantPreview: null,
+          ...(task.error ? { error: task.error } : {}),
+        }).catch((err) => launcherLogger.warn('orchestration.interrupt_settlement_failed', { taskId: task.taskId, err }));
       }
       return stopped;
     },
     admission: executionManager.admission,
     takeovers: executionManager.takeovers,
   };
+
+  const orchestrationDelivery = new OrchestrationDelivery({
+    store: orchestrationStore,
+    deliverToWeb: async (resumeId, prompt) => {
+      const identity = resumeRegistry.get(resumeId);
+      if (!identity) return 'absent';
+      await sessionRegistry.ensureLoaded(identity.wsId);
+      const record = sessionRegistry.findByResumeId(identity.wsId, resumeId);
+      if (!record || !web.has(record.id)) return 'absent';
+      if (web.get(record.id)?.phase !== 'idle') return 'busy';
+      await web.prompt(record.id, prompt);
+      return 'delivered';
+    },
+    deliverToPty: async (resumeId, pointerText) => {
+      const identity = resumeRegistry.get(resumeId);
+      if (!identity) return 'absent';
+      await sessionRegistry.ensureLoaded(identity.wsId);
+      const record = sessionRegistry.findByResumeId(identity.wsId, resumeId);
+      if (!record) return 'absent';
+      const pty = pool.get(record.id);
+      if (!pty) return 'absent';
+      if (!pty.isTuiSettledForDelivery()) return 'busy';
+      const sent = await pty.sendPointerPrompt(pointerText);
+      return sent.ok ? 'delivered' : 'busy';
+    },
+    deliverToHeadless: async (resumeId, prompt, replyRoute) => {
+      if (activeResumeIds.has(resumeId)) return 'busy';
+      const identity = resumeRegistry.get(resumeId);
+      if (!identity || identity.lifecycle === 'retired' || sessionPresence(identity) === 'deleted') {
+        return 'unavailable';
+      }
+      await sessionRegistry.ensureLoaded(identity.wsId);
+      const record = sessionRegistry.findByResumeId(identity.wsId, resumeId);
+      if (record && (pool.get(record.id) || web.has(record.id))) return 'busy';
+      const meta = registry.get(identity.wsId);
+      const adapter = adapters.get(identity.agent);
+      if (!meta || !adapter || !adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
+        return 'unavailable';
+      }
+      // NEVER set origin.resumeId = resumeId — SessionTakeovers forbids self-takeover.
+      const origin: ExecutionOrigin = {
+        kind: 'system',
+        entry: 'orchestration-wake',
+        workspaceId: replyRoute?.workspaceId ?? identity.wsId,
+        ...(replyRoute?.connectorId ? { connectorId: replyRoute.connectorId } : {}),
+        ...(replyRoute?.issueId ? { issueId: replyRoute.issueId } : {}),
+      };
+      const dispatched = await dispatchHeadlessTaskMethod(
+        meta,
+        adapter,
+        prompt,
+        origin,
+        undefined,
+        replyRoute?.trigger,
+        resumeId,
+        replyRoute?.inquiry,
+      );
+      return { status: 'delivered', headlessTaskId: dispatched.taskId };
+    },
+    stopStalledWorker: async (task) => {
+      await executionManager.stop(task.workerResumeId, 'orchestration:stalled');
+    },
+    warn: (event, detail) => launcherLogger.warn(event, detail),
+  });
+
+  orchestration = new OrchestrationManager({
+    store: orchestrationStore,
+    delivery: orchestrationDelivery,
+    resolveWorkspace: (workspaceId) => registry.get(workspaceId),
+    resolveHarnessWorkspace: async (harness) => {
+      if (harness === 'chat') {
+        const preferences = await readQuickChatPreferences().catch(() => ({ recentChatWorkspaceId: null }));
+        const target = await resolveOrCreateChatWorkspaceMethod(preferences.recentChatWorkspaceId);
+        if (!target.ok) return undefined;
+        await rememberRecentChatWorkspace(target.workspace.id).catch(() => undefined);
+        return target.workspace;
+      }
+      const prediction = harness === 'prediction';
+      const preferences = await (prediction
+        ? readAutoPredictionPreferences()
+        : readAutoQuantPreferences()
+      ).catch(() => ({ defaultWorkspaceId: null }));
+      const workspace = preferences.defaultWorkspaceId
+        ? registry.get(preferences.defaultWorkspaceId)
+        : undefined;
+      const expectedTemplate = prediction
+        ? AUTO_PREDICTION_WORKSPACE_TEMPLATE
+        : AUTO_QUANT_WORKSPACE_TEMPLATE;
+      if (!workspace || workspace.template !== expectedTemplate) return undefined;
+      return workspace;
+    },
+    captureReplyRoute: async (parentResumeId, parentWorkspaceId): Promise<OrchestrationReplyRoute> => {
+      const identity = resumeRegistry.get(parentResumeId);
+      const wsId = identity?.wsId ?? parentWorkspaceId;
+      await sessionRegistry.ensureLoaded(wsId);
+      const record = sessionRegistry.findByResumeId(wsId, parentResumeId);
+      const latestTask = headlessTasks.latestForResumeId(parentResumeId);
+      const trigger = latestTask?.trigger;
+      const inquiry = latestTask?.inquiry;
+      const connectorId =
+        latestTask?.communication?.delivery?.connectorId ??
+        (trigger?.metadata?.kind === 'connector-cron-issue'
+          ? trigger.metadata.connectorId
+          : undefined);
+      const issueId =
+        trigger?.kind === 'issue'
+          ? trigger.issueId
+          : inquiry?.subject.kind === 'issue'
+            ? inquiry.subject.issueId
+            : undefined;
+      let surface: OrchestrationReplySurface = 'headless';
+      if (connectorId) {
+        surface = 'connector';
+      } else if (record && web.has(record.id)) {
+        surface = 'web';
+      } else if (record && pool.get(record.id)) {
+        surface = 'pty';
+      }
+      return {
+        workspaceId: wsId,
+        resumeId: parentResumeId,
+        ...(trigger ? { trigger: structuredClone(trigger) } : {}),
+        ...(inquiry ? { inquiry: structuredClone(inquiry) } : {}),
+        ...(connectorId ? { connectorId } : {}),
+        ...(issueId ? { issueId } : {}),
+        surface,
+      };
+    },
+    dispatchWorker: async (request) => {
+      const agentId = request.agent ?? await resolveHeadlessDefaultAgentId(request.workspace);
+      if (!agentId) {
+        throw new OrchestrationError(
+          'adapter_unavailable',
+          `Workspace "${request.workspace.tag}" has no default agent runtime.`,
+        );
+      }
+      const adapter = adapters.get(agentId);
+      if (!adapter || !isAgentRuntime(adapter)) {
+        throw new OrchestrationError('adapter_unavailable', `Unknown agent runtime: ${agentId}`);
+      }
+      if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
+        throw new OrchestrationError(
+          'adapter_unavailable',
+          `Agent runtime "${agentId}" does not support headless execution.`,
+        );
+      }
+      const dispatched = await dispatchHeadlessTaskMethod(
+        request.workspace,
+        adapter,
+        request.prompt,
+        request.origin,
+        request.timeoutMs,
+        undefined,
+        undefined,
+        undefined,
+        request.selection,
+        undefined,
+        request.createdBy,
+      );
+      return {
+        taskId: dispatched.taskId,
+        resumeId: dispatched.resumeId,
+        agent: adapter.id,
+      };
+    },
+    stopWorkerExecution: (workerResumeId, reason) =>
+      executionManager.stop(workerResumeId, reason),
+    isSessionRunning: (resumeId) =>
+      activeResumeIds.has(resumeId) || Boolean(executionManager.current(resumeId)),
+  });
 
   const workspaceRuntimeActivityMethod = (workspaceId: string): WorkspaceRuntimeActivity => {
     const sessions = sessionRegistry.listFor(workspaceId).flatMap((record) => {
@@ -3683,6 +3926,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     sessionRegistry,
     sessionMailbox,
     sessionWakeDelivery,
+    orchestration,
     sessionCoordinator,
     scrollbackStore,
     templates,
