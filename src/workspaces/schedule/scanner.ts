@@ -71,6 +71,7 @@ export const BACKOFF_STEPS_MS = [60_000, 5 * 60_000, 15 * 60_000, 60 * 60_000] a
 
 export type ScheduledIssueRunNowErrorCode =
   | 'not_found'
+  | 'invalid'
   | 'not_scheduled'
   | 'not_retryable'
   | 'not_fireable'
@@ -135,6 +136,7 @@ const PARK_ERROR_CODES: Readonly<Record<string, true>> = {
   retired: true,
   deleted: true,
   // ScheduledIssueRunNowError non-transient states
+  invalid: true,
   not_scheduled: true,
   not_fireable: true,
   not_retryable: true,
@@ -377,9 +379,20 @@ export class ScheduleScanner {
     if (!ws) throw new ScheduledIssueRunNowError('not_found', 'Workspace not found.')
 
     const res = await readWorkspaceIssues(ws.dir)
-    if (!res.ok) throw new ScheduledIssueRunNowError('not_found', 'Issue not found.')
+    if (!res.ok) {
+      if (res.reason === 'invalid') {
+        throw new ScheduledIssueRunNowError('invalid', `Issue declaration is invalid: ${res.error}`)
+      }
+      throw new ScheduledIssueRunNowError('not_found', 'Issue not found.')
+    }
     const issue = res.issues.find((candidate) => candidate.id === issueId)
-    if (!issue) throw new ScheduledIssueRunNowError('not_found', 'Issue not found.')
+    if (!issue) {
+      const invalid = res.invalid.find((candidate) => candidate.id === issueId)
+      if (invalid) {
+        throw new ScheduledIssueRunNowError('invalid', `Issue "${issueId}" is invalid: ${invalid.error}`)
+      }
+      throw new ScheduledIssueRunNowError('not_found', 'Issue not found.')
+    }
     if (!issue.when) {
       throw new ScheduledIssueRunNowError('not_scheduled', 'Only scheduled Issues can be run now.')
     }

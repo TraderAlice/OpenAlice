@@ -94,14 +94,19 @@ describe('HeadlessTaskRegistry', () => {
     })
   })
 
-  it('list filters by wsId / status / limit', async () => {
+  it('list filters by wsId / resumeId / status / limit', async () => {
     const reg = await HeadlessTaskRegistry.load(path, noopLogger)
-    const a = await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1 })
-    await createTask(reg, { wsId: 'w2', agent: 'pi', prompt: 'y', startedAt: 2 })
+    const a = await createTask(reg, { wsId: 'w1', resumeId: 'resume-target', agent: 'codex', prompt: 'x', startedAt: 1 })
+    await createTask(reg, { wsId: 'w2', resumeId: 'resume-other-ws', agent: 'pi', prompt: 'y', startedAt: 2 })
+    for (let i = 0; i < 60; i++) {
+      await createTask(reg, { wsId: 'w1', resumeId: 'resume-busy', agent: 'codex', prompt: `busy-${i}`, startedAt: 3 + i })
+    }
     await reg.complete(a.taskId, { status: 'done' })
     expect(reg.list({ wsId: 'w2' }).length).toBe(1)
     expect(reg.list({ status: 'done' }).map((t) => t.taskId)).toEqual([a.taskId])
     expect(reg.list({ limit: 1 }).length).toBe(1)
+    expect(reg.list({ wsId: 'w1', resumeId: 'resume-target', limit: 5 }).map((t) => t.taskId)).toEqual([a.taskId])
+    expect(reg.count({ wsId: 'w1', resumeId: 'resume-target' })).toBe(1)
   })
 
   it('records a composite Issue trigger when an issue fired the run', async () => {

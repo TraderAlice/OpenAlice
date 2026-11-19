@@ -99,9 +99,27 @@ describe('session_list', () => {
 })
 
 describe('session_show', () => {
-  it('returns the control-plane detail', async () => {
-    expect(await run(sessionShowFactory.build(ctx()), { resumeId: 'resume-a' }))
-      .toMatchObject({ ok: true, session: { resumeId: 'resume-a', agent: 'codex' } })
+  it('returns the control-plane detail including top-level lastError and admissionBlocks', async () => {
+    const tool = sessionShowFactory.build(ctx({
+      sessionControl: {
+        ...ctx().sessionControl!,
+        show: async (resumeId) => ({
+          resumeId,
+          agent: 'codex',
+          lastError: { taskId: 'run-1', status: 'failed', message: 'boom', at: 123 },
+          admissionBlocks: [{ id: 'blk-1', kind: 'execution-fault', reason: '3 failures' }],
+        }),
+      },
+    }))
+    expect(await run(tool, { resumeId: 'resume-a' })).toMatchObject({
+      ok: true,
+      session: {
+        resumeId: 'resume-a',
+        agent: 'codex',
+        lastError: { taskId: 'run-1', status: 'failed', message: 'boom', at: 123 },
+        admissionBlocks: [{ id: 'blk-1', kind: 'execution-fault' }],
+      },
+    })
   })
 
   it('reports unknown sessions', async () => {
