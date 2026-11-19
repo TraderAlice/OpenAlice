@@ -33,16 +33,29 @@ export interface SessionMailboxMessage {
 /** Keep the file bounded: drop oldest acked messages beyond this total. */
 const MAX_MESSAGES = 500
 
+/**
+ * Default watermark lease TTL. If a woken session ignores or crashes on a wake,
+ * the watermark expires after this window so future completions can wake it again.
+ */
+export const DEFAULT_WATERMARK_TTL_MS = 120_000
+
+export interface SessionMailboxOptions {
+  readonly watermarkTtlMs?: number
+}
+
 export class SessionMailbox {
   private messages: SessionMailboxMessage[] = [] // oldest-first in memory
   /** Mutations may finish concurrently; serialize tmp→rename writes. */
   private flushChain: Promise<void> = Promise.resolve()
 
-  private constructor(private readonly path: string) {}
+  private constructor(
+    private readonly path: string,
+    private readonly watermarkTtlMs: number = DEFAULT_WATERMARK_TTL_MS,
+  ) {}
 
   /** Load persisted messages; a missing or corrupt file starts empty. */
-  static async load(path: string): Promise<SessionMailbox> {
-    const mailbox = new SessionMailbox(path)
+  static async load(path: string, options?: SessionMailboxOptions): Promise<SessionMailbox> {
+    const mailbox = new SessionMailbox(path, options?.watermarkTtlMs ?? DEFAULT_WATERMARK_TTL_MS)
     try {
       const parsed = JSON.parse(await readFile(path, 'utf8')) as {
         messages?: SessionMailboxMessage[]
@@ -101,36 +114,74 @@ export class SessionMailbox {
 
   /**
    * True while a pointer wakeup has been injected into the recipient session
-   * and `alice conversation check` has not run since: `checkAndAck` transitions
-   * every `notified` message to `acked`, clearing the watermark.
+   * within the watermark lease TTL and has not been acked since: `checkAndAck`
+   * or `ackByTaskIds` transitions `notified` messages to `acked`, clearing the
+   * watermark. Once `nowMs - notifiedAt >= watermarkTtlMs`, the lease expires
+   * so a crashed or ignored wake cannot permanently jam future notifications.
    */
-  hasActiveWatermark(recipientResumeId: string): boolean {
+  hasActiveWatermark(recipientResumeId: string, nowMs: number = Date.now()): boolean {
     return this.messages.some(
-      (m) => m.recipientResumeId === recipientResumeId && m.status === 'notified',
+      (m) =>
+        m.recipientResumeId === recipientResumeId &&
+        m.status === 'notified' &&
+        typeof m.notifiedAt === 'number' &&
+        nowMs - m.notifiedAt < this.watermarkTtlMs,
     )
   }
 
-  /** Mark unread messages as surfaced (pointer delivered). Persists and returns the pending set. */
+  /** Mark pending messages as surfaced (pointer delivered). Persists and returns the pending set. */
   async markNotified(
     recipientResumeId: string,
     messageIds?: readonly string[],
     nowMs?: number,
   ): Promise<SessionMailboxMessage[]> {
     const at = nowMs ?? Date.now()
+    const targetIds = messageIds ? new Set(messageIds) : undefined
     let changed = false
     for (const m of this.messages) {
       if (
         m.recipientResumeId === recipientResumeId &&
-        m.status === 'unread' &&
-        (!messageIds || messageIds.includes(m.id))
+        (m.status === 'unread' || m.status === 'notified') &&
+        (!targetIds || targetIds.has(m.id))
       ) {
-        m.status = 'notified'
-        m.notifiedAt = at
-        changed = true
+        if (m.status !== 'notified' || m.notifiedAt !== at) {
+          m.status = 'notified'
+          m.notifiedAt = at
+          changed = true
+        }
       }
     }
     if (changed) await this.flush()
     return this.pendingFor(recipientResumeId)
+  }
+
+  /**
+   * Ack pending messages matching specific taskIds for a recipient.
+   * Used when the recipient consumes completed task results via
+   * `conversation read` / `await` / `collect` / `ask --await`.
+   */
+  async ackByTaskIds(
+    recipientResumeId: string,
+    taskIds: readonly string[],
+    nowMs?: number,
+  ): Promise<SessionMailboxMessage[]> {
+    if (taskIds.length === 0) return []
+    const wanted = new Set(taskIds)
+    const at = nowMs ?? Date.now()
+    const acked: SessionMailboxMessage[] = []
+    for (const m of this.messages) {
+      if (
+        m.recipientResumeId === recipientResumeId &&
+        (m.status === 'unread' || m.status === 'notified') &&
+        wanted.has(m.taskId)
+      ) {
+        m.status = 'acked'
+        m.ackedAt = at
+        acked.push(m)
+      }
+    }
+    if (acked.length > 0) await this.flush()
+    return acked.sort((a, b) => a.createdAt - b.createdAt)
   }
 
   /** Ack every pending message: hand payloads to the parent and clear the watermark. */
@@ -149,10 +200,10 @@ export class SessionMailbox {
   }
 
   /** Recipients that should be woken now: unread work and no unexpired watermark. */
-  recipientsWithUnread(): string[] {
+  recipientsWithUnread(nowMs: number = Date.now()): string[] {
     const out = new Set<string>()
     for (const m of this.messages) {
-      if (m.status === 'unread' && !this.hasActiveWatermark(m.recipientResumeId)) {
+      if (m.status === 'unread' && !this.hasActiveWatermark(m.recipientResumeId, nowMs)) {
         out.add(m.recipientResumeId)
       }
     }

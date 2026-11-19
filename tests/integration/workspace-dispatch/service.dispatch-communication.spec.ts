@@ -121,3 +121,55 @@ it('interrupts a real background execution through the unified service and denie
   await expect(service.executions.dispatch(ws, adapter, 'again', { kind: 'schedule', entry: 'test-schedule' }, undefined, undefined, offered.resumeId)).rejects.toMatchObject({ code: 'session_blocked' })
   expect(service.headlessTasks.get(offered.taskId)?.interruptionReason).toBe('user-interrupted')
 }, 15000)
+
+it('wakes a settled headless parent session via deliverToHeadless without self-takeover error', async () => {
+  const { createWorkspaceConversationControl } = await import('../../../src/workspaces/conversation-control.js')
+  const conversation = createWorkspaceConversationControl(service)
+
+  // Start and finish a parent headless Session so it has a captured native session id and SessionRecord.
+  const parent = await conversation.ask({
+    target: { kind: 'workspace', workspaceId: 'ws' },
+    agent: 'codex',
+    prompt: 'start parent',
+    source: { kind: 'human' },
+  })
+  if (parent.status === 'unavailable') throw new Error('parent unavailable')
+  await waitForRun(parent.taskId)
+
+  // Dispatch a child task attributed to the parent Session.
+  const child = await conversation.ask({
+    target: { kind: 'workspace', workspaceId: 'ws' },
+    agent: 'codex',
+    prompt: 'run child work',
+    source: {
+      kind: 'session',
+      workspaceId: 'ws',
+      resumeId: parent.resumeId,
+      agent: 'codex',
+      execution: { kind: 'headless', taskId: parent.taskId },
+    },
+  })
+  if (child.status === 'unavailable') throw new Error('child unavailable')
+  await waitForRun(child.taskId)
+
+  // The child completion should wake the parent headless Session cleanly without triggering
+  // "A Session cannot request its own takeover" in SessionTakeovers.acquire.
+  await vi.waitFor(() => {
+    const parentRuns = service.headlessTasks.list({ wsId: 'ws' })
+      .filter((t) => t.resumeId === parent.resumeId)
+    expect(parentRuns.length).toBeGreaterThanOrEqual(2)
+    const wakeRun = parentRuns.find((t) => t.taskId !== parent.taskId)!
+    expect(wakeRun.status, wakeRun.error).toBe('done')
+    expect(wakeRun.prompt).toContain('alice conversation check')
+  }, { timeout: 10000 })
+
+  const wakeExecutions = service.executions.list(parent.resumeId)
+    .filter((exec) => exec.origin.entry === 'session-wake-mailbox')
+  expect(wakeExecutions).toHaveLength(1)
+  expect(wakeExecutions[0]!.origin).toEqual({
+    kind: 'system',
+    entry: 'session-wake-mailbox',
+    workspaceId: 'ws',
+  })
+  expect(service.sessionMailbox.hasActiveWatermark(parent.resumeId)).toBe(true)
+}, 20000)
