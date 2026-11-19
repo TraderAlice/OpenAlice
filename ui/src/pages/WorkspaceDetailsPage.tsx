@@ -10,6 +10,8 @@ import { Button } from '../components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { CenteredLoading } from '../components/StateViews'
 import { workspaceDisplayName } from '../components/workspace/display'
+import { StandbyWorkspaceBanner } from '../components/workspace/StandbyWorkspaceBanner'
+import { WorkspaceActivationBadge } from '../components/workspace/WorkspaceActivationBadge'
 import { useWorkspaceDetails } from '../hooks/useWorkspaceDetails'
 import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
@@ -47,6 +49,7 @@ export function WorkspaceDetailsPage({ spec }: { spec: Extract<ViewSpec, { kind:
           <Button size="sm" variant="ghost" onClick={back}><ArrowLeft size={14} aria-hidden />{t('workspaceDetails.back')}</Button>
         </>
       } />
+      <StandbyWorkspaceBanner workspace={workspace} />
       {details.loading ? <CenteredLoading label={t('common.loading')} /> : !workspace ? (
         <div className="mx-auto max-w-3xl space-y-3 p-6" role="status">
           <p>{details.error || t('workspaceDetails.notFound')}</p>
@@ -58,7 +61,10 @@ export function WorkspaceDetailsPage({ spec }: { spec: Extract<ViewSpec, { kind:
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground"><Folder size={21} aria-hidden /></span>
             <div className="min-w-0">
               <p className="text-caption mb-1 text-muted-foreground">{t(`office.harness.${source}`)} · Workspace</p>
-              <h1 className="break-words text-xl font-semibold tracking-tight [overflow-wrap:anywhere]">{workspaceDisplayName(workspace)}</h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="break-words text-xl font-semibold tracking-tight [overflow-wrap:anywhere]">{workspaceDisplayName(workspace)}</h1>
+                <WorkspaceActivationBadge workspace={workspace} />
+              </div>
               {workspace.description && <p className="text-body mt-2 max-w-2xl leading-relaxed text-muted-foreground">{workspace.description}</p>}
             </div>
           </header>

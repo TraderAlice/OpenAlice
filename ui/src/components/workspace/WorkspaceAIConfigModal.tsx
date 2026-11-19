@@ -71,6 +71,7 @@ interface Props {
   onAiSaved?: (result: WorkspaceAiSaveResult) => void
   initialAgent?: Tab
   initialSection?: Section
+  initialAbsorbSourceId?: string
 }
 
 export interface WorkspaceAiSaveResult {
@@ -288,6 +289,7 @@ export function WorkspaceAIConfigModal({
   onAiSaved,
   initialAgent = 'claude',
   initialSection = 'general',
+  initialAbsorbSourceId,
 }: Props) {
   const { t } = useTranslation()
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
@@ -1407,6 +1409,7 @@ export function WorkspaceAIConfigModal({
               <WorkspaceAbsorbPanel
                 target={workspace}
                 workspaces={workspaces}
+                initialSourceId={initialAbsorbSourceId}
                 onWorkspaceChanged={refresh}
                 onClose={onClose}
               />
