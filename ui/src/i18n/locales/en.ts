@@ -430,6 +430,25 @@ export const en = {
       failed: 'Failed',
       blocked: 'Blocked',
     },
+    skipState: {
+      coolingDown: 'Cooling down',
+      backingOff: 'Backing off',
+      paused: 'Paused',
+      retryingAt: 'Retrying {{time}}',
+      retryingSoon: 'Retrying on next check',
+      sinceRelative: 'Since {{time}}',
+      ariaLabel: '{{status}} — {{reason}}',
+      hintSessionBlocked:
+        'Automatic runs are paused while this Session is blocked. Release the Session block, reassign the Issue, or run manually to resume.',
+      hintSessionUnavailable:
+        'Automatic runs are paused. Reassign this Issue to an active Session or New Session to resume.',
+      hintRuntimeUnavailable:
+        'Automatic runs are paused. Select an Agent runtime that supports background execution to resume.',
+      hintWorkspaceUnavailable:
+        'Automatic runs are paused. Restore the Workspace or update the Issue owner and runtime to resume.',
+      hintParkedDefault:
+        'Automatic runs are paused until this blocker is resolved or a manual run succeeds.',
+    },
     detail: {
       workItem: 'Work item',
       updateFailed: 'Could not save changes. Please try again.',

@@ -8,6 +8,7 @@ import {
   type IssueDetail as IssueDetailData,
   type IssueProvenanceRecord,
 } from '../api/issues'
+import type { ScheduleSnapshot } from '../api/schedule'
 import { resetAgentRuntimesStore } from '../hooks/useAgentRuntimes'
 import { i18n } from '../i18n'
 import { IssueActivity, IssueDetail } from './IssueDetail'
@@ -34,6 +35,8 @@ const mocks = vi.hoisted(() => ({
   updateIssue: vi.fn(),
   runNow: vi.fn(),
   retry: vi.fn(),
+  useScheduleSnapshot: vi.fn<() => { snapshot: ScheduleSnapshot | null; refresh: () => Promise<void> }>(),
+  refreshSchedule: vi.fn().mockResolvedValue(undefined),
 }))
 
 const scheduledIssue: IssueDetailData = {
@@ -65,6 +68,14 @@ vi.mock('../hooks/useIssueDetail', () => ({
     mutate: mocks.mutate,
   }),
 }))
+
+vi.mock('../hooks/useSchedules', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../hooks/useSchedules')>()
+  return {
+    ...actual,
+    useScheduleSnapshot: () => mocks.useScheduleSnapshot(),
+  }
+})
 
 vi.mock('../contexts/workspaces-context', () => ({
   useWorkspaces: () => ({
@@ -221,6 +232,10 @@ beforeEach(async () => {
       semantics: { reasoning: { mode: 'optional', efforts: ['low', 'high', 'max'], defaultEffort: 'high' } },
     }],
   }] })
+  mocks.useScheduleSnapshot.mockReturnValue({
+    snapshot: null,
+    refresh: mocks.refreshSchedule,
+  })
 })
 
 afterEach(() => {
@@ -1038,5 +1053,101 @@ describe('IssueDetail comment behavior', () => {
     render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
 
     expect(screen.getByRole('button', { name: commentBehavior }).textContent).toContain(customLabel)
+  })
+
+  it('surfaces deferred and parked schedule skipState in the Schedule inspector and refreshes after Run now', async () => {
+    const now = Date.now()
+    mocks.useScheduleSnapshot.mockReturnValue({
+      snapshot: {
+        workspaces: [
+          {
+            wsId: 'demo-ws-auto-quant',
+            tag: 'auto-quant',
+            status: 'ok',
+            tasks: [
+              {
+                id: 'morning-scan',
+                issue: 'Morning movers scan',
+                when: { kind: 'cron', cron: '30 8 * * 1-5', timezone: 'America/New_York' },
+                what: 'Scan the market and publish a brief.',
+                assignee: '@new-each-run',
+                enabled: true,
+                lastFiredAtMs: now - 3_600_000,
+                nextDueAtMs: now,
+                skipState: {
+                  kind: 'deferred',
+                  code: 'session_blocked',
+                  reason: 'Session cooling down after user rate limit.',
+                  retryAtMs: now + 10 * 60_000,
+                  sinceMs: now - 60_000,
+                },
+              },
+            ],
+          },
+        ],
+      },
+      refresh: mocks.refreshSchedule,
+    })
+
+    const { unmount } = render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    const deferredNotice = screen.getByTestId('schedule-skip-notice')
+    expect(deferredNotice.getAttribute('data-skip-kind')).toBe('deferred')
+    expect(within(deferredNotice).getByText('Cooling down')).toBeTruthy()
+    expect(within(deferredNotice).getByText('Retrying in 10m')).toBeTruthy()
+    expect(within(deferredNotice).getByText('Session cooling down after user rate limit.')).toBeTruthy()
+    expect(screen.getByText('in 10m')).toBeTruthy()
+    unmount()
+
+    mocks.useScheduleSnapshot.mockReturnValue({
+      snapshot: {
+        workspaces: [
+          {
+            wsId: 'demo-ws-auto-quant',
+            tag: 'auto-quant',
+            status: 'ok',
+            tasks: [
+              {
+                id: 'morning-scan',
+                issue: 'Morning movers scan',
+                when: { kind: 'cron', cron: '30 8 * * 1-5', timezone: 'America/New_York' },
+                what: 'Scan the market and publish a brief.',
+                assignee: '@resume-faulty-session',
+                enabled: true,
+                lastFiredAtMs: now - 3_600_000,
+                nextDueAtMs: now,
+                skipState: {
+                  kind: 'parked',
+                  code: 'session_blocked',
+                  reason: 'Session admission blocked due to execution fault.',
+                  sinceMs: now - 5 * 60_000,
+                },
+              },
+            ],
+          },
+        ],
+      },
+      refresh: mocks.refreshSchedule,
+    })
+    mocks.runNow.mockResolvedValueOnce(scheduledIssue)
+
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    const parkedNotice = screen.getByTestId('schedule-skip-notice')
+    expect(parkedNotice.getAttribute('data-skip-kind')).toBe('parked')
+    expect(within(parkedNotice).getByText('Paused')).toBeTruthy()
+    expect(
+      within(parkedNotice).getByText('Session admission blocked due to execution fault.'),
+    ).toBeTruthy()
+    expect(
+      within(parkedNotice).getByText(/Release the Session block, reassign the Issue, or run manually to resume\./),
+    ).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
+    const dialog = await screen.findByRole('alertdialog', { name: 'Run this Issue now?' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Run now' }))
+
+    await waitFor(() => expect(mocks.runNow).toHaveBeenCalledWith('demo-ws-auto-quant', 'morning-scan'))
+    expect(mocks.refreshSchedule).toHaveBeenCalled()
   })
 })

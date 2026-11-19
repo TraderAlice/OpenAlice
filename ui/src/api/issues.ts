@@ -2,7 +2,7 @@ import { fetchJson, headers } from './client'
 import type { Entity } from './entities'
 import type { HeadlessTaskRecord, HeadlessTurnProgress } from './headless'
 import type { InboxEntry } from './inbox'
-import type { ScheduleWhen } from './schedule'
+import type { ScheduleSkipState, ScheduleWhen } from './schedule'
 import type { ModelReasoningEffort } from './types'
 
 export const ISSUE_TIMEOUTS = ['15m', '30m', '45m', '60m'] as const
@@ -151,6 +151,8 @@ export interface IssueListItem {
   nextDueAtMs?: number | null
   /** Live scheduler/worker health; present iff the Issue has a schedule. */
   automationHealth?: IssueAutomationHealth
+  /** Optional scanner dispatch skip state (deferred cooldown/backoff or parked blocker). */
+  skipState?: ScheduleSkipState
   /** Adapter id when this row is that connector's phone-desk Issue. */
   connectorDesk?: string
   telegramConnector?: true
@@ -277,6 +279,8 @@ export interface IssueDetailIssue {
   nextDueAtMs?: number | null
   /** Live scheduler/worker health; present iff the Issue has a schedule. */
   automationHealth?: IssueAutomationHealth
+  /** Optional scanner dispatch skip state (deferred cooldown/backoff or parked blocker). */
+  skipState?: ScheduleSkipState
   connectorDesk?: string
   telegramConnector?: true
 }
