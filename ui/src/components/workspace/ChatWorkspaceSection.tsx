@@ -237,6 +237,8 @@ export function ChatWorkspaceSection({
   const rememberViewedWorkspace = (workspaceId: string): void => {
     if (mode !== 'chat') return
     setRecentWorkspaceId(workspaceId)
+    const target = chatWorkspaces.find((workspace) => workspace.id === workspaceId)
+    if (target && isStandbyWorkspace(target)) return
     void preferencesApi.rememberRecentChatWorkspace(workspaceId).catch(() => undefined)
   }
 
@@ -714,7 +716,12 @@ export function ChatWorkspaceSection({
           presetTemplate={templateName}
           initialTag={nextWorkspaceTag(ctx.workspaces, starterTag)}
           onCreated={(workspace) => {
-            ctx.refresh()
+            void ctx.refresh()
+            if (isStandbyWorkspace(workspace)) {
+              if (mode === 'chat') setRecentWorkspaceId(workspace.id)
+              navigate({ kind: landingKind, params: { targetWsId: workspace.id } })
+              return
+            }
             selectHarnessWorkspace(workspace.id, () => {
               navigate({ kind: landingKind, params: { targetWsId: workspace.id } })
             })
