@@ -376,6 +376,11 @@ describe('IbkrBroker — getAccount mixed-currency math (ANG-101 / issues #295 #
     expect(a.netLiquidation).toBe('3913.1')
   })
 
+  it('rejects an account cache with no balance tags instead of reporting $0', async () => {
+    const b = brokerWithCache({ AccountReady: 'true' }, [])
+    await expect(b.getAccount()).rejects.toThrow(/account data incomplete/i)
+  })
+
   it('reconstructs NetLiquidation when the broker value is non-finite', async () => {
     const b = brokerWithCache({
       TotalCashValue: '1000', NetLiquidation: 'NaN',
