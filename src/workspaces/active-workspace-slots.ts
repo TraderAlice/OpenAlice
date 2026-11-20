@@ -122,11 +122,27 @@ export function resolveActiveWorkspaceSlots(
  */
 export class ActiveWorkspaceSlotManager {
   private lastConfiguredSlots: Record<string, string | null> = {}
+  private mutationChain: Promise<void> = Promise.resolve()
 
   constructor(
     private readonly registry: Pick<WorkspaceRegistry, 'get' | 'list'>,
     private readonly store: ActiveWorkspaceSlotStore = createPreferenceWorkspaceSlotStore(),
   ) {}
+
+  private serializeMutation<T>(fn: () => Promise<T>): Promise<T> {
+    const next = this.mutationChain.then(fn)
+    this.mutationChain = next.then(
+      () => undefined,
+      () => undefined,
+    )
+    return next
+  }
+
+  private async writeSlot(template: string, workspaceId: string | null): Promise<void> {
+    const slot = workspaceTemplateSlot(template)
+    await this.store.writeSlot(slot, workspaceId)
+    this.lastConfiguredSlots[slot] = workspaceId
+  }
 
   async resolve(): Promise<ResolvedActiveWorkspaceSlots> {
     const configured = await this.store.readSlots()
@@ -141,18 +157,17 @@ export class ActiveWorkspaceSlotManager {
    * when no Workspaces of that template remain).
    */
   async converge(): Promise<ResolvedActiveWorkspaceSlots> {
-    const resolved = await this.resolve()
-    for (const [template, workspaceId] of resolved.repairs.entries()) {
-      await this.store.writeSlot(template, workspaceId)
-      this.lastConfiguredSlots[template] = workspaceId
-    }
-    return resolved
+    return this.serializeMutation(async () => {
+      const resolved = await this.resolve()
+      for (const [template, workspaceId] of resolved.repairs.entries()) {
+        await this.writeSlot(template, workspaceId)
+      }
+      return resolved
+    })
   }
 
   async setActive(template: string, workspaceId: string | null): Promise<void> {
-    const slot = workspaceTemplateSlot(template)
-    await this.store.writeSlot(slot, workspaceId)
-    this.lastConfiguredSlots[slot] = workspaceId
+    return this.serializeMutation(() => this.writeSlot(template, workspaceId))
   }
 
   async listActiveWorkspaces(): Promise<WorkspaceMeta[]> {
@@ -188,17 +203,19 @@ export class ActiveWorkspaceSlotManager {
    *   the newly created Workspace and persist it.
    */
   async handleWorkspaceCreated(workspace: WorkspaceMeta): Promise<WorkspaceActivationState> {
-    const slot = workspaceTemplateSlot(workspace.template)
-    const configured = await this.store.readSlots()
-    this.lastConfiguredSlots = { ...configured }
-    const configuredId = configured[slot] ?? null
-    if (configuredId && configuredId !== workspace.id) {
-      const existing = this.registry.get(configuredId)
-      if (existing && workspaceTemplateSlot(existing.template) === slot) {
-        return 'standby'
+    return this.serializeMutation(async () => {
+      const slot = workspaceTemplateSlot(workspace.template)
+      const configured = await this.store.readSlots()
+      this.lastConfiguredSlots = { ...configured }
+      const configuredId = configured[slot] ?? null
+      if (configuredId && configuredId !== workspace.id) {
+        const existing = this.registry.get(configuredId)
+        if (existing && workspaceTemplateSlot(existing.template) === slot) {
+          return 'standby'
+        }
       }
-    }
-    await this.setActive(slot, workspace.id)
-    return 'active'
+      await this.writeSlot(slot, workspace.id)
+      return 'active'
+    })
   }
 }
