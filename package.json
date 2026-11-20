@@ -6,6 +6,7 @@
   "imports": {
     "#openalice/pty-backend": {
       "bun": "./src/workspaces/pty-bun.ts",
+      "openalice-source": "./src/workspaces/pty-node.ts",
       "default": "./src/workspaces/pty-node.ts"
     }
   },
