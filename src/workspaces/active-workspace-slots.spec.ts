@@ -202,4 +202,38 @@ describe('active-workspace-slots', () => {
     expect(await manager.activationState('aq-first')).toBe('active')
     expect(await manager.activationState('aq-second')).toBe('standby')
   })
+
+  it('serializes concurrent handleWorkspaceCreated calls for the same template so the second does not steal active', async () => {
+    const slots: Record<string, string | null> = {}
+    let readCount = 0
+    const store = {
+      readSlots: async () => {
+        readCount += 1
+        // Yield on async I/O so unserialized callers would interleave readSlots() before writeSlot().
+        await new Promise((resolve) => setTimeout(resolve, 15))
+        return { ...slots }
+      },
+      writeSlot: async (template: string, workspaceId: string | null) => {
+        await new Promise((resolve) => setTimeout(resolve, 15))
+        slots[template] = workspaceId
+      },
+    }
+
+    const first = makeWs('chat-first', '2026-01-01T00:00:00.000Z', 'chat')
+    const second = makeWs('chat-second', '2026-01-01T00:00:01.000Z', 'chat')
+    const registry = makeFakeRegistry([first, second])
+    const manager = new ActiveWorkspaceSlotManager(registry, store)
+
+    const [firstState, secondState] = await Promise.all([
+      manager.handleWorkspaceCreated(first),
+      manager.handleWorkspaceCreated(second),
+    ])
+
+    expect(readCount).toBe(2)
+    expect(firstState).toBe('active')
+    expect(secondState).toBe('standby')
+    expect(slots.chat).toBe('chat-first')
+    expect(await manager.activationState('chat-first')).toBe('active')
+    expect(await manager.activationState('chat-second')).toBe('standby')
+  })
 })

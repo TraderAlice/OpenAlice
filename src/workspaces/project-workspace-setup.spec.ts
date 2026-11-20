@@ -2,6 +2,7 @@ import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, expect, it, vi } from 'vitest'
+import { rememberRecentChatWorkspace } from '../core/preferences.js'
 import { prepareProjectWorkspaces, readProjectWorkspaceSetup } from './project-workspace-setup.js'
 import type { WorkspaceService } from './service.js'
 
@@ -52,4 +53,24 @@ it('rejects corrupt intent without creating workspaces', async () => {
   const dir = await home(['unknown']); const svc = service()
   await expect(prepareProjectWorkspaces(svc as unknown as WorkspaceService, { home: dir })).rejects.toThrow()
   expect(svc.resolveOrCreateChatWorkspace).not.toHaveBeenCalled()
+})
+it('does not overwrite an active slot claimed concurrently while bootstrap creation was in-flight', async () => {
+  const dir = await home(['chat'])
+  const prefsPath = join(dir, 'data', 'preferences.json')
+  const registry = new Map<string, { template: string }>()
+  const svc = {
+    registry: { get: (id: string) => registry.get(id) },
+    resolveOrCreateChatWorkspace: vi.fn(async () => {
+      // Simulate another chat workspace being created and claiming the active slot concurrently.
+      registry.set('acceptance-chat', { template: 'chat' })
+      await rememberRecentChatWorkspace('acceptance-chat', prefsPath)
+      registry.set('chat-id', { template: 'chat' })
+      return { ok: true, workspace: { id: 'chat-id' } }
+    }),
+    resolveOrCreateAutoQuantWorkspace: vi.fn(async () => { registry.set('quant-id', { template: 'auto-quant-v2' }); return { ok: true, workspace: { id: 'quant-id' } } }),
+    resolveOrCreateAutoPredictionWorkspace: vi.fn(async () => { registry.set('prediction-id', { template: 'auto-prediction' }); return { ok: true, workspace: { id: 'prediction-id' } } }),
+  }
+  await prepareProjectWorkspaces(svc as unknown as WorkspaceService, { home: dir })
+  const prefs = JSON.parse(await readFile(prefsPath, 'utf8'))
+  expect(prefs.quickChat.recentChatWorkspaceId).toBe('acceptance-chat')
 })
