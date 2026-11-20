@@ -1,4 +1,5 @@
 import { createMarketBarsTools } from '../../../src/tool/market-bars.js'
+import { createNetworkCheckTools } from '../../../src/tool/network-check.js'
 import { describe, it, expect } from 'vitest'
 import { ToolCenter } from '../../../src/core/tool-center.js'
 import { WorkspaceToolCenter } from '../../../src/core/workspace-tool-center.js'
@@ -31,9 +32,11 @@ import { sessionSignatureFactory } from '../../../src/tool/session-signature.js'
 import { sessionRenameFactory } from '../../../src/tool/session-rename.js'
 import { sessionToolFactories } from '../../../src/tool/session-tools.js'
 import { headlessToolFactories } from '../../../src/tool/headless-tools.js'
+import { workspaceRuntimeToolFactories } from '../../../src/tool/workspace-runtime-tools.js'
 import { provenanceShowFactory } from '../../../src/tool/provenance-show.js'
 import { conversationToolFactories } from '../../../src/tool/conversation.js'
 import { artifactConversationToolFactories } from '../../../src/tool/conversation-artifacts.js'
+import { orchestrationToolFactories } from '../../../src/tool/orchestration-tools.js'
 import { createTradingTools } from '../../../src/tool/trading.js'
 
 /**
@@ -56,6 +59,7 @@ describe('CLI_EXPORTS — data export (global tools)', () => {
   tc.register(createSnapshotTools(any), 'snapshot')
   tc.register(createSimulateTools(any), 'simulate')
   tc.register(createEconomyTools(any, any), 'economy')
+  tc.register(createNetworkCheckTools(), 'network')
 
   it('every mapped verb resolves to a registered global tool', () => {
     for (const name of mappedToolNames('data')) {
@@ -123,8 +127,10 @@ describe('CLI_EXPORTS — workspace export (scoped collaboration tools)', () => 
   wtc.register(provenanceShowFactory)
   for (const f of conversationToolFactories) wtc.register(f)
   for (const f of artifactConversationToolFactories) wtc.register(f)
+  for (const f of orchestrationToolFactories) wtc.register(f)
   for (const f of sessionToolFactories) wtc.register(f)
   for (const f of headlessToolFactories) wtc.register(f)
+  for (const f of workspaceRuntimeToolFactories) wtc.register(f)
   const built = wtc.build({
     workspaceId: 'ws-test',
     workspaceLabel: 'test',
@@ -140,6 +146,33 @@ describe('CLI_EXPORTS — workspace export (scoped collaboration tools)', () => 
 
   it('is scope: scoped', () => {
     expect(getExport('workspace')?.scope).toBe('scoped')
+  })
+
+  it('registers all 9 orchestration verbs with preamble-aligned flags', () => {
+    expect(CLI_EXPORTS.workspace.commands['orchestration']).toEqual({
+      'worker-start': 'orchestration_worker_start',
+      'worker-list': 'orchestration_worker_list',
+      'worker-stop': 'orchestration_worker_stop',
+      send: 'orchestration_send',
+      ask: 'orchestration_ask',
+      reply: 'orchestration_reply',
+      'worker-done': 'orchestration_worker_done',
+      check: 'orchestration_check',
+      inbox: 'orchestration_inbox',
+    })
+    const shapeKeys = (name: string) =>
+      Object.keys(((built[name]?.inputSchema as { shape?: Record<string, unknown> })?.shape) ?? {})
+    expect(shapeKeys('orchestration_worker_start')).toEqual(
+      expect.arrayContaining(['spec', 'harness', 'wsId', 'agent', 'credential', 'credentialSource', 'model', 'effort', 'maxIdleMs']),
+    )
+    expect(shapeKeys('orchestration_ask')).toEqual(expect.arrayContaining(['dispatch', 'subject', 'body']))
+    expect(shapeKeys('orchestration_reply')).toEqual(expect.arrayContaining(['id', 'body']))
+    expect(shapeKeys('orchestration_send')).toEqual(expect.arrayContaining(['to', 'subject', 'body']))
+    expect(shapeKeys('orchestration_worker_done')).toEqual(
+      expect.arrayContaining(['dispatch', 'outcome', 'summary', 'evidence', 'deliverables', 'deliverable']),
+    )
+    expect(shapeKeys('orchestration_check')).toEqual([])
+    expect(shapeKeys('orchestration_inbox')).toEqual(expect.arrayContaining(['limit', 'dispatch']))
   })
 })
 

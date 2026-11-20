@@ -398,7 +398,7 @@ jobs:
         with:
           node-version: 22.19.0
           cache: pnpm
-      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop' --filter='!@traderalice/landing' --filter='!./packages/uta-broker-*'
       - run: pnpm build:server
       - name: Record commit-bound platform-neutral inputs
         run: >-
@@ -452,7 +452,7 @@ jobs:
           bun-version-file: ".bun-version"
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+        run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop' --filter='!@traderalice/landing' --filter='!./packages/uta-broker-*'
 
       - uses: actions/download-artifact@v4
         with:
@@ -885,17 +885,14 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop' --filter='!@traderalice/landing'
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: ".bun-version"
 
-      - name: Build optional Broker Packs
-        run: pnpm broker-packs:build
-
-      - name: Verify Broker Packs in compiled runtime
-        run: pnpm exec tsx scripts/verify-broker-packs.ts --compiled
+      - name: Build and verify optional Broker Packs in compiled runtime
+        run: pnpm broker-packs:build:compiled
 
       - name: Prove previous-release Broker Pack upgrade
         if: needs.release.outputs.channel == 'stable'

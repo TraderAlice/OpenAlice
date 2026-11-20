@@ -334,7 +334,11 @@ export class WebPlugin implements Plugin {
     // workspace registry, which only exists once workspaceService is created.
     app.route(
       '/api/entities',
-      createEntityRoutes({ entityStore: ctx.entityStore, registry: this.workspaceService.registry }),
+      createEntityRoutes({
+        entityStore: ctx.entityStore,
+        registry: this.workspaceService.registry,
+        listActiveWorkspaces: () => this.workspaceService!.listActiveWorkspaces(),
+      }),
     )
     // Cross-namespace [[name]] resolver — entities (global store) + issues (per-
     // workspace scan) in one lookup so the UI can navigate or disambiguate a

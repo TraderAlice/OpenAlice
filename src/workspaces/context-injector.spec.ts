@@ -12,14 +12,12 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { defaultPath } from '@/core/paths.js';
+import { defaultPath, templatesPath } from '@/core/paths.js';
 
 import { injectWorkspaceContext } from './context-injector.js';
 import type { TemplateMeta } from './template-registry.js';
 
-// src/workspaces/ — this spec's directory.
-const HERE = fileURLToPath(new URL('.', import.meta.url));
-const CHAT_FILES = join(HERE, 'templates', 'chat', 'files');
+const CHAT_FILES = join(templatesPath(), 'chat', 'files');
 
 function makeTemplate(over: Partial<TemplateMeta>): TemplateMeta {
   return {
@@ -113,8 +111,9 @@ describe('injectWorkspaceContext — skills', () => {
     });
     for (const root of ['.claude/skills', '.agents/skills']) {
       const skill = await read(`${root}/delegate-autoquant/SKILL.md`);
+      expect(skill).toContain('alice orchestration worker-start --harness autoquant');
+      expect(skill).toContain('alice orchestration worker-done');
       expect(skill).toContain('alice conversation create --harness autoquant');
-      expect(skill).toContain('The universal result is the Agent\'s ordinary `assistantText` handoff');
       expect(skill).toContain('does not automatically publish either artifact to the');
       expect(skill).toContain('Primary deliverable directory: <absolute path>');
       expect(skill).toContain('Do not rerun the research.');
@@ -127,7 +126,7 @@ describe('injectWorkspaceContext — skills', () => {
       wsId: 'ws-abc',
       dir,
     });
-    for (const name of ['alice', 'alice-analysis', 'alice-uta', 'traderhub', 'file-delivery', 'scan-value-chain']) {
+    for (const name of ['alice', 'alice-analysis', 'alice-uta', 'traderhub', 'file-delivery', 'orchestration', 'scan-value-chain']) {
       expect(existsSync(join(dir, '.claude/skills', name, 'SKILL.md')), name).toBe(true);
       expect(existsSync(join(dir, '.agents/skills', name, 'SKILL.md')), name).toBe(true);
     }

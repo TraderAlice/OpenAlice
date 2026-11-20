@@ -10,7 +10,10 @@ export function createStickerRoutes(svc: WorkspaceService, packs = new StickerPa
   app.onError((error, c) => c.json({ error: error.message }, 400))
   app.get('/', async c => {
     const catalog = await packs.catalog()
-    const workspaces = await Promise.all(svc.registry.list().filter(ws => ws.template === 'chat').map(async ws => {
+    const activeWorkspaces = svc.listActiveWorkspaces
+      ? await svc.listActiveWorkspaces()
+      : svc.registry.list()
+    const workspaces = await Promise.all(activeWorkspaces.filter(ws => ws.template === 'chat').map(async ws => {
       try {
         return { id: ws.id, name: ws.tag || ws.id, ...await packs.inspect(ws.dir) }
       } catch (error) { return { id: ws.id, name: ws.tag || ws.id, error: (error as Error).message, state: null, changed: [], skillPresent: false } }

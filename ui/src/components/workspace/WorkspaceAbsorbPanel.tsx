@@ -30,6 +30,7 @@ import {
 interface Props {
   readonly target: Workspace
   readonly workspaces: readonly Workspace[]
+  readonly initialSourceId?: string
   readonly onWorkspaceChanged: () => void
   readonly onClose: () => void
 }
@@ -42,6 +43,7 @@ interface Props {
 export function WorkspaceAbsorbPanel({
   target,
   workspaces,
+  initialSourceId,
   onWorkspaceChanged,
   onClose,
 }: Props): ReactElement {
@@ -49,7 +51,9 @@ export function WorkspaceAbsorbPanel({
     () => workspaces.filter((workspace) => workspace.id !== target.id),
     [target.id, workspaces],
   )
-  const [sourceId, setSourceId] = useState('')
+  const [sourceId, setSourceId] = useState(() => (
+    initialSourceId && initialSourceId !== target.id ? initialSourceId : ''
+  ))
   const [plan, setPlan] = useState<WorkspaceAbsorbPlan | null>(null)
   const [loading, setLoading] = useState(false)
   const [applying, setApplying] = useState(false)

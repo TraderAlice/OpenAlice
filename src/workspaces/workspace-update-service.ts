@@ -125,9 +125,18 @@ export class WorkspaceUpdateService {
           latest = check.decision.status === 'available' && check.toVersion ? { version: check.toVersion } : null
         } else {
           const receipt = await readHarnessSource(workspace.dir)
-          if (!receipt) throw new Error('Workspace has no Harness source receipt')
-          fromVersion = receipt.version
-          latest = await this.service.sourceUpgrades.latest(template, receipt.version, true)
+          if (!receipt) {
+            const tpl = this.service.templates?.get(template)
+            if (tpl && !tpl.source) {
+              fromVersion = workspace.spawnedFromVersion ?? tpl.version ?? '0.0.0'
+              latest = null
+            } else {
+              throw new Error('Workspace has no Harness source receipt')
+            }
+          } else {
+            fromVersion = receipt.version
+            latest = await this.service.sourceUpgrades.latest(template, receipt.version, true)
+          }
         }
         this.states.set(workspace.id, {
           ...base, checkedAt: new Date().toISOString(), fromVersion,

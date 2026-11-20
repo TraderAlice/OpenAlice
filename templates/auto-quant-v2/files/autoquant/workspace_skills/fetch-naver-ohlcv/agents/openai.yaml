@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fetch Naver OHLCV"
+  short_description: "Acquire South Korea daily OHLCV"
+  default_prompt: "Use $fetch-naver-ohlcv to acquire bounded South Korea daily OHLCV into an auditable AutoQuant staging package."

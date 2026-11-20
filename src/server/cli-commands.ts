@@ -26,6 +26,7 @@ const BASE_EXPORTS: Record<string, CliExport> = {
       rss: 'Search and read the user\'s collected subscribed-feed archive',
       market: 'Discover symbols, bar sources, and optional market-data vendors',
       analysis: 'Read dated K-lines and calculate indicators',
+      network: 'Probe network connectivity to UTA, Yahoo Finance, and TraderHub',
     },
     commands: {
       // `rss`, not `news`: the backing store is the RSS collector's archive —
@@ -55,6 +56,9 @@ const BASE_EXPORTS: Record<string, CliExport> = {
         quant: 'calculateQuant',
         // Dated as-of read with a freshness contract for retrospective analysis.
         snapshot: 'marketSnapshot',
+      },
+      network: {
+        check: 'network_check',
       },
     },
   },
@@ -138,11 +142,13 @@ const BASE_EXPORTS: Record<string, CliExport> = {
     groupDescriptions: {
       peer: 'Discover active desks, their Sessions, and absolute filesystem locations',
       conversation: 'Send ordinary Agent-to-Agent requests and retrieve their replies',
+      orchestration: 'Orchestrate background worker dispatches with structured ask/reply, completion reports, and follow-up steering',
       inbox: 'Send outward-facing notifications and reports to the human Inbox; inspect and follow up on deliveries',
       issue: 'Read the shared work board and manage this Workspace\'s durable work',
       provenance: 'Trace business artifacts to attributable product Sessions',
       signature: 'Show this Session\'s safe product identity',
       session: 'Inspect, rename, configure, interrupt, or archive product Sessions',
+      runtime: 'Inspect and update a Workspace\'s default AI runtime settings (agent, credential, model, effort)',
       headless: 'Inspect background headless runs and their structured logs',
       schedule: 'Inspect scheduled Workspace Issues and their next due times',
       track: 'Maintain the shared index of durable assets and topics',
@@ -164,6 +170,17 @@ const BASE_EXPORTS: Record<string, CliExport> = {
         collect: 'conversation_collect',
         read: 'conversation_read',
         check: 'conversation_check',
+      },
+      orchestration: {
+        'worker-start': 'orchestration_worker_start',
+        'worker-list': 'orchestration_worker_list',
+        'worker-stop': 'orchestration_worker_stop',
+        send: 'orchestration_send',
+        ask: 'orchestration_ask',
+        reply: 'orchestration_reply',
+        'worker-done': 'orchestration_worker_done',
+        check: 'orchestration_check',
+        inbox: 'orchestration_inbox',
       },
       // inbox push: one Markdown body with inline Workspace file references.
       // --body-file publishes Markdown read from a local file.
@@ -206,6 +223,11 @@ const BASE_EXPORTS: Record<string, CliExport> = {
         interrupt: 'session_interrupt',
         delete: 'session_delete',
         restore: 'session_restore',
+      },
+      // runtime: Workspace default AI runtime settings (.alice/settings.json).
+      runtime: {
+        get: 'workspace_runtime_get',
+        set: 'workspace_runtime_set',
       },
       // headless/schedule: read-only observability over background runs and
       // scheduled Issues — the CLI mirror of the WebUI panels.

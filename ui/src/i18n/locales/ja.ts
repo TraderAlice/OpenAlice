@@ -412,6 +412,25 @@ export const ja: Resources = {
       failed: '失敗',
       blocked: 'ブロック中',
     },
+    skipState: {
+      coolingDown: 'クールダウン中',
+      backingOff: 'バックオフ中',
+      paused: '一時停止',
+      retryingAt: '{{time}}に再試行',
+      retryingSoon: '次回チェック時に再試行',
+      sinceRelative: '{{time}}から',
+      ariaLabel: '{{status}} — {{reason}}',
+      hintSessionBlocked:
+        'この Session がブロックされているため、自動実行は一時停止しています。ブロックを解除するか、担当を変更するか、手動で実行すると再開します。',
+      hintSessionUnavailable:
+        '自動実行は一時停止しています。アクティブな Session または「新しいセッション」へ再割り当てすると再開します。',
+      hintRuntimeUnavailable:
+        '自動実行は一時停止しています。バックグラウンド実行に対応する Agent ランタイムを選択してください。',
+      hintWorkspaceUnavailable:
+        '自動実行は一時停止しています。ワークスペースを復旧するか、担当とランタイム設定を更新してください。',
+      hintParkedDefault:
+        'この問題が解消されるか手動実行が成功するまで、自動実行は一時停止しています。',
+    },
     detail: {
       workItem: '作業項目',
       updateFailed: '変更を保存できませんでした。もう一度お試しください。',
@@ -3301,6 +3320,23 @@ export const ja: Resources = {
     notFoundBody: '{{name}} という名前のテンプレートはありません。',
   },
   workspace: {
+    activation: {
+      activeBadge: 'アクティブ',
+      standbyBadge: 'スタンバイ',
+      activate: 'アクティブにする',
+      activating: 'アクティブ化中…',
+      activatedToast: '{{workspace}} をアクティブにしました',
+      activateFailed: 'ワークスペースのアクティブ化に失敗しました',
+      confirmTitle: '{{workspace}} をアクティブにしますか？',
+      confirmSummary: '{{previous}} から切り替えると、元のワークスペースの自動スケジュールは一時停止されます。',
+      confirmOpenIssues: '未完了 Issue {{count}} 件',
+      confirmScheduledIssues: 'スケジュール済み Issue {{count}} 件',
+      confirmInFlightRuns: '実行中タスク {{count}} 件',
+      confirmSafeNote: '元の Issue やファイルはディスク上に安全に保持され、いつでも統合または切り替え直せます。実行中のタスクはそのまま自然に完了します。',
+      standbyBannerTitle: 'スタンバイ ワークスペース',
+      standbyBannerBody: '自動スケジュールは一時停止されており、Issue・ドキュメント・ナレッジはグローバルビューから除外されています。',
+      absorbIntoActive: 'アクティブなワークスペースへ統合',
+    },
     sessionNotFound: 'このセッションは存在しません。',
     sessionOpening: 'セッションを開いています…',
     sessionDisconnected: '対話接続が切断されました。',

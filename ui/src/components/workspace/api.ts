@@ -35,6 +35,8 @@ export interface WorkspaceRuntimeSettings {
   }
 }
 
+export type WorkspaceActivationState = 'active' | 'standby'
+
 export interface Workspace {
   readonly id: string;
   readonly tag: string;
@@ -49,6 +51,11 @@ export interface Workspace {
   readonly dir: string;
   readonly createdAt: string;
   readonly template?: string;
+  /**
+   * Single-active-slot state per template category. Missing/undefined is
+   * treated as `'active'` for backwards compatibility.
+   */
+  readonly activationState?: WorkspaceActivationState;
   /**
    * The template version at the moment this workspace was spawned. Pinned
    * once — system-written, never updated. Used to render lineage in the
@@ -1208,6 +1215,68 @@ export async function initializeAutoPredictionWorkspace(): Promise<Workspace> {
     throw new Error(body?.message ?? body?.error ?? `Auto Prediction initialization failed: ${res.status}`)
   }
   return body.workspace
+}
+
+export function isStandbyWorkspace(
+  workspace: Pick<Workspace, 'activationState'> | null | undefined,
+): boolean {
+  return workspace?.activationState === 'standby'
+}
+
+export interface WorkspaceActivationPreviewCurrentActive {
+  readonly id: string
+  readonly tag: string
+  readonly displayName?: string
+  readonly openIssueCount: number
+  readonly scheduledIssueCount: number
+  readonly inFlightRunCount: number
+}
+
+export interface WorkspaceActivationPreview {
+  readonly workspaceId: string
+  readonly template: string
+  readonly alreadyActive: boolean
+  readonly currentActive: WorkspaceActivationPreviewCurrentActive | null
+}
+
+export interface WorkspaceActivationResult {
+  readonly workspace: Workspace
+  readonly previousActiveId: string | null
+}
+
+export async function getWorkspaceActivationPreview(
+  wsId: string,
+): Promise<WorkspaceActivationPreview> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(wsId)}/activation-preview`,
+  )
+  const body = (await res.json().catch(() => null)) as
+    | (WorkspaceActivationPreview & { message?: string; error?: string })
+    | null
+  if (!res.ok || !body || typeof body.workspaceId !== 'string') {
+    throw new Error(
+      body?.message ?? body?.error ?? `Workspace activation preview failed: ${res.status}`,
+    )
+  }
+  return body
+}
+
+export async function activateWorkspace(
+  wsId: string,
+): Promise<WorkspaceActivationResult> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(wsId)}/activate`,
+    { method: 'POST' },
+  )
+  const body = (await res.json().catch(() => null)) as
+    | (WorkspaceActivationResult & { message?: string; error?: string })
+    | null
+  if (!res.ok || !body?.workspace) {
+    throw new Error(
+      body?.message ?? body?.error ?? `Workspace activation failed: ${res.status}`,
+    )
+  }
+  return body
 }
 
 export async function initializeChatWorkspace(): Promise<Workspace> {

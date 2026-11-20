@@ -129,4 +129,30 @@ describe('createTradingProxyRoutes — UTA optional carrier', () => {
       detail: 'ECONNREFUSED',
     })
   })
+
+  it('includes the target host in 502 proxy network errors without leaking credentials', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw Object.assign(new Error('Unable to connect'), { code: 'ConnectionRefused' })
+    }))
+    const app = createTradingProxyRoutes({ utaBaseUrl: 'http://user:secret@127.0.0.1:47333' })
+    const res = await app.request('/api/trading/uta')
+    expect(res.status).toBe(502)
+    const body = await res.json() as { error: string; detail: string }
+    expect(body.error).toBe('UTA unavailable')
+    expect(body.detail).toContain('127.0.0.1:47333')
+    expect(body.detail).toContain('ConnectionRefused')
+    expect(body.detail).not.toContain('secret')
+  })
+
+  it('includes the target host on proxy timeout errors', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new DOMException('The operation was aborted', 'AbortError')
+    }))
+    const app = createTradingProxyRoutes({ utaBaseUrl: 'http://127.0.0.1:47333' })
+    const res = await app.request('/api/trading/uta')
+    expect(res.status).toBe(502)
+    const body = await res.json() as { error: string; detail: string }
+    expect(body.detail).toContain('127.0.0.1:47333')
+    expect(body.detail).toContain('timed out')
+  })
 })

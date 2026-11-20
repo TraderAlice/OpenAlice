@@ -46,7 +46,7 @@ const built = await Bun.build({
   minify: true,
 })
 if (!built.success) throw new Error(built.logs.map(String).join('\n'))
-for (const path of ['ui/dist', 'default', 'src/workspaces/templates']) {
+for (const path of ['ui/dist', 'default', 'templates']) {
   await cp(join(root, path), join(resources, path), { recursive: true, dereference: true })
 }
 await cp(join(root, 'package.json'), join(resources, 'package.json'))

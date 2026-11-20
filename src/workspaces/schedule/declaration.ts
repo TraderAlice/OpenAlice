@@ -38,6 +38,14 @@ export {
 // The read-only shape GET /api/schedule returns: each workspace's SCHEDULED
 // issues enriched with the scanner's last-fired marker and the computed next-due.
 
+export interface ScheduleSkipState {
+  kind: 'deferred' | 'parked'
+  code: string
+  reason: string
+  retryAtMs?: number
+  sinceMs: number
+}
+
 export interface ScheduleSnapshotTask {
   /** Issue id (filename stem). */
   id: string
@@ -62,6 +70,8 @@ export interface ScheduleSnapshotTask {
   lastFiredAtMs: number | null
   /** When it is next due (epoch ms), null if the schedule yields no future fire. */
   nextDueAtMs: number | null
+  /** Active scanner dispatch gate when automatic firing is deferred or parked. */
+  skipState?: ScheduleSkipState
 }
 
 export interface ScheduleSnapshotWorkspace {
@@ -110,6 +120,7 @@ export function snapshotScheduledIssue(
   nowMs: number,
   lookbackMs: number,
   heldAtMs: number | null = null,
+  skipState?: ScheduleSkipState,
 ): ScheduleSnapshotTask {
   const next = computeNextRun(when, fireBase(when, lastFiredAtMs, nowMs, lookbackMs, heldAtMs))
   return {
@@ -129,5 +140,6 @@ export function snapshotScheduledIssue(
     // An overdue computed time clamps to now: a due-now task reads "due now",
     // never a past/epoch instant — keeps the display consistent with firing.
     nextDueAtMs: next === null ? null : Math.max(next, nowMs),
+    ...(skipState ? { skipState } : {}),
   }
 }

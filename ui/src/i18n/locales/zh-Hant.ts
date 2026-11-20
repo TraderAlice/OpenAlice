@@ -419,6 +419,25 @@ export const zhHant: Resources = {
       failed: '失敗',
       blocked: '受阻',
     },
+    skipState: {
+      coolingDown: '冷卻中',
+      backingOff: '退避重試',
+      paused: '已暫停',
+      retryingAt: '{{time}}重試',
+      retryingSoon: '下次檢查時重試',
+      sinceRelative: '始於 {{time}}',
+      ariaLabel: '{{status}} — {{reason}}',
+      hintSessionBlocked:
+        '目前 Session 處於受阻狀態，自動排程已暫停。解除 Session 封鎖、重新指派議題或手動執行一次後即可恢復。',
+      hintSessionUnavailable:
+        '自動排程已暫停。請將此議題重新指派給活躍的 Session 或「新建 Session」以恢復排程。',
+      hintRuntimeUnavailable:
+        '自動排程已暫停。請選擇支援背景執行的 Agent 執行環境以恢復排程。',
+      hintWorkspaceUnavailable:
+        '自動排程已暫停。請恢復工作區，或更新議題負責人與執行環境設定。',
+      hintParkedDefault:
+        '自動排程已暫停，解決此阻礙或手動執行成功後將自動恢復。',
+    },
     detail: {
       workItem: '工作項目',
       updateFailed: '無法儲存變更，請重試。',
@@ -3308,6 +3327,23 @@ export const zhHant: Resources = {
     notFoundBody: '沒有名為 {{name}} 的模板。',
   },
   workspace: {
+    activation: {
+      activeBadge: '啟用',
+      standbyBadge: '待命',
+      activate: '設為啟用',
+      activating: '正在啟用…',
+      activatedToast: '已將 {{workspace}} 設為啟用工作區',
+      activateFailed: '切換啟用工作區失敗',
+      confirmTitle: '設為啟用工作區：{{workspace}}？',
+      confirmSummary: '從 {{previous}} 切換後，原工作區的自動排程將被暫停。',
+      confirmOpenIssues: '{{count}} 個未關閉 Issue',
+      confirmScheduledIssues: '{{count}} 個排程 Issue',
+      confirmInFlightRuns: '{{count}} 個執行中任務',
+      confirmSafeNote: '原工作區的 Issue 與檔案會安全保留在磁碟上，可隨時合併或切回；執行中的任務會自然完成。',
+      standbyBannerTitle: '待命工作區',
+      standbyBannerBody: '目前處於待命模式：自動排程已暫停，且其中的 Issue、文件與知識不會出現在全域檢視中。',
+      absorbIntoActive: '合併到目前啟用工作區',
+    },
     sessionNotFound: '這個會話已不存在。',
     sessionOpening: '正在開啟會話…',
     sessionDisconnected: '互動連線已中斷。',

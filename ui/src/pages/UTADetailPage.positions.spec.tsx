@@ -43,7 +43,7 @@ describe('UTADetailPage responsive positions', () => {
 
     const desktop = screen.getByTestId('uta-positions-desktop')
     expect(desktop.className).toContain('hidden')
-    expect(desktop.className).toContain('md:block')
+    expect(desktop.className).toContain('@[42rem]/content:block')
     expect(within(desktop).getByRole('columnheader', { name: 'Actions' })).toBeTruthy()
     expect(within(desktop).getByRole('button', { name: 'Close AAPL position' })).toBeTruthy()
 
@@ -64,7 +64,7 @@ describe('UTADetailPage responsive positions', () => {
     )
 
     const mobile = screen.getByTestId('uta-positions-mobile')
-    expect(mobile.className).toContain('md:hidden')
+    expect(mobile.className).toContain('@[42rem]/content:hidden')
     const summary = within(mobile).getByLabelText(
       'AAPL long position, market value $1,100.00, PnL +$100.00, +10.00%. Expand for position details.',
     )

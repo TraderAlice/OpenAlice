@@ -20,6 +20,25 @@ describe('amakeRequest — network failure classification', () => {
     await expect(amakeRequest(URL_OK)).rejects.toThrowError(NetworkUnreachableError)
   })
 
+  it('classifies Bun network failures (Unable to connect / ConnectionRefused / FailedToOpenSocket) as NetworkUnreachableError with host and code', async () => {
+    const refused = Object.assign(
+      new Error('Unable to connect. Is the computer able to access the url?'),
+      { code: 'ConnectionRefused' },
+    )
+    fetchMock.mockRejectedValueOnce(refused)
+    const err1 = await amakeRequest(URL_OK).catch((e) => e)
+    expect(err1).toBeInstanceOf(NetworkUnreachableError)
+    expect((err1 as Error).message).toContain('api.example.com')
+    expect((err1 as Error).message).toContain('ConnectionRefused')
+
+    const socketErr = Object.assign(new Error('Failed to open socket'), { code: 'FailedToOpenSocket' })
+    fetchMock.mockRejectedValueOnce(socketErr)
+    const err2 = await amakeRequest(URL_OK).catch((e) => e)
+    expect(err2).toBeInstanceOf(NetworkUnreachableError)
+    expect((err2 as Error).message).toContain('api.example.com')
+    expect((err2 as Error).message).toContain('FailedToOpenSocket')
+  })
+
   it('preserves the host and error code without prescribing an agent workflow', async () => {
     fetchMock.mockRejectedValueOnce(new TypeError('fetch failed'))
     try {

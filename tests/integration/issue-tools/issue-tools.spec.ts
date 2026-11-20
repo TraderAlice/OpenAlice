@@ -1,5 +1,5 @@
 import * as deskProjection from '../../../src/workspaces/issues/telegram-desk-project.js'
-import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -671,13 +671,112 @@ describe('Issue execution tools', () => {
     expect(start).toHaveBeenCalledWith('peer', 'daily', 'run-failed')
     expect(read).toHaveBeenCalledWith('run-new')
   })
-  it('rejects ambiguous names before dispatch', async () => {
+  it('rejects ambiguous names before dispatch and includes wsTag in candidates', async () => {
     const { context, resolveByName, start } = executionContext()
-    resolveByName.mockResolvedValue([{ wsId: 'a', wsTag: 'a', id: 'daily', title: 'Daily' }, { wsId: 'b', wsTag: 'b', id: 'daily', title: 'Daily' }])
-    expect(await run(issueRunNowFactory.build(context), { id: 'daily' })).toMatchObject({ ok: false })
+    resolveByName.mockResolvedValue([
+      { wsId: 'a', wsTag: 'Alpha', id: 'daily', title: 'Daily' },
+      { wsId: 'b', wsTag: 'Beta', id: 'daily', title: 'Daily' },
+    ])
+    expect(await run(issueRunNowFactory.build(context), { id: 'daily' })).toMatchObject({
+      ok: false,
+      candidates: [
+        { wsId: 'a', wsTag: 'Alpha', id: 'daily', title: 'Daily' },
+        { wsId: 'b', wsTag: 'Beta', id: 'daily', title: 'Daily' },
+      ],
+    })
     expect(start).not.toHaveBeenCalled()
     expect(await run(issueRunNowFactory.build(context), { id: 'daily', wsId: 'b' })).toMatchObject({ ok: true })
     expect(start).toHaveBeenCalledWith('b', 'daily', undefined)
+    // Case-insensitive wsTag matching for --ws-id
+    expect(await run(issueRunNowFactory.build(context), { id: 'daily', wsId: 'alpha' })).toMatchObject({ ok: true })
+    expect(start).toHaveBeenCalledWith('a', 'daily', undefined)
+  })
+  it('strips a trailing .md suffix from --id before lookup', async () => {
+    const { context, resolveByName, start } = executionContext()
+    expect(await run(issueRunNowFactory.build(context), { id: 'daily.md' })).toMatchObject({
+      ok: true,
+      taskId: 'run-new',
+      issueId: 'daily',
+    })
+    expect(resolveByName).toHaveBeenCalledWith('daily')
+    expect(start).toHaveBeenCalledWith('peer', 'daily', undefined)
+  })
+  it('distinguishes --ws-id workspace mismatch from 0 global matches', async () => {
+    const { context, resolveByName, start } = executionContext()
+    resolveByName.mockResolvedValue([
+      { wsId: 'peer', wsTag: 'Desk', id: 'daily', title: 'Daily' },
+    ])
+    const res = await run(issueRunNowFactory.build(context), { id: 'daily', wsId: 'other-ws' })
+    expect(res).toMatchObject({
+      ok: false,
+      candidates: [{ wsId: 'peer', wsTag: 'Desk', id: 'daily', title: 'Daily' }],
+    })
+    expect(String(res.error)).toContain('other-ws')
+    expect(String(res.error)).toContain('Desk (peer)')
+    expect(start).not.toHaveBeenCalled()
+  })
+  it('surfaces the exact parse/validation error for an invalid issue file instead of generic Issue not found', async () => {
+    await mkdir(join(dir, '.alice', 'issues'), { recursive: true })
+    await writeFile(
+      join(dir, '.alice', 'issues', 'broken-cron.md'),
+      '---\ntitle: Broken\nstatus: not_a_real_status\n---\nCheck market\n',
+      'utf8',
+    )
+    const { context, resolveByName } = executionContext()
+    resolveByName.mockResolvedValue([])
+    const res = await run(issueRunNowFactory.build(context), { id: 'broken-cron.md' })
+    expect(res).toMatchObject({ ok: false, code: 'invalid' })
+    expect(String(res.error)).toContain('broken-cron')
+    expect(String(res.error)).not.toBe('Issue not found')
+  })
+  it('probes an active peer workspace by wsTag when --ws-id specifies a tag and the issue is invalid', async () => {
+    const peerDir = await mkdtemp(join(tmpdir(), 'issue-tools-peer-'))
+    try {
+      await mkdir(join(peerDir, '.alice', 'issues'), { recursive: true })
+      await writeFile(
+        join(peerDir, '.alice', 'issues', 'peer-broken.md'),
+        '---\ntitle: Peer Broken\nstatus: invalid_state\n---\nBody\n',
+        'utf8',
+      )
+      const { context, resolveByName } = executionContext()
+      resolveByName.mockResolvedValue([])
+      const peerCtx: WorkspaceToolContext = {
+        ...context,
+        resolveWorkspace: (id) => {
+          if (id === 'ws-self') return { id: 'ws-self', dir, tag: 'Self' }
+          if (id === 'ws-peer') return { id: 'ws-peer', dir: peerDir, tag: 'Desk' }
+          return null
+        },
+        workspaceInventory: async () => [
+          { id: 'ws-self', tag: 'Self', createdAt: '2026-01-01', sessions: { total: 0, running: 0, recent: [] }, headlessRunning: 0 },
+          { id: 'ws-peer', tag: 'Desk', createdAt: '2026-01-01', sessions: { total: 0, running: 0, recent: [] }, headlessRunning: 0 },
+        ],
+      }
+      const res = await run(issueRunNowFactory.build(peerCtx), { id: 'peer-broken', wsId: 'desk' })
+      expect(res).toMatchObject({ ok: false, code: 'invalid' })
+      expect(String(res.error)).toContain('peer-broken')
+      expect(String(res.error)).toContain('Desk (ws-peer)')
+    } finally {
+      await rm(peerDir, { recursive: true, force: true })
+    }
+  })
+  it('surfaces workspace-level invalid declaration error (e.g. legacy .alice/issue.json)', async () => {
+    await mkdir(join(dir, '.alice'), { recursive: true })
+    await writeFile(join(dir, '.alice', 'issue.json'), '{"legacy":true}', 'utf8')
+    const { context, resolveByName } = executionContext()
+    resolveByName.mockResolvedValue([])
+    const res = await run(issueRunNowFactory.build(context), { id: 'anything', wsId: 'ws-self' })
+    expect(res).toMatchObject({ ok: false, code: 'invalid' })
+    expect(String(res.error)).toMatch(/invalid/i)
+    expect(String(res.error)).not.toBe('Issue not found')
+  })
+  it('returns Issue not found when 0 global matches exist and no invalid declaration matches', async () => {
+    const { context, resolveByName } = executionContext()
+    resolveByName.mockResolvedValue([])
+    expect(await run(issueRunNowFactory.build(context), { id: 'missing-issue' })).toEqual({
+      ok: false,
+      error: 'Issue not found',
+    })
   })
   it('preserves scheduler conflict errors without falling back to ask', async () => {
     const { context, start } = executionContext()

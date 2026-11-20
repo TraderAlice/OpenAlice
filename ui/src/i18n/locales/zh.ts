@@ -415,6 +415,25 @@ export const zh: Resources = {
       failed: '失败',
       blocked: '受阻',
     },
+    skipState: {
+      coolingDown: '冷却中',
+      backingOff: '退避重试',
+      paused: '已暂停',
+      retryingAt: '{{time}}重试',
+      retryingSoon: '下次检查时重试',
+      sinceRelative: '始于 {{time}}',
+      ariaLabel: '{{status}} — {{reason}}',
+      hintSessionBlocked:
+        '当前 Session 处于受阻状态，自动计划已暂停。解除 Session 阻止、重新分配议题或手动运行一次后即可恢复。',
+      hintSessionUnavailable:
+        '自动计划已暂停。请将此议题重新分配给活跃的 Session 或“新建 Session”以恢复调度。',
+      hintRuntimeUnavailable:
+        '自动计划已暂停。请选择支持后台执行的 Agent 运行时以恢复调度。',
+      hintWorkspaceUnavailable:
+        '自动计划已暂停。请恢复工作区，或更新议题负责人与运行时设置。',
+      hintParkedDefault:
+        '自动计划已暂停，解决此阻碍或手动运行成功后将自动恢复。',
+    },
     detail: {
       workItem: '工作项',
       updateFailed: '未能保存更改，请重试。',
@@ -3304,6 +3323,23 @@ export const zh: Resources = {
     notFoundBody: '没有名为 {{name}} 的模板。',
   },
   workspace: {
+    activation: {
+      activeBadge: '激活',
+      standbyBadge: '待命',
+      activate: '设为激活',
+      activating: '正在激活…',
+      activatedToast: '已将 {{workspace}} 设为激活工作区',
+      activateFailed: '切换激活工作区失败',
+      confirmTitle: '设为激活工作区：{{workspace}}？',
+      confirmSummary: '从 {{previous}} 切换后，原工作区的定时调度将被暂停。',
+      confirmOpenIssues: '{{count}} 个未关闭 Issue',
+      confirmScheduledIssues: '{{count}} 个定时调度 Issue',
+      confirmInFlightRuns: '{{count}} 个运行中任务',
+      confirmSafeNote: '原工作区的 Issue 和文件会安全保留在磁盘上，可随时合并或切回；正在执行的任务会自然完成。',
+      standbyBannerTitle: '待命工作区',
+      standbyBannerBody: '当前处于待命模式：自动调度已暂停，且其中的 Issue、文档与知识不会出现在全局视图中。',
+      absorbIntoActive: '合并到当前激活工作区',
+    },
     sessionNotFound: '这个会话已不存在。',
     sessionOpening: '正在打开会话…',
     sessionDisconnected: '交互连接已断开。',

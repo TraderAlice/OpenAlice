@@ -114,6 +114,57 @@ describe('IssueScheduleEditor', () => {
     expect((screen.getByRole('combobox', { name: 'Run timeout' }) as HTMLSelectElement).value).toBe('60m')
     expect(onPatch).not.toHaveBeenCalled()
   })
+  it('defers validation errors until blur or submit, uses polite live regions, and clears immediately when fixed', () => {
+    editor()
+    const input = cron()
+
+    fireEvent.change(input, { target: { value: '0 0 * *' } })
+    expect(save().disabled).toBe(true)
+    expect(input.getAttribute('aria-invalid')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByText(/5-field cron/i)).toBeNull()
+
+    fireEvent.blur(input)
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    expect(screen.queryByRole('alert')).toBeNull()
+    const errorMessage = document.querySelector('[aria-live="polite"]')
+    expect(errorMessage).toBeTruthy()
+    expect(errorMessage?.textContent).toBeTruthy()
+
+    // Fixing the value clears the error immediately without waiting for blur
+    fireEvent.change(input, { target: { value: '0 0 * * *' } })
+    expect(input.getAttribute('aria-invalid')).toBeNull()
+    expect(document.querySelector('[aria-live="polite"]')).toBeNull()
+    expect(save().disabled).toBe(false)
+
+    // Submitting an invalid form via Enter also surfaces the polite error
+    fireEvent.change(input, { target: { value: 'bad-cron' } })
+    expect(input.getAttribute('aria-invalid')).toBeNull()
+    fireEvent.submit(input.closest('form')!)
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    expect(document.querySelector('[aria-live="polite"]')).toBeTruthy()
+  })
+  it('populates the timezone datalist with deduplicated local, UTC, and IANA time zones', () => {
+    editor()
+    const zoneInput = screen.getByRole('combobox', { name: 'Time zone' }) as HTMLInputElement
+    const listId = zoneInput.getAttribute('list')
+    expect(listId).toBeTruthy()
+    const options = [...(document.getElementById(listId!)?.querySelectorAll('option') ?? [])].map(
+      (option) => option.getAttribute('value'),
+    )
+    expect(options).toContain('local')
+    expect(options).toContain('UTC')
+    expect(options).toContain('Asia/Shanghai')
+    expect(new Set(options).size).toBe(options.length)
+
+    // Timezone validation also waits until blur and clears immediately when fixed
+    fireEvent.change(zoneInput, { target: { value: 'Mars/Olympus_Mons' } })
+    expect(zoneInput.getAttribute('aria-invalid')).toBeNull()
+    fireEvent.blur(zoneInput)
+    expect(zoneInput.getAttribute('aria-invalid')).toBe('true')
+    fireEvent.change(zoneInput, { target: { value: 'Asia/Shanghai' } })
+    expect(zoneInput.getAttribute('aria-invalid')).toBeNull()
+  })
   it('does not expose a generic cadence writer for connector desks', () => {
     render(<IssueScheduleEditor issue={{ ...issue, connectorDesk: 'telegram' }} saving={false} onPatch={vi.fn()}>Cadence</IssueScheduleEditor>)
     expect(screen.queryByRole('button', { name: 'Schedule settings' })).toBeNull()

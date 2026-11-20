@@ -430,6 +430,25 @@ export const en = {
       failed: 'Failed',
       blocked: 'Blocked',
     },
+    skipState: {
+      coolingDown: 'Cooling down',
+      backingOff: 'Backing off',
+      paused: 'Paused',
+      retryingAt: 'Retrying {{time}}',
+      retryingSoon: 'Retrying on next check',
+      sinceRelative: 'Since {{time}}',
+      ariaLabel: '{{status}} — {{reason}}',
+      hintSessionBlocked:
+        'Automatic runs are paused while this Session is blocked. Release the Session block, reassign the Issue, or run manually to resume.',
+      hintSessionUnavailable:
+        'Automatic runs are paused. Reassign this Issue to an active Session or New Session to resume.',
+      hintRuntimeUnavailable:
+        'Automatic runs are paused. Select an Agent runtime that supports background execution to resume.',
+      hintWorkspaceUnavailable:
+        'Automatic runs are paused. Restore the Workspace or update the Issue owner and runtime to resume.',
+      hintParkedDefault:
+        'Automatic runs are paused until this blocker is resolved or a manual run succeeds.',
+    },
     detail: {
       workItem: 'Work item',
       updateFailed: 'Could not save changes. Please try again.',
@@ -3340,6 +3359,23 @@ export const en = {
     notFoundBody: 'No template named {{name}}.',
   },
   workspace: {
+    activation: {
+      activeBadge: 'Active',
+      standbyBadge: 'Standby',
+      activate: 'Activate',
+      activating: 'Activating…',
+      activatedToast: '{{workspace}} is now active',
+      activateFailed: 'Failed to activate workspace',
+      confirmTitle: 'Activate {{workspace}}?',
+      confirmSummary: 'Switching active workspace from {{previous}} will pause automatic scheduling for its issues.',
+      confirmOpenIssues: '{{count}} open issues',
+      confirmScheduledIssues: '{{count}} scheduled issues',
+      confirmInFlightRuns: '{{count}} in-flight runs',
+      confirmSafeNote: 'Existing issues and files remain safely on disk and can be absorbed or switched back anytime. Any in-flight runs will finish naturally.',
+      standbyBannerTitle: 'Standby workspace',
+      standbyBannerBody: 'Auto-scheduling is paused, and its issues, docs, and knowledge are excluded from global views.',
+      absorbIntoActive: 'Absorb into active workspace',
+    },
     sessionNotFound: 'This Session no longer exists.',
     sessionOpening: 'Opening Session…',
     sessionDisconnected: 'The interactive connection is disconnected.',

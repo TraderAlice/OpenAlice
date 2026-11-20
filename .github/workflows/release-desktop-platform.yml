@@ -65,7 +65,7 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter='!@traderalice/landing' --filter='!./packages/uta-broker-*'
 
       # macOS still uses dugite's embedded Git. Windows keeps only dugite's JS
       # wrapper and routes it to managed PortableGit in the packaged smoke.
@@ -249,7 +249,7 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter='!@traderalice/landing' --filter='!./packages/uta-broker-*'
 
       - name: Restore desktop release candidate
         uses: actions/download-artifact@v4

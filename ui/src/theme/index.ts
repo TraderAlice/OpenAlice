@@ -12,26 +12,34 @@
  * (e.g. the persisted key changing shape across a version bump).
  */
 
-import { resolveEffectivePalette } from './palettes'
+import { paletteAppearance, resolveEffectivePalette } from './palettes'
 import { useThemeStore, readInitialThemePreferences } from './store'
 import { resolveStylePalettePair } from './styleProfiles'
 
 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
 
-function applyTheme(state: ReturnType<typeof readInitialThemePreferences>): void {
+export function applyTheme(state: ReturnType<typeof readInitialThemePreferences>): void {
   const root = document.documentElement
   const stylePalettePair = resolveStylePalettePair(state.uiStyle, state.stylePaletteMode)
-  root.dataset.theme = state.theme
-  root.dataset.dayPalette = state.dayPalette
-  root.dataset.nightPalette = state.nightPalette
-  root.dataset.uiStyle = state.uiStyle
-  root.dataset.stylePaletteMode = state.stylePaletteMode
-  root.dataset.palette = resolveEffectivePalette(
+  const palette = resolveEffectivePalette(
     state.theme,
     systemTheme.matches,
     stylePalettePair?.day ?? state.dayPalette,
     stylePalettePair?.night ?? state.nightPalette,
   )
+  const appearance = paletteAppearance(palette)
+  root.dataset.theme = state.theme
+  root.dataset.dayPalette = state.dayPalette
+  root.dataset.nightPalette = state.nightPalette
+  root.dataset.uiStyle = state.uiStyle
+  root.dataset.stylePaletteMode = state.stylePaletteMode
+  root.dataset.palette = palette
+  root.dataset.appearance = appearance
+  const colorSchemeMeta = document.querySelector<HTMLMetaElement>('meta[name="color-scheme"]')
+  if (colorSchemeMeta) {
+    colorSchemeMeta.content = appearance
+    colorSchemeMeta.setAttribute('content', appearance)
+  }
 }
 
 applyTheme(readInitialThemePreferences())

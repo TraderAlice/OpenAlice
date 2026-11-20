@@ -70,7 +70,7 @@ const r=await Bun.build({entrypoints:[${JSON.stringify(probe)}],compile:{...runt
     if (result.error || result.status !== 0) throw new Error(`Compiled probe build failed: ${result.error ?? result.stderr}`)
     if (process.platform === 'darwin') signCliMacOS(compiledProbe, process.arch)
   }
-  for (const asset of catalog.packs) await verifyAsset(asset, tempRoot)
+  await Promise.all(catalog.packs.map((asset) => verifyAsset(asset, tempRoot)))
 } finally {
   await rm(tempRoot, { recursive: true, force: true })
 }

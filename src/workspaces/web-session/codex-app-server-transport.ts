@@ -5,6 +5,7 @@
  * starts a new one, drives turns with `turn/start`, and answers command,
  * file-change, permission, and user-input requests from the browser.
  */
+import { isCodexNativeUnavailableModel } from '../adapters/codex.js'
 import { JsonRpcPeer } from './json-rpc.js'
 import {
   isJsonObject,
@@ -61,11 +62,22 @@ export class CodexAppServerTransport implements WebSessionTransport {
     await this.peer.notify('initialized', {})
     // `AskForApproval` / `SandboxMode` are kebab-case wire enums (verified
     // against `codex app-server generate-json-schema`, 0.153.x).
+    const isNative = !this.ctx.input.env['OPENALICE_SESSION_KEY']
+      && !this.ctx.input.command.some((arg) => arg.startsWith('model_provider='))
+    let model = this.ctx.input.model
+    if (isNative && isCodexNativeUnavailableModel(model)) {
+      this.ctx.logger.warn('codex.native_unavailable_model_dropped', {
+        model,
+        surface: 'web',
+        reason: 'model is unavailable on native ChatGPT subscription accounts; falling back to Codex CLI default',
+      })
+      model = undefined
+    }
     const options = {
       cwd: this.ctx.input.cwd,
       approvalPolicy: 'never',
       sandbox: 'danger-full-access',
-      ...(this.ctx.input.model ? { model: this.ctx.input.model } : {}),
+      ...(model ? { model } : {}),
     }
     const result = this.threadId
       ? await this.peer.request('thread/resume', { threadId: this.threadId, ...options }, THREAD_TIMEOUT_MS)

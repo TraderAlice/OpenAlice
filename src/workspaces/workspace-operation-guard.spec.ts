@@ -49,3 +49,51 @@ describe('WorkspaceOperationGuard groups', () => {
     lease.release()
   })
 })
+
+describe('WorkspaceOperationGuard shared leases', () => {
+  it('allows multiple shared start-leases to coexist on one Workspace', () => {
+    const guard = new WorkspaceOperationGuard()
+    const a = guard.acquireShared('ws', 'headless-run')
+    const b = guard.acquireShared('ws', 'headless-probe')
+    expect(a).not.toBeNull()
+    expect(b).not.toBeNull()
+    expect(guard.current('ws')).toBe('headless-run')
+    a!.release()
+    expect(guard.current('ws')).toBe('headless-probe')
+    b!.release()
+    expect(guard.current('ws')).toBeNull()
+  })
+
+  it('rejects an exclusive acquire while any shared lease is active', () => {
+    const guard = new WorkspaceOperationGuard()
+    const shared = guard.acquireShared('ws', 'headless-run')!
+    expect(guard.acquire('ws', 'template-upgrade')).toBeNull()
+    expect(guard.current('ws')).toBe('headless-run')
+    shared.release()
+    expect(guard.acquire('ws', 'template-upgrade')).not.toBeNull()
+  })
+
+  it('rejects a shared acquire while an exclusive lease is active', () => {
+    const guard = new WorkspaceOperationGuard()
+    const exclusive = guard.acquire('ws', 'offboarding')!
+    expect(guard.acquireShared('ws', 'headless-run')).toBeNull()
+    exclusive.release()
+    expect(guard.acquireShared('ws', 'headless-run')).not.toBeNull()
+  })
+
+  it('waits for every shared lease to release before granting an exclusive lease', async () => {
+    const guard = new WorkspaceOperationGuard()
+    const a = guard.acquireShared('ws', 'headless-run')!
+    const b = guard.acquireShared('ws', 'headless-probe')!
+    const pending = guard.acquireWhenAvailable('ws', 'template-upgrade')
+    let settled = false
+    void pending.then(() => { settled = true })
+    a.release()
+    await Promise.resolve()
+    expect(settled).toBe(false)
+    b.release()
+    const lease = await pending
+    expect(guard.current('ws')).toBe('template-upgrade')
+    lease.release()
+  })
+})

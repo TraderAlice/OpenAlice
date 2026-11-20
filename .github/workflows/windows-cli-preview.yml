@@ -81,7 +81,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
-      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop' --filter='!@traderalice/landing' --filter='!./packages/uta-broker-*'
         if: inputs.candidate_run == ''
       - run: pnpm build:server
         if: inputs.candidate_run == '' && !inputs.neutral_inputs

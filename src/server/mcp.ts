@@ -16,6 +16,7 @@ import type { WorkspaceService } from '../workspaces/service.js'
 import type { InboxOrigin } from '../core/inbox-store.js'
 import { extractMcpShape, wrapToolExecute } from '../core/mcp-export.js'
 import { makeHeadlessControl, makeScheduleControl, makeSessionControl, registerCliRoutes } from './cli.js'
+import { makeWorkspaceRuntimeControl } from './workspace-runtime-control.js'
 import { resolveInboxOrigin } from './inbox-origin.js'
 import { createWorkspaceConversationControl } from '../workspaces/conversation-control.js'
 import { sessionCoworkerLabel } from '../workspaces/session-registry.js'
@@ -106,6 +107,7 @@ export class McpPlugin implements Plugin {
         entityStore,
         ...(svc ? { provenanceStore: svc.provenanceStore } : {}),
         ...(svc ? { conversation: createWorkspaceConversationControl(svc) } : {}),
+        ...(svc ? { orchestration: svc.orchestration } : {}),
         ...(svc ? { templateUpgrades: svc.templateUpgrades } : {}),
         ...(svc ? {
           setSessionDisplayName: async (input) => {
@@ -124,6 +126,7 @@ export class McpPlugin implements Plugin {
           sessionControl: makeSessionControl(svc),
           headlessControl: makeHeadlessControl(svc),
           scheduleControl: makeScheduleControl(svc),
+          workspaceRuntimeControl: makeWorkspaceRuntimeControl(svc),
         } : {}),
         // Parity with the CLI gateway so external MCP consumers get the same
         // workspace_path resolution — shared helper, so the two can't drift.

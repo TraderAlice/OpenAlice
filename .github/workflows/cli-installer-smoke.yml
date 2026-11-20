@@ -143,7 +143,7 @@ jobs:
         with:
           bun-version-file: ".bun-version"
 
-      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop' --filter='!@traderalice/landing' --filter='!./packages/uta-broker-*'
 
       - run: pnpm build:server
 
@@ -245,7 +245,7 @@ jobs:
           node-version: 22.19.0
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop' --filter='!@traderalice/landing' --filter='!./packages/uta-broker-*'
 
       - name: Build platform-neutral server inputs
         run: pnpm build:server
@@ -293,9 +293,8 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
-      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
-      - run: pnpm broker-packs:build
-      - run: pnpm exec tsx scripts/verify-broker-packs.ts --compiled
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop' --filter='!@traderalice/landing'
+      - run: pnpm broker-packs:build:compiled
       - uses: actions/upload-artifact@v4
         with:
           name: dev-broker-${{ matrix.platform }}-${{ matrix.arch }}
@@ -342,7 +341,7 @@ jobs:
         with:
           bun-version-file: ".bun-version"
 
-      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop' --filter='!@traderalice/landing' --filter='!./packages/uta-broker-*'
 
       - name: Download platform-neutral inputs
         uses: actions/download-artifact@v4

@@ -37,11 +37,13 @@ import {
 } from '../components/workspace/terminalAppearance'
 import { WorkspaceAIConfigModal, type Tab } from '../components/workspace/WorkspaceAIConfigModal'
 import {
+  activateWorkspace as apiActivateWorkspace,
   deleteSession as apiDeleteSession,
   type AgentId,
   getIssueDefaultAgent,
   getAutoQuantDefaultWorkspace,
   getAutoPredictionDefaultWorkspace,
+  getWorkspaceActivationPreview,
   getWorkspaceManager,
   getWorkspaceSessionDirectory,
   getWorkspaceDefaultAgent,
@@ -73,7 +75,9 @@ import {
   type SessionRecord,
   type TemplateInfo,
   type Workspace,
+  type WorkspaceActivationPreview,
 } from '../components/workspace/api'
+import { workspaceDisplayName } from '../components/workspace/display'
 import { useWorkspace } from '../tabs/store'
 import type { WorkspaceSource } from '../tabs/types'
 import {
@@ -124,8 +128,15 @@ export function WorkspacesProvider({ children, renderContent }: { children: Reac
     wsId: string
     agent?: AgentId
     section?: 'general' | 'launch' | 'ai' | 'template' | 'absorb'
+    absorbSourceWsId?: string
   } | null>(null)
   const [pendingSessionDelete, setPendingSessionDelete] = useState<{ wsId: string; sessionId: string } | null>(null)
+  const [activatingWorkspaceId, setActivatingWorkspaceId] = useState<string | null>(null)
+  const [pendingActivation, setPendingActivation] = useState<{
+    wsId: string
+    preview: WorkspaceActivationPreview
+    resolve: (activated: boolean) => void
+  } | null>(null)
   const { t } = useTranslation()
   const toast = useToast()
   const terminalAppearance = useTerminalAppearance()
@@ -765,15 +776,92 @@ export function WorkspacesProvider({ children, renderContent }: { children: Reac
     }
   }, [refresh, refreshWorkspaceManager])
 
+  const commitActivateWorkspace = useCallback(async (wsId: string): Promise<boolean> => {
+    setActivatingWorkspaceId(wsId)
+    try {
+      const result = await apiActivateWorkspace(wsId)
+      const activated = result.workspace
+      setWorkspaces((prev) => prev.map((candidate) => {
+        if (candidate.id === activated.id) {
+          return { ...candidate, ...activated, activationState: 'active' }
+        }
+        if (result.previousActiveId && candidate.id === result.previousActiveId) {
+          return { ...candidate, activationState: 'standby' }
+        }
+        return candidate
+      }))
+      if (activated.template === 'auto-quant-v2') {
+        setAutoQuantDefaultWorkspaceId(activated.id)
+        setAutoQuantPreferenceError(null)
+      } else if (activated.template === 'auto-prediction') {
+        setAutoPredictionDefaultWorkspaceId(activated.id)
+        setAutoPredictionPreferenceError(null)
+      }
+      await Promise.all([
+        refresh(),
+        refreshAutoQuantPreference(),
+        refreshAutoPredictionPreference(),
+      ])
+      toast.success(
+        t('workspace.activation.activatedToast', {
+          workspace: workspaceDisplayName(activated),
+        }),
+      )
+      return true
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('workspace.activation.activateFailed'))
+      return false
+    } finally {
+      setActivatingWorkspaceId((current) => (current === wsId ? null : current))
+    }
+  }, [refresh, refreshAutoPredictionPreference, refreshAutoQuantPreference, t, toast])
+
+  const requestActivateWorkspace = useCallback(async (wsId: string): Promise<boolean> => {
+    setActivatingWorkspaceId(wsId)
+    try {
+      const preview = await getWorkspaceActivationPreview(wsId)
+      if (preview.alreadyActive) {
+        await refresh()
+        setActivatingWorkspaceId((current) => (current === wsId ? null : current))
+        return true
+      }
+      const currentActive = preview.currentActive
+      const needsConfirm = Boolean(
+        currentActive
+        && (
+          currentActive.openIssueCount > 0
+          || currentActive.scheduledIssueCount > 0
+          || currentActive.inFlightRunCount > 0
+        ),
+      )
+      if (!needsConfirm) {
+        return await commitActivateWorkspace(wsId)
+      }
+      setActivatingWorkspaceId((current) => (current === wsId ? null : current))
+      return await new Promise<boolean>((resolve) => {
+        setPendingActivation((previous) => {
+          previous?.resolve(false)
+          return { wsId, preview, resolve }
+        })
+      })
+    } catch (err) {
+      setActivatingWorkspaceId((current) => (current === wsId ? null : current))
+      toast.error(err instanceof Error ? err.message : t('workspace.activation.activateFailed'))
+      return false
+    }
+  }, [commitActivateWorkspace, refresh, t, toast])
+
   const openAgentConfig = useCallback((
     wsId: string,
     agent?: AgentId,
     section?: 'general' | 'launch' | 'ai' | 'template' | 'absorb',
+    absorbSourceWsId?: string,
   ): void => {
     setConfiguringAgentTarget({
       wsId,
       ...(agent ? { agent } : {}),
       ...(section ? { section } : {}),
+      ...(absorbSourceWsId ? { absorbSourceWsId } : {}),
     })
   }, [])
 
@@ -798,6 +886,8 @@ export function WorkspacesProvider({ children, renderContent }: { children: Reac
     autoPredictionDefaultWorkspaceId,
     autoPredictionPreferenceLoaded,
     autoPredictionPreferenceError,
+    activatingWorkspaceId,
+    requestActivateWorkspace,
     refresh,
     refreshTemplates,
     refreshAutoQuantPreference,
@@ -825,6 +915,7 @@ export function WorkspacesProvider({ children, renderContent }: { children: Reac
     saveWorkspaceMetadata,
     renameWorkspace,
   }), [
+    activatingWorkspaceId,
     agents,
     autoPredictionDefaultWorkspaceId,
     autoPredictionPreferenceError,
@@ -851,6 +942,7 @@ export function WorkspacesProvider({ children, renderContent }: { children: Reac
     refreshTemplates,
     refreshWorkspaceManager,
     renameWorkspace,
+    requestActivateWorkspace,
     requestDeleteSession,
     setSessionPresence,
     setSessionDisplayName,
@@ -880,6 +972,30 @@ export function WorkspacesProvider({ children, renderContent }: { children: Reac
   const pendingDeleteLabel =
     pendingDeleteSession?.title?.trim() || pendingDeleteSession?.name || ''
 
+  const pendingActivationTarget = pendingActivation
+    ? workspaces.find((w) => w.id === pendingActivation.wsId) ?? null
+    : null
+  const pendingActivationTargetLabel = pendingActivationTarget
+    ? workspaceDisplayName(pendingActivationTarget)
+    : pendingActivation?.wsId ?? ''
+  const pendingActivationPrevious = pendingActivation?.preview.currentActive ?? null
+  const pendingActivationPreviousLabel = pendingActivationPrevious
+    ? (pendingActivationPrevious.displayName?.trim() || pendingActivationPrevious.tag)
+    : ''
+  const pendingActivationCounts: string[] = pendingActivationPrevious
+    ? [
+        pendingActivationPrevious.openIssueCount > 0
+          ? String(t('workspace.activation.confirmOpenIssues', { count: pendingActivationPrevious.openIssueCount }))
+          : null,
+        pendingActivationPrevious.scheduledIssueCount > 0
+          ? String(t('workspace.activation.confirmScheduledIssues', { count: pendingActivationPrevious.scheduledIssueCount }))
+          : null,
+        pendingActivationPrevious.inFlightRunCount > 0
+          ? String(t('workspace.activation.confirmInFlightRuns', { count: pendingActivationPrevious.inFlightRunCount }))
+          : null,
+      ].filter((item): item is string => item !== null)
+    : []
+
   const content = <>
         {children}
         {configuringAgentTarget !== null && (
@@ -893,6 +1009,7 @@ export function WorkspacesProvider({ children, renderContent }: { children: Reac
                   ? 'launch'
                   : 'general'
             )}
+            initialAbsorbSourceId={configuringAgentTarget.absorbSourceWsId}
             onAiSaved={({ model, runtimeLabel, workspaceLabel }) => {
               toast.success(model
                 ? t('workspaceSettings.ai.savedModelToast', {
@@ -929,6 +1046,43 @@ export function WorkspacesProvider({ children, renderContent }: { children: Reac
               setPendingSessionDelete(null)
             }}
             onClose={() => setPendingSessionDelete(null)}
+          />
+        )}
+        {pendingActivation !== null && (
+          <ConfirmDialog
+            title={t('workspace.activation.confirmTitle', { workspace: pendingActivationTargetLabel })}
+            message={(
+              <div className="space-y-2.5">
+                <p>
+                  {t('workspace.activation.confirmSummary', { previous: pendingActivationPreviousLabel })}
+                </p>
+                {pendingActivationCounts.length > 0 && (
+                  <ul className="list-disc space-y-1 pl-5 text-[12px] text-muted-foreground">
+                    {pendingActivationCounts.map((item) => (
+                      <li key={item} className="tabular-nums text-foreground">{item}</li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-[12px] text-muted-foreground">
+                  {t('workspace.activation.confirmSafeNote')}
+                </p>
+              </div>
+            )}
+            confirmLabel={t('workspace.activation.activate')}
+            cancelLabel={t('common.cancel')}
+            workingLabel={t('workspace.activation.activating')}
+            variant="primary"
+            onConfirm={async () => {
+              const target = pendingActivation
+              const activated = await commitActivateWorkspace(target.wsId)
+              setPendingActivation(null)
+              target.resolve(activated)
+            }}
+            onClose={() => {
+              const target = pendingActivation
+              setPendingActivation(null)
+              target.resolve(false)
+            }}
           />
         )}
   </>

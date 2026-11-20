@@ -19,11 +19,13 @@ import type {
   IssueStatus,
   IssueWorkspace,
 } from '../api/issues'
-import type { ScheduleWhen } from '../api/schedule'
+import type { ScheduleSkipState, ScheduleWhen } from '../api/schedule'
 import { useIssues } from '../hooks/useIssues'
+import { resolveScheduleSkipState, useScheduleSnapshot } from '../hooks/useSchedules'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { formatRelativeTime } from '../lib/intl'
 import { useWorkspace } from '../tabs/store'
+import { ScheduleSkipPill } from './ScheduleSkipState'
 import { CenteredLoading } from './StateViews'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './ui/dropdown-menu'
 import { SelectionCheckIcon } from './ui/selection-check-icon'
@@ -265,6 +267,8 @@ interface BoardRow {
   wsId: string
   wsTag: string
   issue: IssueListItem
+  /** Active scanner skip state from GET /api/schedule (for non-terminal scheduled issues). */
+  skipState?: ScheduleSkipState
   /** When this issue's name collides across workspaces (`issue.nameCollision`),
    *  how many OTHER workspaces also claim the name — drives the warning tooltip.
    *  Absent ⇒ no collision. */
@@ -296,9 +300,16 @@ const PRIORITY_ORDER: Record<IssuePriority, number> = {
   none: 4,
 }
 
+function rowAttention(row: BoardRow): number {
+  const base = row.issue.automationHealth ? ATTENTION_ORDER[row.issue.automationHealth.state] : 4
+  if (row.skipState?.kind === 'parked') return Math.min(base, ATTENTION_ORDER.blocked)
+  if (row.skipState?.kind === 'deferred') return Math.min(base, ATTENTION_ORDER.interrupted)
+  return base
+}
+
 function boardRowOrder(a: BoardRow, b: BoardRow): number {
-  const aAttention = a.issue.automationHealth ? ATTENTION_ORDER[a.issue.automationHealth.state] : 4
-  const bAttention = b.issue.automationHealth ? ATTENTION_ORDER[b.issue.automationHealth.state] : 4
+  const aAttention = rowAttention(a)
+  const bAttention = rowAttention(b)
   if (aAttention !== bAttention) return aAttention - bAttention
 
   const priority = PRIORITY_ORDER[a.issue.priority] - PRIORITY_ORDER[b.issue.priority]
@@ -377,13 +388,13 @@ export function PropertyMenu({ field, issue, onPatch, controlId, showLabel = fal
   </DropdownMenu>
 }
 
-function IssueRow({ wsId, wsTag, issue, dupOthers, onOpen, onPatch, columns }: BoardRow & { columns: IssueColumn[]; onOpen: () => void; onPatch: (patch: IssuePatch) => Promise<void> }) {
+function IssueRow({ wsId, wsTag, issue, skipState, dupOthers, onOpen, onPatch, columns }: BoardRow & { columns: IssueColumn[]; onOpen: () => void; onPatch: (patch: IssuePatch) => Promise<void> }) {
   const { t } = useTranslation()
   const terminal = issue.status === 'done' || issue.status === 'canceled'
   return (
-    <li className="group flex h-11 min-w-0 items-center gap-1 px-3 hover:bg-muted/45 sm:px-6">
+    <li className="group flex h-11 min-w-0 items-center gap-1 px-3 hover:bg-muted/45 @sm/content:px-6">
       {columns.includes('priority') && <PropertyMenu controlId={`issue-priority-${wsId}-${issue.id}`} field="priority" issue={issue} onPatch={onPatch} />}
-      {columns.includes('id') && <span className="hidden w-16 shrink-0 truncate text-xs text-muted-foreground sm:block" title={t('issues.issueIdTitle', { id: issue.id })}>#{issue.id}</span>}
+      {columns.includes('id') && <span className="hidden w-16 shrink-0 truncate text-xs text-muted-foreground @sm/content:block" title={t('issues.issueIdTitle', { id: issue.id })}>#{issue.id}</span>}
       {columns.includes('status') && <PropertyMenu controlId={`issue-status-${wsId}-${issue.id}`} field="status" issue={issue} onPatch={onPatch} />}
       <button
         type="button"
@@ -399,12 +410,16 @@ function IssueRow({ wsId, wsTag, issue, dupOthers, onOpen, onPatch, columns }: B
             <Copy size={12} aria-hidden />
           </span>
         )}
-        {columns.includes('workspace') && <span className="hidden max-w-36 shrink-0 items-center gap-1.5 rounded-full border border-border/70 px-2 py-0.5 text-[11px] text-muted-foreground lg:inline-flex" title={t('issues.workspaceTitle', { workspace: wsTag, id: wsId.slice(0, 8) })}>
+        {columns.includes('workspace') && <span className="hidden max-w-36 shrink-0 items-center gap-1.5 rounded-full border border-border/70 px-2 py-0.5 text-[11px] text-muted-foreground @lg/content:inline-flex" title={t('issues.workspaceTitle', { workspace: wsTag, id: wsId.slice(0, 8) })}>
           <Layers size={11} className="shrink-0" aria-hidden />
           <span className="truncate">{wsTag}</span>
         </span>}
         {columns.includes('schedule') && <span data-testid="issue-automation-summary" className="flex shrink-0 items-center gap-4">
-          <span className="hidden w-28 items-center justify-end sm:flex"><BoardCadence issue={issue} /></span>
+          {!terminal && issue.when && skipState ? (
+            <ScheduleSkipPill skipState={skipState} />
+          ) : (
+            <span className="hidden w-28 items-center justify-end @sm/content:flex"><BoardCadence issue={issue} /></span>
+          )}
         </span>}
       </button>
       {columns.includes('assignee') && <div className="ml-2 shrink-0"><IssueAssigneePopover wsId={wsId} id={issue.id} assignee={issue.assignee} health={issue.automationHealth} /></div>}
@@ -450,7 +465,7 @@ function StatusGroup({
         aria-expanded={!collapsed}
         aria-controls={listId}
         aria-label={t(collapsed ? 'issues.expandStatus' : 'issues.collapseStatus', { status: statusLabel })}
-        className="flex h-9 w-full items-center gap-2 rounded-lg bg-muted/45 px-3 text-left transition-colors hover:bg-muted/60 sm:px-4"
+        className="flex h-9 w-full items-center gap-2 rounded-lg bg-muted/45 px-3 text-left transition-colors hover:bg-muted/60 @sm/content:px-4"
       >
         {collapsed ? (
           <ChevronRight size={14} className="shrink-0 text-muted-foreground/70" />
@@ -505,6 +520,14 @@ function InvalidWorkspaces({ workspaces }: { workspaces: IssueWorkspace[] }) {
 export function IssuesBoard() {
   const { t } = useTranslation()
   const { data, error, loading, updateIssue } = useIssues()
+  const hasScheduledIssues = Boolean(
+    data?.workspaces?.some(
+      (ws) => ws.status === 'ok' && ws.issues?.some((issue) => Boolean(issue.when)),
+    ),
+  )
+  const { snapshot: scheduleSnapshot, refresh: refreshSchedule } = useScheduleSnapshot({
+    enabled: hasScheduledIssues,
+  })
   const { workspaces: workspaceMetas } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
@@ -559,14 +582,21 @@ export function IssuesBoard() {
   }
 
   const rows: BoardRow[] = okWorkspaces.flatMap((w) =>
-    (w.issues ?? []).map((issue) => ({
-      wsId: w.wsId,
-      wsTag: workspaceMetas.find((workspace) => workspace.id === w.wsId)?.displayName || w.tag,
-      issue,
-      dupOthers: issue.nameCollision
-        ? Math.max(0, (wsByName.get(nameKey(issue.title))?.size ?? 1) - 1)
-        : undefined,
-    })),
+    (w.issues ?? []).map((issue) => {
+      const terminal = issue.status === 'done' || issue.status === 'canceled'
+      const skipState = !terminal && issue.when
+        ? resolveScheduleSkipState(scheduleSnapshot, w.wsId, issue.id, issue.skipState)
+        : undefined
+      return {
+        wsId: w.wsId,
+        wsTag: workspaceMetas.find((workspace) => workspace.id === w.wsId)?.displayName || w.tag,
+        issue,
+        ...(skipState ? { skipState } : {}),
+        dupOthers: issue.nameCollision
+          ? Math.max(0, (wsByName.get(nameKey(issue.title))?.size ?? 1) - 1)
+          : undefined,
+      }
+    }),
   )
 
   const visibleRows = rows.filter((row) => matchesIssueView(row.issue, row.wsId, view))
@@ -595,7 +625,7 @@ export function IssuesBoard() {
 
   if (rows.length === 0 && invalid.length === 0) {
     return (
-      <div className="mx-auto max-w-[1240px] space-y-3">
+      <div className="@container/content mx-auto max-w-[1240px] space-y-3">
         {toolbar}
         {staleBanner}
         <div className="rounded-lg border border-dashed border-border px-6 py-12 text-center">
@@ -614,7 +644,7 @@ export function IssuesBoard() {
   }
 
   return (
-    <div data-testid="issues-board" className="w-full space-y-1">
+    <div data-testid="issues-board" className="@container/content w-full space-y-1">
       {toolbar}
       {staleBanner}
       {groups.length === 0 && rows.length > 0 && <p className="py-16 text-center text-sm text-muted-foreground">{t('issues.view.noMatches')}</p>}
@@ -631,7 +661,10 @@ export function IssuesBoard() {
           collapsed={collapsed.has(`${view.grouping}:${g.key}`)}
           onToggle={() => toggle(`${view.grouping}:${g.key}`)}
           onOpenRow={openRow}
-          onPatch={updateIssue}
+          onPatch={async (wsId, id, patch) => {
+            await updateIssue(wsId, id, patch)
+            if (hasScheduledIssues) void refreshSchedule()
+          }}
         />
       ))}
     </div>

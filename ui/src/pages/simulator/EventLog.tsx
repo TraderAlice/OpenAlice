@@ -15,8 +15,12 @@ import { Button } from '../../components/ui/button'
 const COLLAPSED_COUNT = 5
 
 function formatTime(ts: number): string {
-  const d = new Date(ts)
-  return d.toTimeString().slice(0, 8)
+  return new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(new Date(ts))
 }
 
 export function EventLog({ events }: { events: SimulatorEvent[] }) {
@@ -33,8 +37,8 @@ export function EventLog({ events }: { events: SimulatorEvent[] }) {
             <tbody>
               {visible.map((ev) => (
                 <tr key={ev.id} className="text-foreground">
-                  <td className="py-0.5 pr-3 font-mono text-[11px] leading-[15px] text-muted-foreground/80 w-20">{formatTime(ev.ts)}</td>
-                  <td className="py-0.5 pr-3 text-muted-foreground/60 text-[11px] w-20">{formatRelativeTime(ev.ts)}</td>
+                  <td className="py-0.5 pr-3 font-mono text-[11px] leading-[15px] tabular-nums text-muted-foreground/80 w-20">{formatTime(ev.ts)}</td>
+                  <td className="py-0.5 pr-3 text-muted-foreground/60 text-[11px] tabular-nums w-20">{formatRelativeTime(ev.ts)}</td>
                   <td className="py-0.5 pr-3">
                     <span className={ev.status === 'err' ? 'text-destructive' : 'text-foreground'}>{ev.label}</span>
                     {ev.detail && (

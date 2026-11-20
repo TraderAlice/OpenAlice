@@ -35,6 +35,8 @@ interface MarkerRecord {
 
 export class ScheduleMarkerStore {
   private readonly records = new Map<string, MarkerRecord>()
+  private flushSeq = 0
+  private flushChain: Promise<void> = Promise.resolve()
 
   private constructor(
     private readonly path: string,
@@ -81,29 +83,40 @@ export class ScheduleMarkerStore {
     await this.flush()
   }
 
-  /** Drop markers whose key wasn't seen this scan (workspace/task gone) - bounds growth. */
-  async prune(seenKeys: Set<string>): Promise<void> {
+  /** Drop markers whose key wasn't seen this scan (workspace/task gone) - bounds growth.
+   *  Workspaces listed in `preserveWorkspaceIds` (e.g. standby workspaces) retain
+   *  their markers so re-activating them never loses firing history. */
+  async prune(seenKeys: Set<string>, preserveWorkspaceIds?: ReadonlySet<string>): Promise<void> {
     let changed = false
     for (const key of [...this.records.keys()]) {
-      if (!seenKeys.has(key)) {
-        this.records.delete(key)
-        changed = true
+      if (seenKeys.has(key)) continue
+      if (preserveWorkspaceIds && preserveWorkspaceIds.size > 0) {
+        const sepIdx = key.indexOf(SEP)
+        if (sepIdx > 0 && preserveWorkspaceIds.has(key.slice(0, sepIdx))) continue
       }
+      this.records.delete(key)
+      changed = true
     }
     if (changed) await this.flush()
   }
 
-  private async flush(): Promise<void> {
-    try {
-      await mkdir(dirname(this.path), { recursive: true })
-      const markers: Record<string, MarkerRecord> = {}
-      for (const [key, value] of this.records) markers[key] = value
-      const tmp = `${this.path}.tmp`
-      await writeFile(tmp, JSON.stringify({ version: 2, markers }, null, 2), 'utf8')
-      await rename(tmp, this.path)
-    } catch (err) {
-      this.logger.warn('schedule_marker.flush_failed', { err })
+  private flush(): Promise<void> {
+    const run = async (): Promise<void> => {
+      try {
+        await mkdir(dirname(this.path), { recursive: true })
+        const markers: Record<string, MarkerRecord> = {}
+        for (const [key, value] of this.records) markers[key] = value
+        // Unique tmp name + chained writes: concurrent set()/hold() calls on the
+        // same tick otherwise race on rename() of a single shared .tmp file.
+        const tmp = `${this.path}.${process.pid}.${++this.flushSeq}.tmp`
+        await writeFile(tmp, JSON.stringify({ version: 2, markers }, null, 2), 'utf8')
+        await rename(tmp, this.path)
+      } catch (err) {
+        this.logger.warn('schedule_marker.flush_failed', { err })
+      }
     }
+    this.flushChain = this.flushChain.then(run, run)
+    return this.flushChain
   }
 }
 

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { act, renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useOfficeFloor } from './useOfficeFloor'
 
@@ -17,6 +17,10 @@ vi.mock('../api', () => ({
 
 beforeEach(() => {
   floor.mockReset()
+})
+
+afterEach(() => {
+  cleanup()
 })
 
 describe('useOfficeFloor', () => {
@@ -62,5 +66,43 @@ describe('useOfficeFloor', () => {
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(floor).toHaveBeenCalledWith({ asOfSeq: 2 })
     expect(result.current.building?.asOfSeq).toBe(2)
+  })
+
+  it('skips interval polling while hidden and refreshes immediately when visible again', async () => {
+    vi.useFakeTimers()
+    const visibility = Object.getOwnPropertyDescriptor(document, 'visibilityState')
+    try {
+      floor.mockResolvedValue({
+        config: {
+          workspaceSleepAfterMs: 3 * 24 * 60 * 60 * 1000,
+          harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 1, prediction: 1, other: 0 },
+        },
+        offices: [],
+        lastSeq: 1,
+        firstSeq: 1,
+      })
+      const { unmount } = renderHook(() => useOfficeFloor())
+      await act(async () => {
+        await Promise.resolve()
+      })
+      expect(floor).toHaveBeenCalledTimes(1)
+
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+      await act(async () => {
+        vi.advanceTimersByTime(8_000)
+      })
+      expect(floor).toHaveBeenCalledTimes(1)
+
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+      expect(floor).toHaveBeenCalledTimes(2)
+      unmount()
+    } finally {
+      if (visibility) Object.defineProperty(document, 'visibilityState', visibility)
+      else Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+      vi.useRealTimers()
+    }
   })
 })

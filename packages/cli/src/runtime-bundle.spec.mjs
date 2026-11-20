@@ -131,7 +131,7 @@ async function createFixture() {
   const files = {
     'dist/main.js': 'main\n',
     'ui/dist/index.html': '<html></html>\n',
-    'src/workspaces/templates/chat/bootstrap.mjs': 'export {}\n',
+    'templates/chat/bootstrap.mjs': 'export {}\n',
     'src/workspaces/cli/bin/openalice-cli.cjs': 'module.exports = {}\n',
     'src/workspaces/cli/bin/pi-session-provider.ts': 'export default function () {}\n',
     'services/uta/dist/uta.js': 'uta\n',

@@ -51,6 +51,11 @@ describe('ModelCombobox', () => {
     expect(onChange).toHaveBeenCalledWith('private-model')
 
     fireEvent.keyDown(input, { key: 'ArrowDown' })
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
+    expect(onChange).toHaveBeenLastCalledWith('private-model')
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 })
+    expect(onChange).toHaveBeenLastCalledWith('private-model')
+
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(onChange).toHaveBeenLastCalledWith('deepseek-v4-flash')
   })

@@ -23,14 +23,18 @@ import type { IssueCommentRequest } from '../dispatch-communication.js'
  * without firing immediately on creation OR never firing at all — seeding cron
  * from `now` makes `computeNextRun` always strictly future, i.e. never due).
  * Then `computeNextRun(when, base) <= now`. The last-fired marker is written
- * only AFTER a successful dispatch. Admission skips (`busy`, capacity) leave
- * `every` due; cron defaults to the same catch-up, or consumes the slot when
- * `catchUp: false`.
+ * only AFTER a successful dispatch. Pure transient skips (capacity, busy,
+ * takeover declined) retry on the next tick (with cron catch-up / calendar-only
+ * cursor handling). Timed cooldowns and backoff errors defer dispatch in an
+ * in-memory DispatchGate without mutating schedule markers; structural/permanent
+ * blockers park automatic dispatch until the Issue changes, a Session block
+ * lifts, or a manual run succeeds.
  */
 
 import { computeNextRun, scheduleCatchesUp, type Schedule } from '../../core/schedule-expr.js'
 import type { CliAdapter } from '../cli-adapter.js'
 import type { SessionRuntimeSelection } from '../session-runtime-binding.js'
+import { SessionAdmissionError } from '../session-admission.js'
 import type { Logger } from '../logger.js'
 import type { WorkspaceMeta, WorkspaceRegistry } from '../workspace-registry.js'
 import type { HeadlessTaskInquiry, HeadlessTaskTrigger } from '../headless-task-registry.js'
@@ -54,6 +58,7 @@ import {
 import {
   fireBase,
   snapshotScheduledIssue,
+  type ScheduleSkipState,
   type ScheduleSnapshot,
   type ScheduleSnapshotTask,
   type ScheduleSnapshotWorkspace,
@@ -61,8 +66,12 @@ import {
 
 export const DEFAULT_INTERVAL_MS = 60_000
 
+/** Capped exponential backoff ladder for `not_ready` and unrecognized errors. */
+export const BACKOFF_STEPS_MS = [60_000, 5 * 60_000, 15 * 60_000, 60 * 60_000] as const
+
 export type ScheduledIssueRunNowErrorCode =
   | 'not_found'
+  | 'invalid'
   | 'not_scheduled'
   | 'not_retryable'
   | 'not_fireable'
@@ -80,6 +89,184 @@ export class ScheduledIssueRunNowError extends Error {
   }
 }
 
+export type ScheduleDispatchErrorCode =
+  | 'dispatch_in_progress'
+  | 'issue_not_found'
+  | 'no_agent_owner'
+  | 'assignee_workspace_unavailable'
+  | 'adapter_no_headless'
+  | 'workspace_not_active'
+  | 'invalid_runtime_settings'
+  | 'claim_persistence_unsupported'
+  | 'service_shutting_down'
+
+/** Typed error for schedule dispatch pre-flight / structural conditions so
+ *  `classifyScheduleSkip` classifies by stable code instead of message strings. */
+export class ScheduleDispatchError extends Error {
+  constructor(
+    public readonly code: ScheduleDispatchErrorCode,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'ScheduleDispatchError'
+  }
+}
+
+export type ScheduleSkipDisposition = 'retry_next_tick' | 'defer' | 'park'
+
+export type ScheduleSkipDecision =
+  | { disposition: 'retry_next_tick'; code: string; reason: string }
+  | { disposition: 'defer'; code: string; reason: string; retryAtMs: number; sessionBlocked?: boolean }
+  | { disposition: 'defer'; code: string; reason: string; backoff: true }
+  | { disposition: 'park'; code: string; reason: string; sessionBlocked?: boolean }
+
+const RETRY_NEXT_TICK_CODES: Readonly<Record<string, true>> = {
+  headless_capacity: true,
+  busy: true,
+  takeover_declined: true,
+  already_running: true,
+  dispatch_in_progress: true,
+}
+
+const PARK_ERROR_CODES: Readonly<Record<string, true>> = {
+  // HeadlessResumeError permanent states
+  not_found: true,
+  wrong_workspace: true,
+  wrong_agent: true,
+  retired: true,
+  deleted: true,
+  // ScheduledIssueRunNowError non-transient states
+  invalid: true,
+  not_scheduled: true,
+  not_fireable: true,
+  not_retryable: true,
+  // ScheduleDispatchError structural blockers
+  issue_not_found: true,
+  no_agent_owner: true,
+  assignee_workspace_unavailable: true,
+  adapter_no_headless: true,
+  workspace_not_active: true,
+  invalid_runtime_settings: true,
+  claim_persistence_unsupported: true,
+  service_shutting_down: true,
+}
+
+/** Classify a schedule dispatch failure structurally (`instanceof` / `code`).
+ *  Unrecognized errors safely fall back to capped exponential backoff (`defer`). */
+export function classifyScheduleSkip(err: unknown, nowMs: number): ScheduleSkipDecision {
+  const reason = err instanceof Error ? err.message : String(err)
+  const rawCode = typeof err === 'object' && err !== null && 'code' in err
+    ? (err as { code?: unknown }).code
+    : undefined
+  const code = typeof rawCode === 'string' && rawCode.length > 0 ? rawCode : undefined
+
+  if (err instanceof SessionAdmissionError || code === 'session_blocked') {
+    const retryAt = err instanceof SessionAdmissionError
+      ? err.retryAt
+      : (typeof err === 'object' && err !== null && 'retryAt' in err
+          ? (err as { retryAt?: unknown }).retryAt
+          : undefined)
+    if (typeof retryAt === 'number' && Number.isFinite(retryAt)) {
+      return {
+        disposition: 'defer',
+        code: 'session_blocked',
+        reason,
+        retryAtMs: Math.max(nowMs, retryAt),
+        sessionBlocked: true,
+      }
+    }
+    return {
+      disposition: 'park',
+      code: 'session_blocked',
+      reason,
+      sessionBlocked: true,
+    }
+  }
+
+  if (code && RETRY_NEXT_TICK_CODES[code]) {
+    return { disposition: 'retry_next_tick', code, reason }
+  }
+  if (err instanceof Error && err.name === 'HeadlessCapacityError') {
+    return { disposition: 'retry_next_tick', code: 'headless_capacity', reason }
+  }
+  if (code === 'not_ready') {
+    return { disposition: 'defer', code: 'not_ready', reason, backoff: true }
+  }
+  if (code && PARK_ERROR_CODES[code]) {
+    return { disposition: 'park', code, reason }
+  }
+
+  return {
+    disposition: 'defer',
+    code: code ?? 'unknown_error',
+    reason,
+    backoff: true,
+  }
+}
+
+type DispatchGate =
+  | {
+      kind: 'deferred'
+      code: string
+      reason: string
+      retryAtMs: number
+      sinceMs: number
+      streak: number
+      fingerprint: string
+      resumeId?: string
+      sessionBlocked?: boolean
+    }
+  | {
+      kind: 'parked'
+      code: string
+      reason: string
+      sinceMs: number
+      fingerprint: string
+      resumeId?: string
+      sessionBlocked?: boolean
+    }
+
+function toScheduleSkipState(gate: DispatchGate | undefined): ScheduleSkipState | undefined {
+  if (!gate) return undefined
+  if (gate.kind === 'deferred') {
+    return {
+      kind: 'deferred',
+      code: gate.code,
+      reason: gate.reason,
+      retryAtMs: gate.retryAtMs,
+      sinceMs: gate.sinceMs,
+    }
+  }
+  return {
+    kind: 'parked',
+    code: gate.code,
+    reason: gate.reason,
+    sinceMs: gate.sinceMs,
+  }
+}
+
+function issueDependencyFingerprint(
+  issue: IssueRecord,
+  when: Schedule,
+  resumeId: string | undefined,
+): string {
+  const whenKey = when.kind === 'at'
+    ? { kind: 'at', at: when.at }
+    : when.kind === 'every'
+      ? { kind: 'every', every: when.every }
+      : { kind: 'cron', cron: when.cron, timezone: when.timezone ?? null, catchUp: when.catchUp ?? null }
+  return JSON.stringify({
+    assignee: issue.assignee,
+    agent: issue.agent ?? null,
+    when: whenKey,
+    credential: issue.credential ?? null,
+    credentialSource: issue.credentialSource ?? null,
+    model: issue.model ?? null,
+    effort: issue.effort ?? null,
+    resumeId: resumeId ?? null,
+  })
+}
+
 /** The slice of ScheduleMarkerStore the scanner needs (structural, for testing). */
 export interface MarkerStore {
   key(wsId: string, taskId: string): string
@@ -87,15 +274,19 @@ export interface MarkerStore {
   getHeld(wsId: string, taskId: string): number | undefined
   set(wsId: string, taskId: string, ts: number): Promise<void>
   hold(wsId: string, taskId: string, ts: number): Promise<void>
-  prune(seenKeys: Set<string>): Promise<void>
+  prune(seenKeys: Set<string>, preserveWorkspaceIds?: ReadonlySet<string>): Promise<void>
 }
 
 export interface ScheduleScannerDeps {
   registry: WorkspaceRegistry
+  /** Canonical active-workspace filter; standby workspaces are never scanned or scheduled. */
+  listActiveWorkspaces?: () => Promise<WorkspaceMeta[]> | WorkspaceMeta[]
   /** Resolve the execution Workspace for an exact signed Session owner. */
   resolveResumeWorkspace?: (resumeId: string) => WorkspaceMeta | undefined
   canRetryIssueRun?: (wsId: string, issueId: string, runId: string) => boolean
   isIssueRunning?: (wsId: string, issueId: string) => boolean
+  /** Lightweight in-memory check for whether a Session still has an active admission block. */
+  isSessionBlocked?: (resumeId: string, nowMs: number) => boolean
   resolveAdapter: (meta: WorkspaceMeta, agentId?: string, resumeId?: string) => CliAdapter | Promise<CliAdapter>
   dispatch: (
     meta: WorkspaceMeta,
@@ -139,10 +330,15 @@ export class ScheduleScanner {
   private timer: ReturnType<typeof setTimeout> | null = null
   private stopped = false
   private scanning = false
+  private rescanRequested = false
   /** Close the tiny manual-retry vs schedule-tick race for one Issue. This is
    * only a dispatch-start lock, not a per-Workspace execution lock. */
   private readonly dispatchingIssues = new Set<string>()
   private readonly pendingFires = new Map<string, Promise<void>>()
+  /** In-memory dispatch gate per Issue (keyed by `markers.key(wsId, taskId)`). */
+  private readonly dispatchGates = new Map<string, DispatchGate>()
+  /** Last `schedule.fire_skipped` key `(disposition, code, reason)` per Issue. */
+  private readonly lastSkippedLogs = new Map<string, string>()
 
   async waitForDispatches(): Promise<void> { await Promise.allSettled(this.pendingFires.values()) }
   /** Snapshot built as a side-effect of each scan; null until the first scan. */
@@ -177,6 +373,25 @@ export class ScheduleScanner {
     return this.lastSnapshot
   }
 
+  /** Drop the cached snapshot and immediately re-scan active workspaces.
+   *  Used when active Workspace slots change so the previous active stops
+   *  scheduling immediately and the newly active begins scheduling. */
+  async refresh(): Promise<void> {
+    this.lastSnapshot = null
+    if (this.stopped) return
+    if (this.scanning) {
+      this.rescanRequested = true
+      return
+    }
+    await this.scan(false)
+  }
+
+  private async activeWorkspaces(): Promise<WorkspaceMeta[]> {
+    return this.deps.listActiveWorkspaces
+      ? await this.deps.listActiveWorkspaces()
+      : this.deps.registry.list()
+  }
+
   /** Dispatch one scheduled Issue immediately without touching its firing
    * marker. This is the authoritative manual-run / retry path: it re-reads the
    * live Issue and reuses the exact prompt, owner, runtime, and optional timeout used by
@@ -186,9 +401,20 @@ export class ScheduleScanner {
     if (!ws) throw new ScheduledIssueRunNowError('not_found', 'Workspace not found.')
 
     const res = await readWorkspaceIssues(ws.dir)
-    if (!res.ok) throw new ScheduledIssueRunNowError('not_found', 'Issue not found.')
+    if (!res.ok) {
+      if (res.reason === 'invalid') {
+        throw new ScheduledIssueRunNowError('invalid', `Issue declaration is invalid: ${res.error}`)
+      }
+      throw new ScheduledIssueRunNowError('not_found', 'Issue not found.')
+    }
     const issue = res.issues.find((candidate) => candidate.id === issueId)
-    if (!issue) throw new ScheduledIssueRunNowError('not_found', 'Issue not found.')
+    if (!issue) {
+      const invalid = res.invalid.find((candidate) => candidate.id === issueId)
+      if (invalid) {
+        throw new ScheduledIssueRunNowError('invalid', `Issue "${issueId}" is invalid: ${invalid.error}`)
+      }
+      throw new ScheduledIssueRunNowError('not_found', 'Issue not found.')
+    }
     if (!issue.when) {
       throw new ScheduledIssueRunNowError('not_scheduled', 'Only scheduled Issues can be run now.')
     }
@@ -199,9 +425,10 @@ export class ScheduleScanner {
       )
     }
     if (isConnectorDeskIssue(issue)) {
+      const active = await this.activeWorkspaces()
       const extras = extraConnectorDeskKeys(
         await findConnectorDesks(
-          this.deps.registry.list().map((item) => ({ id: item.id, dir: item.dir })),
+          active.map((item) => ({ id: item.id, dir: item.dir })),
         ),
       )
       if (extras.has(`${ws.id}:${issue.id}`)) {
@@ -226,6 +453,7 @@ export class ScheduleScanner {
       undefined,
       retryOfTaskId,
     )
+    this.clearDispatchGate(this.deps.markers.key(ws.id, issue.id), ws.id, issue.id)
     return { taskId: result.taskId }
   }
 
@@ -266,19 +494,49 @@ export class ScheduleScanner {
     const seen = new Set<string>()
     try {
       await this.deps.reconcileSessionRuntimeBindings?.()
-      // registry.list() order is preserved by Promise.all → stable display order.
+      const active = await this.activeWorkspaces()
+      const activeIds = new Set(active.map((ws) => ws.id))
+      const standbyIds = new Set(
+        this.deps.registry.list()
+          .filter((ws) => !activeIds.has(ws.id))
+          .map((ws) => ws.id),
+      )
+      // active order is preserved by Promise.all → stable display order.
       const extraDesks = extraConnectorDeskKeys(
         await findConnectorDesks(
-          this.deps.registry.list().map((ws) => ({ id: ws.id, dir: ws.dir })),
+          active.map((ws) => ({ id: ws.id, dir: ws.dir })),
         ),
       )
       const workspaces = await Promise.all(
-        this.deps.registry.list().map((ws) => this.scanWorkspace(ws, nowMs, seen, extraDesks, waitForDispatch)),
+        active.map((ws) => this.scanWorkspace(ws, nowMs, seen, extraDesks, waitForDispatch)),
       )
-      await this.deps.markers.prune(seen)
+      await this.deps.markers.prune(seen, standbyIds.size > 0 ? standbyIds : undefined)
+      for (const key of [...this.dispatchGates.keys()]) {
+        if (!seen.has(key)) this.dispatchGates.delete(key)
+      }
+      for (const key of [...this.lastSkippedLogs.keys()]) {
+        if (!seen.has(key)) this.lastSkippedLogs.delete(key)
+      }
+      // Reconcile each task's skipState against live dispatchGates right before
+      // publishing lastSnapshot so async fire() calls launched by scan(false)
+      // that settled while awaiting other workspaces or prune() are never lost.
+      for (const ws of workspaces) {
+        for (const task of ws.tasks) {
+          const skipState = toScheduleSkipState(this.dispatchGates.get(this.deps.markers.key(ws.wsId, task.id)))
+          if (skipState) {
+            task.skipState = skipState
+          } else {
+            delete task.skipState
+          }
+        }
+      }
       this.lastSnapshot = { workspaces }
     } finally {
       this.scanning = false
+      if (this.rescanRequested && !this.stopped) {
+        this.rescanRequested = false
+        void this.scan(false).catch((err) => this.deps.logger.warn('schedule.rescan_failed', { err }))
+      }
     }
   }
 
@@ -322,9 +580,38 @@ export class ScheduleScanner {
       const when = issue.when
       if (!when) continue
       if (isConnectorDeskIssue(issue) && extraDesks.has(`${ws.id}:${issue.id}`)) continue
-      seen.add(this.deps.markers.key(ws.id, issue.id))
+      const markerKey = this.deps.markers.key(ws.id, issue.id)
+      seen.add(markerKey)
       const fireKey = `${ws.id}:${issue.id}`
-      if (!this.pendingFires.has(fireKey) && isFireable(issue) && this.isDue(ws.id, issue.id, when, nowMs)) {
+      const resumeId = issueAssigneeResumeId(issue.assignee) ?? undefined
+      const fingerprint = issueDependencyFingerprint(issue, when, resumeId)
+      let gate = this.dispatchGates.get(markerKey)
+
+      if (!isFireable(issue)) {
+        if (gate || this.lastSkippedLogs.has(markerKey)) {
+          this.clearDispatchGate(markerKey)
+          gate = undefined
+        }
+      } else if (gate) {
+        const recoveredByEdit = gate.fingerprint !== fingerprint
+        const recoveredBySessionRelease = Boolean(
+          gate.sessionBlocked
+          && gate.resumeId
+          && this.deps.isSessionBlocked
+          && !this.deps.isSessionBlocked(gate.resumeId, nowMs),
+        )
+        if (recoveredByEdit || recoveredBySessionRelease) {
+          this.clearDispatchGate(markerKey)
+          gate = undefined
+        }
+      }
+
+      const gated = gate !== undefined && (gate.kind === 'parked' || nowMs < gate.retryAtMs)
+      const due = !gated && isFireable(issue) && this.isDue(ws.id, issue.id, when, nowMs)
+      if (!gated && gate?.kind === 'deferred' && !due) {
+        this.clearDispatchGate(markerKey)
+      }
+      if (!this.pendingFires.has(fireKey) && due) {
         const firing = this.fire(
           ws,
           issue.id,
@@ -332,20 +619,22 @@ export class ScheduleScanner {
           issueFirePrompt(issue),
           issue.agent,
           issueRunOverrides(issue),
-          issueAssigneeResumeId(issue.assignee) ?? undefined,
+          resumeId,
           issueAssigneeClaimsFirstSession(issue.assignee),
           issueTimeoutMs(issue.timeout),
           issue.connectorDesk,
+          fingerprint,
           nowMs,
         ).catch(err => this.deps.logger.warn('schedule.fire_failed', { wsId: ws.id, issueId: issue.id, err }))
           .finally(() => { this.pendingFires.delete(fireKey) })
         this.pendingFires.set(fireKey, firing)
         if (waitForDispatch) await firing
       }
-      // Read the marker AFTER any fire so last/next reflect a just-fired run.
+      // Read the marker and gate AFTER any fire so last/next/skipState reflect a just-fired or just-gated run.
       const last = this.deps.markers.get(ws.id, issue.id) ?? null
       const held = this.deps.markers.getHeld(ws.id, issue.id) ?? null
-      tasks.push(snapshotScheduledIssue(issue, when, last, nowMs, this.intervalMs, held))
+      const skipState = toScheduleSkipState(this.dispatchGates.get(markerKey))
+      tasks.push(snapshotScheduledIssue(issue, when, last, nowMs, this.intervalMs, held, skipState))
     }
     return { wsId: ws.id, tag: ws.tag, status: 'ok', tasks }
   }
@@ -355,6 +644,28 @@ export class ScheduleScanner {
     const held = this.deps.markers.getHeld(wsId, taskId) ?? null
     const next = computeNextRun(when, fireBase(when, last, nowMs, this.intervalMs, held))
     return next !== null && next <= nowMs
+  }
+
+  private clearDispatchGate(markerKey: string, wsId?: string, taskId?: string): void {
+    this.dispatchGates.delete(markerKey)
+    this.lastSkippedLogs.delete(markerKey)
+    if (wsId && taskId) this.syncSnapshotSkipState(wsId, taskId, undefined)
+  }
+
+  private syncSnapshotSkipState(
+    wsId: string,
+    taskId: string,
+    skipState: ScheduleSkipState | undefined,
+  ): void {
+    if (!this.lastSnapshot) return
+    const ws = this.lastSnapshot.workspaces.find((entry) => entry.wsId === wsId)
+    const task = ws?.tasks.find((entry) => entry.id === taskId)
+    if (!task) return
+    if (skipState) {
+      task.skipState = skipState
+    } else {
+      delete task.skipState
+    }
   }
 
   private async fire(
@@ -368,8 +679,10 @@ export class ScheduleScanner {
     claimFreshSession: boolean,
     timeoutMs: number | undefined,
     connectorDesk: string | undefined,
+    fingerprint: string,
     nowMs: number,
   ): Promise<void> {
+    const markerKey = this.deps.markers.key(issueWorkspace.id, taskId)
     try {
       const { taskId: runId } = await this.dispatchIssue(
         issueWorkspace,
@@ -383,6 +696,7 @@ export class ScheduleScanner {
         connectorDesk,
       )
       await this.deps.markers.set(issueWorkspace.id, taskId, nowMs)
+      this.clearDispatchGate(markerKey, issueWorkspace.id, taskId)
       this.deps.logger.info('schedule.fired', {
         wsId: issueWorkspace.id,
         taskId,
@@ -391,14 +705,70 @@ export class ScheduleScanner {
         ...(resumeId ? { resumeId } : {}),
       })
     } catch (err) {
-      // Capacity / busy: every stays due with no marker. Cron catch-up holds
-      // the occurrence; calendar-only cron consumes it.
-      await this.noteCronMiss(issueWorkspace.id, taskId, when, nowMs)
-      this.deps.logger.info('schedule.fire_skipped', {
-        wsId: issueWorkspace.id,
-        taskId,
-        reason: err instanceof Error ? err.message : String(err),
-      })
+      const decision = classifyScheduleSkip(err, nowMs)
+      const prevGate = this.dispatchGates.get(markerKey)
+      let retryAtMs: number | undefined
+
+      if (decision.disposition === 'retry_next_tick') {
+        // Capacity / busy: every/at stays due with no marker or gate. Cron catch-up
+        // holds the occurrence; calendar-only cron consumes it.
+        if (prevGate) {
+          this.dispatchGates.delete(markerKey)
+          this.syncSnapshotSkipState(issueWorkspace.id, taskId, undefined)
+        }
+        await this.noteCronMiss(issueWorkspace.id, taskId, when, nowMs)
+      } else if (decision.disposition === 'defer') {
+        const sameCode = prevGate?.kind === 'deferred' && prevGate.code === decision.code
+        let streak = 0
+        if ('backoff' in decision) {
+          streak = sameCode ? prevGate.streak + 1 : 1
+          const delayMs = BACKOFF_STEPS_MS[Math.min(streak - 1, BACKOFF_STEPS_MS.length - 1)]
+          retryAtMs = nowMs + delayMs
+        } else {
+          retryAtMs = decision.retryAtMs
+        }
+        const blockedResumeId = resumeId ?? (err instanceof SessionAdmissionError ? err.blocks[0]?.resumeId : undefined)
+        const gate: DispatchGate = {
+          kind: 'deferred',
+          code: decision.code,
+          reason: decision.reason,
+          retryAtMs,
+          sinceMs: sameCode ? prevGate.sinceMs : nowMs,
+          streak,
+          fingerprint,
+          ...(blockedResumeId ? { resumeId: blockedResumeId } : {}),
+          ...('sessionBlocked' in decision && decision.sessionBlocked ? { sessionBlocked: true } : {}),
+        }
+        this.dispatchGates.set(markerKey, gate)
+        this.syncSnapshotSkipState(issueWorkspace.id, taskId, toScheduleSkipState(gate))
+      } else {
+        const sameCode = prevGate?.kind === 'parked' && prevGate.code === decision.code
+        const blockedResumeId = resumeId ?? (err instanceof SessionAdmissionError ? err.blocks[0]?.resumeId : undefined)
+        const gate: DispatchGate = {
+          kind: 'parked',
+          code: decision.code,
+          reason: decision.reason,
+          sinceMs: sameCode ? prevGate.sinceMs : nowMs,
+          fingerprint,
+          ...(blockedResumeId ? { resumeId: blockedResumeId } : {}),
+          ...(decision.sessionBlocked ? { sessionBlocked: true } : {}),
+        }
+        this.dispatchGates.set(markerKey, gate)
+        this.syncSnapshotSkipState(issueWorkspace.id, taskId, toScheduleSkipState(gate))
+      }
+
+      const logKey = JSON.stringify([decision.disposition, decision.code, decision.reason])
+      if (this.lastSkippedLogs.get(markerKey) !== logKey) {
+        this.lastSkippedLogs.set(markerKey, logKey)
+        this.deps.logger.info('schedule.fire_skipped', {
+          wsId: issueWorkspace.id,
+          taskId,
+          disposition: decision.disposition,
+          code: decision.code,
+          reason: decision.reason,
+          ...(retryAtMs !== undefined ? { retryAtMs } : {}),
+        })
+      }
     }
   }
 
@@ -447,7 +817,7 @@ export class ScheduleScanner {
           'This Issue is already being dispatched.',
         )
       }
-      throw new Error(`Issue dispatch already in progress: ${dispatchKey}`)
+      throw new ScheduleDispatchError('dispatch_in_progress', `Issue dispatch already in progress: ${dispatchKey}`)
     }
     this.dispatchingIssues.add(dispatchKey)
     try {
@@ -462,11 +832,11 @@ export class ScheduleScanner {
       if (claimFreshSession || commentId) {
         const read = await readWorkspaceIssues(issueWorkspace.dir)
         const live = read.ok ? read.issues.find((issue) => issue.id === issueId) : undefined
-        if (!live) throw new Error('Issue not found.')
+        if (!live) throw new ScheduleDispatchError('issue_not_found', 'Issue not found.')
         resumeId = issueAssigneeResumeId(live.assignee) ?? undefined
         claimFreshSession = issueAssigneeClaimsFirstSession(live.assignee)
         if (!resumeId && !claimFreshSession && live.assignee !== '@new-each-run') {
-          throw new Error('Issue ownership changed; no Agent owner is selected.')
+          throw new ScheduleDispatchError('no_agent_owner', 'Issue ownership changed; no Agent owner is selected.')
         }
         agentId = live.agent
         selection = issueRunOverrides(live)
@@ -479,11 +849,11 @@ export class ScheduleScanner {
         ? this.resolveResumeWorkspace(resumeId)
         : issueWorkspace
       if (!executionWorkspace) {
-        throw new Error(`assigned Session Workspace is unavailable: ${resumeId}`)
+        throw new ScheduleDispatchError('assignee_workspace_unavailable', `assigned Session Workspace is unavailable: ${resumeId}`)
       }
       const adapter = await this.deps.resolveAdapter(executionWorkspace, agentId, resumeId)
       if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
-        throw new Error(`agent runtime does not support headless work: ${adapter.id}`)
+        throw new ScheduleDispatchError('adapter_no_headless', `agent runtime does not support headless work: ${adapter.id}`)
       }
       const trigger: HeadlessTaskTrigger | undefined = commentId ? undefined : {
         kind: 'issue',
@@ -583,7 +953,7 @@ export class ScheduleScanner {
             )
       if (claimFreshSession) {
         if (!this.deps.claimFreshSession) {
-          throw new Error('Issue @new-then-resume ownership cannot be persisted in this runtime')
+          throw new ScheduleDispatchError('claim_persistence_unsupported', 'Issue @new-then-resume ownership cannot be persisted in this runtime')
         }
         try {
           await this.deps.claimFreshSession({

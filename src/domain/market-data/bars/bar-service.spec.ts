@@ -125,7 +125,60 @@ describe('getBars — barId forms', () => {
   it('vendor barId without assetClass resolves an exact catalog match', async () => {
     const svc = createBarService(makeDeps())
     expect((await svc.getBars({ barId: 'yfinance|AAPL' }, { interval: '1d' })).meta.barId).toBe('yfinance|AAPL')
-    await expect(svc.getBars({ barId: 'yfinance|AA' }, { interval: '1d' })).rejects.toThrow(/Cannot uniquely resolve/)
+    await expect(svc.getBars({ barId: 'yfinance|AA' }, { interval: '1d' })).rejects.toThrow(/Cannot uniquely resolve.*--asset-class/)
+  })
+
+  it('fast-paths Yahoo index barIds (^N225, ^GSPC) to equity without catalog search', async () => {
+    const equitySearch = vi.fn(async () => [])
+    const deps = makeDeps()
+    deps.marketSearch.equityClient.search = equitySearch as never
+    const svc = createBarService(deps)
+
+    const { meta } = await svc.getBars({ barId: 'yfinance|^N225' }, { interval: '1d' })
+    expect(meta.barId).toBe('yfinance|^N225')
+    expect(deps.equityClient.getHistorical).toHaveBeenCalledWith(expect.objectContaining({ symbol: '^N225', provider: 'yfinance' }))
+    expect(equitySearch).not.toHaveBeenCalled()
+  })
+
+  it('resolves Yahoo global ETF barIds (1306.T) via equity catalog search', async () => {
+    const deps = makeDeps()
+    deps.marketSearch.equityClient.search = vi.fn(async () => [{ symbol: '1306.T', name: 'TOPIX ETF', quote_type: 'ETF' }]) as never
+    const svc = createBarService(deps)
+
+    const { meta } = await svc.getBars({ barId: 'yfinance|1306.T' }, { interval: '1d' })
+    expect(meta.barId).toBe('yfinance|1306.T')
+    expect(deps.equityClient.getHistorical).toHaveBeenCalledWith(expect.objectContaining({ symbol: '1306.T', provider: 'yfinance' }))
+  })
+
+  it('resolves raw Yahoo crypto (BTC-USD) and FX (JPY=X) barIds cleanly while preserving ambiguity guards', async () => {
+    const deps = makeDeps()
+    deps.marketSearch.cryptoClient.search = vi.fn(async ({ query }: { query: string }) =>
+      query === 'BTC' || query === 'BTC-USD' ? [{ symbol: 'BTCUSD', name: 'Bitcoin USD' }] : [],
+    ) as never
+    deps.marketSearch.currencyClient.search = vi.fn(async ({ query }: { query: string }) =>
+      query === 'JPY' || query === 'JPY=X' ? [{ symbol: 'USDJPY', name: 'USD/JPY' }] : [],
+    ) as never
+    deps.marketSearch.equityClient.search = vi.fn(async ({ query }: { query: string }) =>
+      query === 'BRK-B' ? [{ symbol: 'BRK-B', name: 'Berkshire Hathaway' }] : [],
+    ) as never
+    const svc = createBarService(deps)
+
+    const btc = await svc.getBars({ barId: 'yfinance|BTC-USD' }, { interval: '1d' })
+    expect(btc.meta.barId).toBe('yfinance|BTC-USD')
+    expect(deps.cryptoClient.getHistorical).toHaveBeenCalledWith(expect.objectContaining({ symbol: 'BTC-USD', provider: 'yfinance' }))
+
+    const jpy = await svc.getBars({ barId: 'yfinance|JPY=X' }, { interval: '1d' })
+    expect(jpy.meta.barId).toBe('yfinance|JPY=X')
+    expect(deps.currencyClient.getHistorical).toHaveBeenCalledWith(expect.objectContaining({ symbol: 'JPY=X', provider: 'yfinance' }))
+
+    // Dashed equities like BRK-B must still resolve to equity, not crypto.
+    const brk = await svc.getBars({ barId: 'yfinance|BRK-B' }, { interval: '1d' })
+    expect(brk.meta.barId).toBe('yfinance|BRK-B')
+    expect(deps.equityClient.getHistorical).toHaveBeenCalledWith(expect.objectContaining({ symbol: 'BRK-B', provider: 'yfinance' }))
+
+    // Ambiguity guard still fires if both equity and crypto match.
+    deps.marketSearch.equityClient.search = vi.fn(async () => [{ symbol: 'BTC-USD', name: 'Hypothetical Equity' }]) as never
+    await expect(svc.getBars({ barId: 'yfinance|BTC-USD' }, { interval: '1d' })).rejects.toThrow(/Cannot uniquely resolve.*--asset-class/)
   })
 
   it('invalid barId throws', async () => {
