@@ -104,8 +104,9 @@ export async function probeFsEventsWorking(options: {
   } catch {
     return false
   } finally {
+    const cleanup = stop as (() => Promise<void> | void) | null
     try {
-      await stop?.()
+      await cleanup?.()
     } catch { /* ignore */ }
     try {
       rmSync(dir, { recursive: true, force: true })
