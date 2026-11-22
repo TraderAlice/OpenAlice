@@ -99,6 +99,15 @@ export function Footer() {
               >
                 Docs
               </Link>
+              <Link
+                href="/code-signing"
+                data-evt="footer_code_signing"
+                data-target="code_signing"
+                data-location="footer"
+                className={colLink}
+              >
+                Code signing
+              </Link>
             </div>
 
             <div className="col-span-1 md:col-span-2">
