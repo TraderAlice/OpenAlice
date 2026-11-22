@@ -80,10 +80,10 @@ export function VersionOverviewSection() {
       : backend?.updateAuthority === 'none' ? t('settings.about.status.noUpdater')
         : backend?.updateAuthority === 'source' ? text('sourceManaged') : backend?.decision?.status === 'current' ? text('current') : text('unknown')
   const row = (kind: 'app' | 'backend' | 'project', icon: ReactNode, subtitle: string, identity: string, status: string, available: boolean, action: () => void, children?: ReactNode) => <section id={`settings-version-${kind}`} tabIndex={-1} className="min-w-0 scroll-mt-5 outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">
-    <div className="grid grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-3 px-4 py-5 sm:grid-cols-[1.5rem_minmax(0,1fr)_auto] sm:px-5">
+    <div className="grid grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-3 px-4 py-5 @[40rem]:grid-cols-[1.5rem_minmax(12rem,1fr)_minmax(0,auto)] @[40rem]:px-5">
       <div className={`self-start pt-0.5 ${available ? 'text-primary' : 'text-muted-foreground'}`} aria-hidden>{icon}</div>
       <div className="min-w-0"><h3 className="text-sm font-semibold">{text(kind)}</h3><p className="mt-1 break-words text-xs text-muted-foreground">{subtitle}</p></div>
-      <div className="col-start-2 flex flex-wrap items-center gap-x-4 gap-y-2 sm:col-start-3 sm:row-start-1">
+      <div className="col-start-2 flex flex-wrap items-center gap-x-4 gap-y-2 @[40rem]:col-start-3 @[40rem]:row-start-1 @[40rem]:justify-end">
         {identity && <span className="text-xs tabular-nums">{identity}</span>}
         <span className={`flex items-center gap-1.5 text-xs ${available ? 'text-primary' : status === text('needsAttention') || status === text('checkFailed') ? 'text-warning' : 'text-muted-foreground'}`}><span className={`size-1.5 shrink-0 rounded-full ${available ? 'bg-primary' : status === text('current') ? 'bg-success' : 'bg-current'}`} aria-hidden />{status}</span>
         {(available || (kind === 'project' && activeOperation)) && <Button size="sm" onClick={action}>{activeOperation && kind === 'project' ? text('viewProgress') : text('viewUpdate')}</Button>}
@@ -92,12 +92,12 @@ export function VersionOverviewSection() {
     </div>{children}
   </section>
   const projectDetails = <Collapsible open={expanded} onOpenChange={setExpanded}>
-    <CollapsibleTrigger render={<Button variant="ghost" size="sm" className="mb-3 ml-12 sm:ml-14" />}><ChevronDown className={`size-3.5 transition-transform motion-reduce:transition-none ${expanded ? '' : '-rotate-90'}`} />{text('projectDetails')}</CollapsibleTrigger>
-    <CollapsibleContent><div className="mx-4 mb-5 ml-12 space-y-4 border-l border-border pl-4 sm:mx-5 sm:ml-14">
-      {rows.map(item => <div key={item.kind} className="grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2 sm:grid-cols-[1rem_minmax(0,1fr)_auto]">
+    <CollapsibleTrigger render={<Button variant="ghost" size="sm" className="mb-3 ml-12 @[40rem]:ml-14" />}><ChevronDown className={`size-3.5 transition-transform motion-reduce:transition-none ${expanded ? '' : '-rotate-90'}`} />{text('projectDetails')}</CollapsibleTrigger>
+    <CollapsibleContent><div className="mx-4 mb-5 ml-12 space-y-4 border-l border-border pl-4 @[40rem]:mx-5 @[40rem]:ml-14">
+      {rows.map(item => <div key={item.kind} className="grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2 @lg:grid-cols-[1rem_minmax(10rem,1fr)_minmax(0,auto)]">
         <span className="pt-0.5 text-muted-foreground" aria-hidden>{item.kind === 'chat' ? <MessageCircle className="size-4" /> : item.kind === 'auto-quant' ? <BarChart3 className="size-4" /> : <FlaskConical className="size-4" />}</span>
         <div className="min-w-0"><p className="text-sm font-medium">{item.label}</p>{item.workspace && <p className="mt-1 break-words text-xs text-muted-foreground">{item.workspace.displayName || item.workspace.tag} · {text('defaultWorkspace')}</p>}</div>
-        <div className="col-start-2 flex flex-wrap items-center gap-2 text-xs sm:col-start-3 sm:row-start-1">{item.workspace && <span className="flex items-center gap-2 tabular-nums">{version(item.current)}{item.candidate && <><ArrowRight className="size-3 text-muted-foreground" /><span className="text-primary">{version(item.candidate)}</span></>}</span>}<span className={item.candidate ? 'text-primary' : 'text-muted-foreground'}>{item.status}</span></div>
+        <div className="col-start-2 flex flex-wrap items-center gap-2 text-xs @lg:col-start-3 @lg:row-start-1 @lg:justify-end">{item.workspace && <span className="flex items-center gap-2 tabular-nums">{version(item.current)}{item.candidate && <><ArrowRight className="size-3 text-muted-foreground" /><span className="text-primary">{version(item.candidate)}</span></>}</span>}<span className={item.candidate ? 'text-primary' : 'text-muted-foreground'}>{item.status}</span></div>
         {item.error && <p role="alert" className="col-span-full break-words text-xs text-warning">{item.error}</p>}
       </div>)}
       {setupFailures.length > 0 && <Button variant="outline" size="sm" disabled={setup?.busy} onClick={() => { void setup?.retry() }}>{setup?.busy ? t('projectSetup.preparing') : t('common.retry')}</Button>}
@@ -107,7 +107,7 @@ export function VersionOverviewSection() {
   </Collapsible>
   return <section className="border-t border-border/60 py-7">
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><h2 id={VERSION_OVERVIEW_ID} tabIndex={-1} className="w-fit scroll-mt-5 rounded-sm text-lg font-semibold outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">{text('title')}</h2><Button variant="ghost" size="sm" disabled={updates.checking} onClick={() => { void updates.refresh().catch(error => setLocalError(String(error))) }}><RefreshCw className={`size-3.5 ${updates.checking ? 'animate-spin motion-reduce:animate-none' : ''}`} />{text('checkAgain')}</Button></div>
-    <div className="divide-y divide-border/70 overflow-hidden rounded-lg border border-border/70">
+    <div className="@container divide-y divide-border/70 overflow-hidden rounded-lg border border-border/70">
       {row('app', <Monitor className="size-5" />, window.openAlice?.updater ? text('desktop') : text('browser'), version(appVersion), appStatus, appAvailable, () => open(updates.nativeReady ? 'native-review' : 'app'))}
       {row('backend', <Server className="size-5" />, `${machineName} · ${backendUnavailable ? text('offline') : text('connected')}`, version(backend?.current), integrated ? text('integrated') : backendStatus, Boolean(backend?.hasUpdate), integrated ? () => open(updates.nativeReady ? 'native-review' : 'app') : remote && backend?.hasUpdate ? () => reviewBackend() : () => open('backend'))}
       {row('project', <Folder className="size-5" />, projectName, '', projectStatus, projectAvailable, () => open('project'), projectDetails)}

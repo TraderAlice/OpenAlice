@@ -143,6 +143,16 @@ export class OrchestrationManager {
     return this.deps.store.getTaskByDispatchId(dispatchId)
   }
 
+  listTasks(filter: WorkerListFilter = {}): OrchestrationTask[] {
+    return this.deps.store.listTasks(filter).map((task) => structuredClone(task))
+  }
+
+  listMessages(
+    filter: Parameters<OrchestrationStore['listMessages']>[0] = {},
+  ): OrchestrationMessage[] {
+    return this.deps.store.listMessages(filter)
+  }
+
   async reconcileOnStartup(
     isTaskActive: (headlessTaskId: string) => boolean,
     nowMs?: number,

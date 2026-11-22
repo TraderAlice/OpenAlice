@@ -31,6 +31,8 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { SelectionCheckIcon } from './ui/selection-check-icon'
 import { IssueAssigneePopover } from './IssueAssigneePopover'
 import { IssueListToolbar } from './IssueListToolbar'
+import { DispatchBoard, DispatchToolbarControls } from './dispatch/DispatchBoard'
+import { useDispatchBoard } from './dispatch/useDispatchBoard'
 import { matchesIssueView, readIssueView, type IssueColumn } from './issue-list-view'
 import { STATUS_META } from './issue-status-meta'
 
@@ -533,6 +535,7 @@ export function IssuesBoard() {
   const setSidebar = useWorkspace((s) => s.setSidebar)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [view, setView] = useState(readIssueView)
+  const dispatchBoard = useDispatchBoard(view.tab === 'dispatch')
   useEffect(() => {
     try { localStorage.setItem('openalice-issue-list-view', JSON.stringify({ tab: view.tab, grouping: view.grouping, ordering: view.ordering, completed: view.completed, columns: view.columns })) } catch { /* Storage may be unavailable. */ }
   }, [view.tab, view.grouping, view.ordering, view.completed, view.columns])
@@ -549,6 +552,26 @@ export function IssuesBoard() {
       else next.add(status)
       return next
     })
+
+  if (view.tab === 'dispatch') {
+    const dispatchToolbar = (
+      <IssueListToolbar
+        view={view}
+        onChange={(patch) => setView((current) => ({ ...current, ...patch }))}
+        workspaces={[]}
+        visible={0}
+        total={0}
+        dispatchRunningCount={dispatchBoard.snapshot?.summary.runningSpanCount ?? 0}
+        rightSlot={<DispatchToolbarControls board={dispatchBoard} />}
+      />
+    )
+    return (
+      <div data-testid="issues-board" className="@container/content w-full space-y-1">
+        {dispatchToolbar}
+        <DispatchBoard board={dispatchBoard} />
+      </div>
+    )
+  }
 
   // Keep showing any snapshot we have (incl. the warm cache) rather than
   // flipping to a loading/error screen on a transient refresh failure.

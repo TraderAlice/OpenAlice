@@ -487,6 +487,26 @@ export class OrchestrationStore {
       .sort((a, b) => a.createdAt - b.createdAt)
   }
 
+  /** Read-only query of orchestration messages across dispatches, oldest-first. */
+  listMessages(filter: {
+    dispatchIds?: ReadonlySet<string>
+    sinceMs?: number
+    untilMs?: number
+  } = {}): OrchestrationMessage[] {
+    return this.messages
+      .filter((m) => {
+        if (filter.dispatchIds && !filter.dispatchIds.has(m.dispatchId)) return false
+        const latestActivityAt = m.ackedAt ?? m.leasedAt ?? m.createdAt
+        if (filter.sinceMs !== undefined && latestActivityAt < filter.sinceMs && m.createdAt < filter.sinceMs) {
+          return false
+        }
+        if (filter.untilMs !== undefined && m.createdAt > filter.untilMs) return false
+        return true
+      })
+      .map((m) => structuredClone(m))
+      .sort((a, b) => a.createdAt - b.createdAt)
+  }
+
   /** Unique recipients with deliverable work (`unread` or expired `leased`) and no active lease. */
   recipientsWithDeliverableWork(nowMs?: number): string[] {
     const at = nowMs ?? Date.now()
