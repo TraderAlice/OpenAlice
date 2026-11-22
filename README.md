@@ -164,6 +164,10 @@ setup.
   </a>
 </p>
 
+## Code Signing
+
+Free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/). See [CODE_SIGNING.md](CODE_SIGNING.md) for our Code Signing Policy, team roles, and Privacy Policy.
+
 ## License
 
 [AGPL-3.0](LICENSE)
