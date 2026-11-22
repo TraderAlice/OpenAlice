@@ -3,13 +3,18 @@ import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Clock,
   FileText,
   GitFork,
   Inbox,
+  Layers,
   MessageSquare,
+  Pause,
   Radio,
   RefreshCw,
   Terminal,
@@ -17,11 +22,8 @@ import {
 
 import type {
   DispatchArtifact,
-  DispatchBoardSnapshot,
   DispatchEdge,
   DispatchEdgeKind,
-  DispatchLane,
-  DispatchScheduleMarker,
   DispatchSpan,
 } from '../../api/dispatch'
 import { ScheduleSkipPill } from '../ScheduleSkipState'
@@ -33,58 +35,57 @@ import {
   type DispatchSelectedItem,
 } from './DispatchInspectorSheet'
 import {
+  buildDispatchEpisodes,
   clampTimePct,
+  clusterLaneSpans,
   collectConnectedTraceIds,
-  packSpansIntoTracks,
+  formatBurstClockSpan,
+  formatClockPoint,
+  formatDurationMs,
+  formatTickTime,
+  formatWindowRange,
+  isDifferentCalendarDay,
+  localeForLanguage,
+  resolveSpanTitle,
+  type DispatchEpisode,
+  type DispatchExecutionItem,
   type DispatchFocusTarget,
+  type DispatchSpanCluster,
   type PackedDispatchSpan,
 } from './layout'
 import type { DispatchWindowPreset, UseDispatchBoardResult } from './useDispatchBoard'
 
 export type DispatchFilterKind = 'all' | 'orchestration' | 'scheduled' | 'outputs' | 'attention'
 
-const TRACK_HEIGHT_PX = 28
+const TRACK_HEIGHT_PX = 26
 const TRACK_GAP_PX = 4
-const TRACK_TOP_PAD_PX = 6
-
-function formatClockRange(ms: number): string {
-  return new Intl.DateTimeFormat(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(ms))
-}
-
-function formatTickTime(ms: number, spanMs: number): string {
-  const date = new Date(ms)
-  if (spanMs >= 18 * 60 * 60_000) {
-    return new Intl.DateTimeFormat(undefined, {
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).format(date)
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
-}
+const TRACK_TOP_PAD_PX = 8
+const MIN_LANE_HEIGHT_PX = 64
+const MAX_LANE_TRACKS = 2
 
 function spanTitle(span: DispatchSpan, t: TFunction): string {
-  if (span.trigger.kind === 'scheduled-issue') {
-    return span.trigger.issueTitle || `#${span.trigger.issueId}`
+  const fallback =
+    span.trigger.kind === 'orchestration'
+      ? `${t('issues.dispatch.triggerOrchestration')} (${span.agent})`
+      : span.agent
+  return resolveSpanTitle(span, fallback)
+}
+
+function triggerKindLabel(kind: DispatchSpan['trigger']['kind'], t: TFunction): string {
+  switch (kind) {
+    case 'scheduled-issue':
+      return t('issues.dispatch.triggerScheduled')
+    case 'orchestration':
+      return t('issues.dispatch.triggerOrchestration')
+    case 'conversation':
+      return t('issues.dispatch.triggerConversation')
+    case 'inquiry':
+      return t('issues.dispatch.triggerInquiry')
+    case 'interactive':
+      return t('issues.dispatch.triggerInteractive')
+    case 'manual':
+      return t('issues.dispatch.triggerManual')
   }
-  if (span.trigger.kind === 'inquiry') {
-    return span.trigger.question
-  }
-  if (span.sessionLabel) return span.sessionLabel
-  if (span.trigger.kind === 'orchestration') {
-    return `${t('issues.dispatch.triggerOrchestration')} (${span.agent})`
-  }
-  return span.agent
 }
 
 function SpanTriggerIcon({ trigger }: { trigger: DispatchSpan['trigger'] }) {
@@ -103,6 +104,38 @@ function SpanTriggerIcon({ trigger }: { trigger: DispatchSpan['trigger'] }) {
   }
 }
 
+function SpanStatusIcon({ status }: { status: DispatchSpan['status'] }) {
+  if (status === 'running') {
+    return (
+      <span
+        className="size-2 shrink-0 rounded-full bg-primary animate-pulse motion-reduce:animate-none"
+        aria-hidden
+      />
+    )
+  }
+  if (status === 'failed') {
+    return <AlertTriangle size={13} className="shrink-0 text-destructive" aria-hidden />
+  }
+  if (status === 'interrupted') {
+    return <Pause size={13} className="shrink-0 text-warning" aria-hidden />
+  }
+  return <CheckCircle2 size={13} className="shrink-0 text-success" aria-hidden />
+}
+
+function statusBadgeClasses(status: DispatchSpan['status']): string {
+  if (status === 'running') return 'border-primary/40 bg-primary/15 text-primary'
+  if (status === 'failed') return 'border-destructive/40 bg-destructive/15 text-destructive'
+  if (status === 'interrupted') return 'border-warning/40 bg-warning/15 text-warning'
+  return 'border-success/40 bg-success/15 text-success'
+}
+
+function statusLabel(status: DispatchSpan['status'], t: TFunction): string {
+  if (status === 'running') return t('issues.dispatch.statusRunning')
+  if (status === 'failed') return t('issues.dispatch.statusFailed')
+  if (status === 'interrupted') return t('issues.dispatch.statusInterrupted')
+  return t('issues.dispatch.statusDone')
+}
+
 function spanBarClasses(span: DispatchSpan, emphasized: boolean, dimmed: boolean): string {
   const base =
     'group absolute flex min-w-5 items-center gap-1 overflow-hidden rounded-md border px-1.5 text-left text-[11px] transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
@@ -115,6 +148,26 @@ function spanBarClasses(span: DispatchSpan, emphasized: boolean, dimmed: boolean
           ? 'border-warning/60 bg-warning/15 text-warning'
           : 'border-border bg-card text-foreground hover:border-foreground/40 hover:bg-muted/60'
   const focusRing = emphasized ? 'ring-2 ring-primary/50 border-primary z-10' : 'z-[5]'
+  const opacity = dimmed ? 'opacity-30' : 'opacity-100'
+  return `${base} ${tone} ${focusRing} ${opacity}`
+}
+
+function clusterPillClasses(
+  cluster: DispatchSpanCluster,
+  emphasized: boolean,
+  dimmed: boolean,
+): string {
+  const base =
+    'group absolute inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-1.5 text-[11px] font-medium shadow-xs transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+  const tone =
+    cluster.worstStatus === 'failed'
+      ? 'border-destructive/60 bg-destructive/15 text-destructive hover:bg-destructive/20'
+      : cluster.worstStatus === 'interrupted'
+        ? 'border-warning/60 bg-warning/15 text-warning hover:bg-warning/20'
+        : cluster.worstStatus === 'running'
+          ? 'border-primary/60 bg-primary/15 text-primary hover:bg-primary/20'
+          : 'border-border bg-card text-foreground hover:border-foreground/40 hover:bg-muted/70'
+  const focusRing = emphasized ? 'ring-2 ring-primary/50 border-primary z-20' : 'z-[8]'
   const opacity = dimmed ? 'opacity-30' : 'opacity-100'
   return `${base} ${tone} ${focusRing} ${opacity}`
 }
@@ -142,49 +195,69 @@ function edgePillClasses(edge: DispatchEdge, emphasized: boolean, dimmed: boolea
   return `${base} ${tone} ${ring} ${opacity}`
 }
 
-function matchesSpanFilter(
-  span: DispatchSpan,
-  filter: DispatchFilterKind,
-  connectedArtifactRunIds: ReadonlySet<string>,
-  connectedArtifactResumes: ReadonlySet<string>,
-): boolean {
-  if (filter === 'all') return true
-  if (filter === 'orchestration') {
-    return span.trigger.kind === 'orchestration' || span.trigger.kind === 'conversation'
-  }
-  if (filter === 'scheduled') {
-    return span.trigger.kind === 'scheduled-issue'
-  }
-  if (filter === 'outputs') {
-    return connectedArtifactRunIds.has(span.id)
-      || connectedArtifactResumes.has(`${span.workspaceId}\0${span.resumeId}`)
-  }
-  if (filter === 'attention') {
-    return span.status === 'failed' || span.status === 'interrupted' || span.toolFailures > 0
-  }
-  return true
+function isAttentionEdge(edge: DispatchEdge): boolean {
+  return (
+    edge.kind === 'escalation'
+    || edge.deliveryStatus === 'unread'
+    || edge.taskStatus === 'waiting_parent'
+    || edge.outcome === 'failed'
+  )
 }
 
-function matchesEdgeFilter(edge: DispatchEdge, filter: DispatchFilterKind): boolean {
-  if (filter === 'all') return true
-  if (filter === 'orchestration') return true
-  if (filter === 'attention') {
-    return edge.kind === 'escalation'
-      || edge.deliveryStatus === 'unread'
-      || edge.taskStatus === 'waiting_parent'
-      || edge.outcome === 'failed'
+function edgeConnectsSpan(edge: DispatchEdge, span: DispatchSpan): boolean {
+  if (edge.taskId && span.id === edge.taskId) return true
+  if (
+    edge.dispatchId
+    && span.trigger.kind === 'orchestration'
+    && span.trigger.dispatchId === edge.dispatchId
+  ) {
+    return true
+  }
+  const slackMs = 120_000
+  const spanEnd = span.finishedAt ?? Number.MAX_SAFE_INTEGER
+  const inWindow = edge.at >= span.startedAt - slackMs && edge.at <= spanEnd + slackMs
+  if (!inWindow) return false
+  if (edge.fromResumeId && span.workspaceId === edge.fromWorkspaceId && span.resumeId === edge.fromResumeId) {
+    return true
+  }
+  if (span.workspaceId === edge.toWorkspaceId && span.resumeId === edge.toResumeId) {
+    return true
   }
   return false
 }
 
+function snippetText(span: DispatchSpan): string | undefined {
+  if (span.error) return span.error
+  if (span.assistantPreview) return span.assistantPreview
+  const raw = span.originalPrompt ?? span.prompt
+  if (!raw) return undefined
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim().replace(/^#+\s*/, '')
+    if (trimmed) return trimmed
+  }
+  return undefined
+}
+
+function artifactSnippet(art: DispatchArtifact): string | undefined {
+  if (art.kind === 'report') return art.summary
+  const lines = art.body.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+  const firstNonHeading = lines.find((l) => !l.startsWith('#')) ?? lines[0]
+  return firstNonHeading?.replace(/^#+\s*/, '')
+}
+
 export function DispatchToolbarControls({ board }: { board: UseDispatchBoardResult }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = localeForLanguage(i18n.language)
   const presets: readonly DispatchWindowPreset[] = ['1h', '6h', '24h']
-  const rangeLabel = `${formatClockRange(board.fromMs)} – ${formatClockRange(board.toMs)}`
+  const rangeLabel = formatWindowRange(board.fromMs, board.toMs, locale)
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <div className="inline-flex rounded-full border border-border bg-background p-0.5" role="group" aria-label={t('issues.dispatch.title')}>
+      <div
+        className="inline-flex rounded-full border border-border bg-background p-0.5"
+        role="group"
+        aria-label={t('issues.dispatch.title')}
+      >
         {presets.map((p) => (
           <Button
             key={p}
@@ -270,10 +343,15 @@ interface ComputedEdgeGeometry {
 }
 
 export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = localeForLanguage(i18n.language)
+
   const [filter, setFilter] = useState<DispatchFilterKind>('all')
   const [selected, setSelected] = useState<DispatchSelectedItem>(null)
   const [hovered, setHovered] = useState<DispatchFocusTarget>(null)
+  const [focusedClusterId, setFocusedClusterId] = useState<string | null>(null)
+  const [focusedEpisodeId, setFocusedEpisodeId] = useState<string | null>(null)
+  const [expandedBurstIds, setExpandedBurstIds] = useState<ReadonlySet<string>>(() => new Set())
 
   const snapshot = board.snapshot
   const fromMs = snapshot?.fromMs ?? board.fromMs
@@ -281,8 +359,18 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
 
   const canvasRef = useRef<HTMLDivElement | null>(null)
   const trackRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  const episodeRefs = useRef<Map<string, HTMLElement>>(new Map())
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
   const [edgeGeometries, setEdgeGeometries] = useState<ComputedEdgeGeometry[]>([])
+
+  const laneLabelMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const lane of snapshot?.lanes ?? []) {
+      map.set(lane.workspaceId, lane.label)
+    }
+    return map
+  }, [snapshot?.lanes])
+  const laneLabel = useCallback((wsId: string) => laneLabelMap.get(wsId) ?? wsId, [laneLabelMap])
 
   const connectedArtifactRunIds = useMemo(() => {
     const set = new Set<string>()
@@ -300,17 +388,49 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
     return set
   }, [snapshot?.artifacts])
 
-  const visibleSpans = useMemo(() => {
-    const spans = snapshot?.spans ?? []
-    return spans.filter((span) =>
-      matchesSpanFilter(span, filter, connectedArtifactRunIds, connectedArtifactResumes),
-    )
-  }, [snapshot?.spans, filter, connectedArtifactRunIds, connectedArtifactResumes])
-
   const visibleEdges = useMemo(() => {
     const edges = snapshot?.edges ?? []
-    return edges.filter((edge) => matchesEdgeFilter(edge, filter))
+    if (filter === 'all' || filter === 'orchestration') return edges
+    if (filter === 'attention') return edges.filter(isAttentionEdge)
+    return []
   }, [snapshot?.edges, filter])
+
+  const visibleSpans = useMemo(() => {
+    const spans = snapshot?.spans ?? []
+    if (filter === 'all') return spans
+    if (filter === 'orchestration') {
+      return spans.filter(
+        (span) =>
+          span.trigger.kind === 'orchestration'
+          || span.trigger.kind === 'conversation'
+          || visibleEdges.some((edge) => edgeConnectsSpan(edge, span)),
+      )
+    }
+    if (filter === 'scheduled') {
+      return spans.filter((span) => span.trigger.kind === 'scheduled-issue')
+    }
+    if (filter === 'outputs') {
+      return spans.filter(
+        (span) =>
+          connectedArtifactRunIds.has(span.id)
+          || connectedArtifactResumes.has(`${span.workspaceId}\0${span.resumeId}`),
+      )
+    }
+    return spans.filter(
+      (span) =>
+        span.status === 'failed'
+        || span.status === 'interrupted'
+        || span.toolFailures > 0
+        || Boolean(span.error)
+        || visibleEdges.some((edge) => edgeConnectsSpan(edge, span)),
+    )
+  }, [
+    snapshot?.spans,
+    filter,
+    visibleEdges,
+    connectedArtifactRunIds,
+    connectedArtifactResumes,
+  ])
 
   const visibleArtifacts = useMemo(() => {
     const artifacts = snapshot?.artifacts ?? []
@@ -318,7 +438,12 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
     if (filter === 'scheduled') return artifacts.filter((a) => a.kind === 'inbox' && Boolean(a.issueId))
     if (filter === 'orchestration') {
       const orchSpanIds = new Set(visibleSpans.map((s) => s.id))
-      return artifacts.filter((a) => a.runId && orchSpanIds.has(a.runId))
+      const orchResumes = new Set(visibleSpans.map((s) => `${s.workspaceId}\0${s.resumeId}`))
+      return artifacts.filter(
+        (a) =>
+          (a.runId && orchSpanIds.has(a.runId))
+          || (!a.runId && a.resumeId && orchResumes.has(`${a.workspaceId}\0${a.resumeId}`)),
+      )
     }
     return []
   }, [snapshot?.artifacts, filter, visibleSpans])
@@ -327,19 +452,39 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
     const lanes = snapshot?.lanes ?? []
     return lanes.map((lane) => {
       const laneSpans = visibleSpans.filter((s) => s.workspaceId === lane.workspaceId)
-      const packed = packSpansIntoTracks(laneSpans, fromMs, toMs)
-      const laneArtifacts = visibleArtifacts.filter((a) => a.workspaceId === lane.workspaceId)
+      const clustered = clusterLaneSpans(laneSpans, fromMs, toMs, {
+        maxTracks: MAX_LANE_TRACKS,
+      })
       const laneSchedules = (snapshot?.scheduleMarkers ?? []).filter(
         (m) => m.workspaceId === lane.workspaceId,
       )
       return {
         lane,
-        packed,
-        artifacts: laneArtifacts,
+        clustered,
         schedules: laneSchedules,
       }
     })
-  }, [snapshot?.lanes, snapshot?.scheduleMarkers, visibleSpans, visibleArtifacts, fromMs, toMs])
+  }, [snapshot?.lanes, snapshot?.scheduleMarkers, visibleSpans, fromMs, toMs])
+
+  const allClusters = useMemo(
+    () => laneLayouts.flatMap((l) => l.clustered.clusters),
+    [laneLayouts],
+  )
+
+  const episodes = useMemo(
+    () => buildDispatchEpisodes(visibleSpans, visibleEdges, visibleArtifacts),
+    [visibleSpans, visibleEdges, visibleArtifacts],
+  )
+
+  const focusedCluster = useMemo(
+    () => (focusedClusterId ? allClusters.find((c) => c.id === focusedClusterId) ?? null : null),
+    [allClusters, focusedClusterId],
+  )
+
+  const focusedEpisode = useMemo(
+    () => (focusedEpisodeId ? episodes.find((e) => e.id === focusedEpisodeId) ?? null : null),
+    [episodes, focusedEpisodeId],
+  )
 
   const focusTarget: DispatchFocusTarget = hovered ?? (
     selected?.kind === 'span'
@@ -348,7 +493,21 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
         ? { kind: 'edge', id: selected.item.id }
         : selected?.kind === 'artifact'
           ? { kind: 'artifact', id: selected.item.id }
-          : null
+          : focusedCluster
+            ? {
+                kind: 'group',
+                spanIds: focusedCluster.spans.map((s) => s.id),
+                edgeIds: [],
+                artifactIds: [],
+              }
+            : focusedEpisode
+              ? {
+                  kind: 'group',
+                  spanIds: focusedEpisode.spanIds,
+                  edgeIds: focusedEpisode.kind === 'orchestration' ? focusedEpisode.edgeIds : [],
+                  artifactIds: focusedEpisode.artifactIds,
+                }
+              : null
   )
 
   const trace = useMemo(
@@ -369,11 +528,21 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
     }
     setCanvasSize({ width: canvasRect.width, height: canvasRect.height })
 
-    const trackBySpanId = new Map<string, PackedDispatchSpan>()
+    const trackBySpanId = new Map<string, number>()
+    const spansByWorkspace = new Map<string, { span: DispatchSpan; track: number }[]>()
     for (const layout of laneLayouts) {
-      for (const item of layout.packed.packed) {
-        trackBySpanId.set(item.span.id, item)
+      const wsList: { span: DispatchSpan; track: number }[] = []
+      for (const item of layout.clustered.spans) {
+        trackBySpanId.set(item.span.id, item.track)
+        wsList.push({ span: item.span, track: item.track })
       }
+      for (const cluster of layout.clustered.clusters) {
+        for (const s of cluster.spans) {
+          trackBySpanId.set(s.id, cluster.track)
+          wsList.push({ span: s, track: cluster.track })
+        }
+      }
+      spansByWorkspace.set(layout.lane.workspaceId, wsList)
     }
 
     const findSpanTrackForEdge = (
@@ -383,16 +552,15 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
       taskId?: string,
     ): number => {
       if (taskId && trackBySpanId.has(taskId)) {
-        return trackBySpanId.get(taskId)!.track
+        return trackBySpanId.get(taskId)!
       }
       if (!resumeId) return 0
-      const match = laneLayouts
-        .find((l) => l.lane.workspaceId === workspaceId)
-        ?.packed.packed.find((item) =>
-          item.span.resumeId === resumeId
-          && at >= item.span.startedAt - 120_000
-          && at <= (item.span.finishedAt ?? toMs) + 120_000,
-        )
+      const match = (spansByWorkspace.get(workspaceId) ?? []).find(
+        ({ span }) =>
+          span.resumeId === resumeId
+          && at >= span.startedAt - 120_000
+          && at <= (span.finishedAt ?? toMs) + 120_000,
+      )
       return match?.track ?? 0
     }
 
@@ -411,7 +579,7 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
         edge.toWorkspaceId,
         edge.toResumeId,
         edge.at,
-        edge.kind === 'dispatch' ? edge.taskId : undefined,
+        edge.kind === 'dispatch' || edge.kind === 'conversation' ? edge.taskId : undefined,
       )
 
       const x1 = fromRect.left - canvasRect.left + pct * fromRect.width
@@ -457,6 +625,64 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
     else trackRefs.current.delete(wsId)
   }, [])
 
+  const setEpisodeRef = useCallback((episodeId: string, el: HTMLElement | null) => {
+    if (el) episodeRefs.current.set(episodeId, el)
+    else episodeRefs.current.delete(episodeId)
+  }, [])
+
+  const handleFilterChange = useCallback((nextFilter: DispatchFilterKind) => {
+    setFilter(nextFilter)
+    setFocusedClusterId(null)
+    setFocusedEpisodeId(null)
+  }, [])
+
+  const toggleBurstExpanded = useCallback((episodeId: string) => {
+    setExpandedBurstIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(episodeId)) next.delete(episodeId)
+      else next.add(episodeId)
+      return next
+    })
+  }, [])
+
+  const handleClusterClick = useCallback(
+    (cluster: DispatchSpanCluster) => {
+      if (focusedClusterId === cluster.id) {
+        const latestSpan = cluster.spans[cluster.spans.length - 1]
+        if (latestSpan) {
+          setSelected({ kind: 'span', item: latestSpan })
+        }
+        return
+      }
+
+      const clusterSpanSet = new Set(cluster.spans.map((s) => s.id))
+      const matchingEpisodes = episodes.filter((ep) =>
+        ep.spanIds.some((id) => clusterSpanSet.has(id)),
+      )
+
+      setFocusedClusterId(cluster.id)
+      const primaryEpisode = matchingEpisodes[0] ?? null
+      setFocusedEpisodeId(primaryEpisode?.id ?? null)
+
+      const burstIdsToExpand = matchingEpisodes
+        .filter((ep) => ep.kind === 'burst')
+        .map((ep) => ep.id)
+      if (burstIdsToExpand.length > 0) {
+        setExpandedBurstIds((prev) => {
+          const next = new Set(prev)
+          for (const id of burstIdsToExpand) next.add(id)
+          return next
+        })
+      }
+
+      if (primaryEpisode) {
+        const el = episodeRefs.current.get(primaryEpisode.id)
+        el?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
+      }
+    },
+    [episodes, focusedClusterId],
+  )
+
   if (board.loading && !snapshot) {
     return <CenteredLoading />
   }
@@ -489,6 +715,57 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
   const hasAnyVisibleItems =
     visibleSpans.length > 0 || visibleEdges.length > 0 || visibleArtifacts.length > 0
 
+  const windowIncludeDate = isDifferentCalendarDay(fromMs, toMs) || spanMs >= 12 * 3_600_000
+
+  const renderArtifactChip = (art: DispatchArtifact) => {
+    const isEmphasized =
+      selected?.kind === 'artifact' && selected.item.id === art.id
+        ? true
+        : hasFocus && trace.artifactIds.has(art.id)
+    const isDimmed = hasFocus && !trace.artifactIds.has(art.id)
+    return (
+      <button
+        key={art.id}
+        type="button"
+        data-testid={`dispatch-artifact-${art.id}`}
+        onClick={() => setSelected({ kind: 'artifact', item: art })}
+        onMouseEnter={() => setHovered({ kind: 'artifact', id: art.id })}
+        onMouseLeave={() => setHovered(null)}
+        className={`inline-flex max-w-64 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+          art.kind === 'inbox'
+            ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15'
+            : 'border-border bg-background text-foreground hover:bg-muted/60'
+        } ${isEmphasized ? 'ring-2 ring-primary/50' : ''} ${isDimmed ? 'opacity-40' : ''}`}
+      >
+        {art.kind === 'inbox' ? (
+          <Inbox size={10} className="shrink-0" aria-hidden />
+        ) : (
+          <FileText size={10} className="shrink-0 text-muted-foreground" aria-hidden />
+        )}
+        {art.kind === 'inbox' && art.unread && (
+          <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
+        )}
+        <span className="truncate">{art.kind === 'inbox' ? art.title : art.path}</span>
+        <span className="shrink-0 font-mono text-[10px] opacity-75">
+          {formatClockPoint(art.at, {
+            includeDate: isDifferentCalendarDay(art.at, toMs),
+            locale,
+          })}
+        </span>
+      </button>
+    )
+  }
+
+  const isEpisodeEmphasized = (ep: DispatchEpisode): boolean => {
+    if (focusedEpisodeId === ep.id) return true
+    if (!hasFocus) return false
+    return (
+      ep.spanIds.some((id) => trace.spanIds.has(id))
+      || (ep.kind === 'orchestration' && ep.edgeIds.some((id) => trace.edgeIds.has(id)))
+      || ep.artifactIds.some((id) => trace.artifactIds.has(id))
+    )
+  }
+
   return (
     <div data-testid="dispatch-board" className="@container/dispatch space-y-3 px-2 pb-6">
       {board.error && snapshot && (
@@ -497,21 +774,23 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
         </div>
       )}
 
-      {/* Filter & summary bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2">
-        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t('issues.dispatch.title')}>
+      {/* Lightweight borderless filter strip & summary stats */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-0.5">
+        <div className="flex flex-wrap items-center gap-1" role="group" aria-label={t('issues.dispatch.title')}>
           {filterChips.map((chip) => (
-            <Button
+            <button
               key={chip.id}
               type="button"
-              variant="outline"
-              size="sm"
               aria-pressed={filter === chip.id}
-              onClick={() => setFilter(chip.id)}
-              className={`h-7 rounded-full px-2.5 text-xs ${filter === chip.id ? 'bg-background font-medium text-foreground shadow-xs' : 'border-transparent bg-transparent text-muted-foreground hover:bg-muted/60'}`}
+              onClick={() => handleFilterChange(chip.id)}
+              className={`inline-flex h-7 items-center rounded-full px-2.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                filter === chip.id
+                  ? 'bg-muted font-medium text-foreground'
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+              }`}
             >
               {chip.label}
-            </Button>
+            </button>
           ))}
         </div>
 
@@ -521,6 +800,11 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
             <span>{t('issues.dispatch.runs', { count: snapshot.summary.totalSpanCount })}</span>
             <span>{t('issues.dispatch.messages', { count: snapshot.summary.edgeCount })}</span>
             <span>{t('issues.dispatch.outputs', { count: snapshot.summary.artifactCount })}</span>
+            {snapshot.summary.errorSpanCount > 0 && (
+              <span className="font-medium text-destructive">
+                {t('issues.dispatch.failedCount', { count: snapshot.summary.errorSpanCount })}
+              </span>
+            )}
             {snapshot.summary.runningSpanCount > 0 && (
               <span className="inline-flex items-center gap-1 font-medium text-primary">
                 <span className="size-1.5 rounded-full bg-primary animate-pulse motion-reduce:animate-none" aria-hidden />
@@ -545,8 +829,8 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
             <p className="font-medium text-foreground">{t('issues.dispatch.quietTitle')}</p>
             <p className="mt-0.5 text-muted-foreground">
               {t('issues.dispatch.quietHint', {
-                from: formatClockRange(fromMs),
-                to: formatClockRange(toMs),
+                from: formatClockPoint(fromMs, { includeDate: windowIncludeDate, locale }),
+                to: formatClockPoint(toMs, { includeDate: windowIncludeDate, locale }),
               })}
             </p>
           </div>
@@ -561,13 +845,13 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
       {!isQuiet && filter !== 'all' && !hasAnyVisibleItems && (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-border bg-muted/15 px-4 py-3 text-xs">
           <p className="text-muted-foreground">{t('issues.dispatch.noFilterMatches')}</p>
-          <Button type="button" size="sm" variant="ghost" onClick={() => setFilter('all')}>
+          <Button type="button" size="sm" variant="ghost" onClick={() => handleFilterChange('all')}>
             {t('issues.dispatch.clearFilter')}
           </Button>
         </div>
       )}
 
-      {/* Main Swimlane Canvas */}
+      {/* Zone 1: Compact Active-Workspace Swimlane Map */}
       {snapshot && snapshot.lanes.length > 0 && (
         <div className="overflow-hidden rounded-lg border border-border/70 bg-background">
           {/* Time Ruler */}
@@ -575,10 +859,12 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
             <div className="w-48 shrink-0 border-r border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
               {t('issues.dispatch.workspaceLabel')}
             </div>
-            <div className="relative flex-1 px-2 py-1.5">
+            <div className="relative flex-1 px-3 py-1.5">
               <div className="flex justify-between font-mono text-[10px] tabular-nums text-muted-foreground">
                 {ticks.map((frac) => (
-                  <span key={frac}>{formatTickTime(fromMs + spanMs * frac, spanMs)}</span>
+                  <span key={frac} className="whitespace-nowrap">
+                    {formatTickTime(fromMs + spanMs * frac, spanMs, fromMs, toMs, locale)}
+                  </span>
                 ))}
               </div>
             </div>
@@ -586,15 +872,18 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
 
           {/* Lanes + SVG Overlay */}
           <div ref={canvasRef} className="relative divide-y divide-border/60">
-            {laneLayouts.map(({ lane, packed, artifacts, schedules }) => {
-              const laneBodyHeight =
+            {laneLayouts.map(({ lane, clustered, schedules }) => {
+              const laneBodyHeight = Math.max(
+                MIN_LANE_HEIGHT_PX,
                 TRACK_TOP_PAD_PX * 2
-                + packed.trackCount * TRACK_HEIGHT_PX
-                + Math.max(0, packed.trackCount - 1) * TRACK_GAP_PX
+                  + clustered.trackCount * TRACK_HEIGHT_PX
+                  + Math.max(0, clustered.trackCount - 1) * TRACK_GAP_PX,
+              )
               const nextDue = schedules
                 .filter((s) => s.nextDueAtMs !== null)
                 .sort((a, b) => (a.nextDueAtMs ?? Infinity) - (b.nextDueAtMs ?? Infinity))[0]
               const skippedSchedule = schedules.find((s) => s.skipState)
+              const showDistinctTag = Boolean(lane.tag && lane.tag !== lane.label)
 
               return (
                 <section
@@ -602,21 +891,20 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                   data-testid={`dispatch-lane-${lane.workspaceId}`}
                   className="flex flex-col @[42rem]/dispatch:flex-row"
                 >
-                  {/* Sticky/fixed lane header */}
-                  <div className="flex shrink-0 flex-col justify-start gap-2 border-b border-border/50 bg-muted/15 px-3 py-2.5 @[42rem]/dispatch:w-48 @[42rem]/dispatch:border-b-0 @[42rem]/dispatch:border-r">
+                  {/* Compact lane header */}
+                  <div className="flex shrink-0 flex-col justify-center gap-1.5 border-b border-border/50 bg-muted/15 px-3 py-2 @[42rem]/dispatch:w-48 @[42rem]/dispatch:border-b-0 @[42rem]/dispatch:border-r">
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span className="size-1.5 shrink-0 rounded-full bg-success" aria-hidden />
                         <h3 className="truncate text-xs font-semibold text-foreground" title={lane.label}>
                           {lane.label}
                         </h3>
-                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                          {t('issues.dispatch.activeBadge')}
-                        </span>
                       </div>
-                      <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
-                        {lane.tag}
-                      </p>
+                      {showDistinctTag && (
+                        <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
+                          {lane.tag}
+                        </p>
+                      )}
                     </div>
 
                     {(skippedSchedule || nextDue) && (
@@ -638,8 +926,13 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                             title={nextDue.title}
                           >
                             <Clock size={10} className="shrink-0" aria-hidden />
-                            <span className="truncate">
-                              {t('issues.dispatch.scheduledDue', { time: formatClockRange(nextDue.nextDueAtMs) })}
+                            <span className="truncate tabular-nums">
+                              {t('issues.dispatch.scheduledDue', {
+                                time: formatClockPoint(nextDue.nextDueAtMs, {
+                                  includeDate: isDifferentCalendarDay(nextDue.nextDueAtMs, toMs),
+                                  locale,
+                                }),
+                              })}
                             </span>
                           </button>
                         )}
@@ -647,14 +940,13 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                     )}
                   </div>
 
-                  {/* Timeline track body */}
+                  {/* Timeline track body (capped to maxTracks = 2) */}
                   <div className="min-w-0 flex-1">
                     <div
                       ref={(el) => setTrackRef(lane.workspaceId, el)}
                       className="relative w-full"
                       style={{ minHeight: laneBodyHeight }}
                     >
-                      {/* Subtle grid guide lines */}
                       {ticks.slice(1, -1).map((frac) => (
                         <div
                           key={frac}
@@ -664,7 +956,6 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                         />
                       ))}
 
-                      {/* Current time indicator */}
                       {nowPct > 0 && nowPct < 100 && (
                         <div
                           aria-hidden
@@ -673,34 +964,33 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                         />
                       )}
 
-                      {/* Upcoming schedule due ticks inside window */}
                       {schedules.map((marker) => {
                         if (marker.nextDueAtMs === null || marker.nextDueAtMs < fromMs || marker.nextDueAtMs > toMs) {
                           return null
                         }
-                        const pct = clampTimePct(marker.nextDueAtMs, fromMs, toMs)
+                        const rawPct = clampTimePct(marker.nextDueAtMs, fromMs, toMs)
+                        const pct = Math.max(4, Math.min(96, rawPct))
+                        const formattedDue = formatClockPoint(marker.nextDueAtMs, {
+                          includeDate: isDifferentCalendarDay(marker.nextDueAtMs, toMs),
+                          locale,
+                        })
                         return (
                           <button
                             key={`sched-${marker.issueId}`}
                             type="button"
                             onClick={() => setSelected({ kind: 'schedule', item: marker })}
-                            title={`${marker.title} · ${formatClockRange(marker.nextDueAtMs)}`}
+                            title={`${marker.title} · ${formattedDue}`}
                             className="absolute top-1 z-10 -translate-x-1/2 rounded-full border border-dashed border-border bg-background/90 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:border-foreground/50 hover:text-foreground"
                             style={{ left: `${pct}%` }}
                           >
-                            <Clock size={9} className="inline mr-0.5" aria-hidden />
-                            {formatClockRange(marker.nextDueAtMs)}
+                            <Clock size={9} className="mr-0.5 inline" aria-hidden />
+                            {formattedDue}
                           </button>
                         )
                       })}
 
-                      {/* Packed execution spans */}
-                      {packed.packed.map(({ span, track, leftPct, widthPct }) => {
-                        const spanArtifacts = artifacts.filter(
-                          (art) => art.runId === span.id || (!art.runId && art.resumeId === span.resumeId),
-                        )
-                        const inboxCount = spanArtifacts.filter((a) => a.kind === 'inbox').length
-                        const reportCount = spanArtifacts.filter((a) => a.kind === 'report').length
+                      {/* Unclustered execution spans */}
+                      {clustered.spans.map(({ span, track, leftPct, widthPct }: PackedDispatchSpan) => {
                         const isEmphasized =
                           selected?.kind === 'span' && selected.item.id === span.id
                             ? true
@@ -726,7 +1016,10 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                             title={`${spanTitle(span, t)} (${span.agent})`}
                           >
                             {span.status === 'running' && (
-                              <span className="size-1.5 shrink-0 rounded-full bg-primary animate-pulse motion-reduce:animate-none" aria-hidden />
+                              <span
+                                className="size-1.5 shrink-0 rounded-full bg-primary animate-pulse motion-reduce:animate-none"
+                                aria-hidden
+                              />
                             )}
                             {span.status === 'failed' && (
                               <AlertTriangle size={11} className="shrink-0 text-destructive" aria-hidden />
@@ -735,68 +1028,80 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                             <span className="min-w-0 flex-1 truncate font-medium">
                               {spanTitle(span, t)}
                             </span>
-                            {inboxCount > 0 && (
-                              <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-primary/15 px-1 py-0.5 text-[10px] font-medium text-primary">
-                                <Inbox size={9} aria-hidden />
-                                {inboxCount}
-                              </span>
+                          </button>
+                        )
+                      })}
+
+                      {/* Collapsed burst cluster pills */}
+                      {clustered.clusters.map((cluster) => {
+                        const isEmphasized =
+                          focusedClusterId === cluster.id
+                          || (hasFocus && cluster.spans.some((s) => trace.spanIds.has(s.id)))
+                        const isDimmed =
+                          hasFocus && !cluster.spans.some((s) => trace.spanIds.has(s.id))
+                        const topPx = TRACK_TOP_PAD_PX + cluster.track * (TRACK_HEIGHT_PX + TRACK_GAP_PX)
+                        const anchorRight = cluster.leftPct > 86
+                        const labelText =
+                          cluster.worstStatus === 'failed' || cluster.worstStatus === 'interrupted'
+                            ? `×${cluster.count}`
+                            : t('issues.dispatch.clusterRuns', { count: cluster.count })
+                        const titleText = t('issues.dispatch.clusterTitle', {
+                          count: cluster.count,
+                          status: statusLabel(cluster.worstStatus, t),
+                        })
+
+                        return (
+                          <button
+                            key={cluster.id}
+                            type="button"
+                            data-testid={`dispatch-cluster-${cluster.id}`}
+                            aria-label={titleText}
+                            title={titleText}
+                            onClick={() => handleClusterClick(cluster)}
+                            onMouseEnter={() =>
+                              setHovered({
+                                kind: 'group',
+                                spanIds: cluster.spans.map((s) => s.id),
+                                edgeIds: [],
+                                artifactIds: [],
+                              })
+                            }
+                            onMouseLeave={() => setHovered(null)}
+                            className={clusterPillClasses(cluster, isEmphasized, isDimmed)}
+                            style={{
+                              top: topPx,
+                              height: TRACK_HEIGHT_PX,
+                              ...(anchorRight
+                                ? { right: `${Math.max(0.5, 100 - (cluster.leftPct + cluster.widthPct))}%` }
+                                : { left: `${cluster.leftPct}%` }),
+                            }}
+                          >
+                            {cluster.worstStatus === 'failed' && (
+                              <AlertTriangle size={11} className="shrink-0" aria-hidden />
                             )}
-                            {reportCount > 0 && (
-                              <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">
-                                <FileText size={9} aria-hidden />
-                                {reportCount}
-                              </span>
+                            {cluster.worstStatus === 'interrupted' && (
+                              <Pause size={11} className="shrink-0" aria-hidden />
                             )}
+                            {cluster.worstStatus === 'running' && (
+                              <span
+                                className="size-1.5 shrink-0 rounded-full bg-primary animate-pulse motion-reduce:animate-none"
+                                aria-hidden
+                              />
+                            )}
+                            {cluster.worstStatus === 'done' && (
+                              <Layers size={11} className="shrink-0 text-muted-foreground" aria-hidden />
+                            )}
+                            <span className="tabular-nums">{labelText}</span>
                           </button>
                         )
                       })}
                     </div>
-
-                    {/* Outputs / Inbox & Report milestones rail for this Workspace */}
-                    {artifacts.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1.5 border-t border-border/40 bg-muted/10 px-2.5 py-1.5">
-                        {artifacts.map((art) => {
-                          const isEmphasized =
-                            selected?.kind === 'artifact' && selected.item.id === art.id
-                              ? true
-                              : hasFocus && trace.artifactIds.has(art.id)
-                          const isDimmed = hasFocus && !trace.artifactIds.has(art.id)
-                          return (
-                            <button
-                              key={art.id}
-                              type="button"
-                              data-testid={`dispatch-artifact-${art.id}`}
-                              onClick={() => setSelected({ kind: 'artifact', item: art })}
-                              onMouseEnter={() => setHovered({ kind: 'artifact', id: art.id })}
-                              onMouseLeave={() => setHovered(null)}
-                              className={`inline-flex max-w-60 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                                art.kind === 'inbox'
-                                  ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15'
-                                  : 'border-border bg-background text-foreground hover:bg-muted/60'
-                              } ${isEmphasized ? 'ring-2 ring-primary/50' : ''} ${isDimmed ? 'opacity-30' : ''}`}
-                            >
-                              {art.kind === 'inbox' ? (
-                                <Inbox size={10} className="shrink-0" aria-hidden />
-                              ) : (
-                                <FileText size={10} className="shrink-0 text-muted-foreground" aria-hidden />
-                              )}
-                              <span className="truncate">
-                                {art.kind === 'inbox' ? art.title : art.path}
-                              </span>
-                              <span className="shrink-0 font-mono text-[10px] opacity-75">
-                                {formatClockRange(art.at)}
-                              </span>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )}
                   </div>
                 </section>
               )
             })}
 
-            {/* SVG Causal Curves Overlay (renders when measured layout > 0) */}
+            {/* SVG Causal Curves Overlay */}
             {canvasSize.width > 0 && canvasSize.height > 0 && edgeGeometries.length > 0 && (
               <>
                 <svg
@@ -877,37 +1182,473 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
               </>
             )}
           </div>
-
-          {/* Compact interactive message ribbon for keyboard/narrow screens or test fallback */}
-          {visibleEdges.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 bg-muted/20 px-3 py-2">
-              <span className="mr-1 text-[11px] font-medium text-muted-foreground">
-                {t('issues.dispatch.relatedMessagesTitle')}:
-              </span>
-              {visibleEdges.map((edge) => {
-                const isEmphasized =
-                  selected?.kind === 'edge' && selected.item.id === edge.id
-                    ? true
-                    : hasFocus && trace.edgeIds.has(edge.id)
-                const isDimmed = hasFocus && !trace.edgeIds.has(edge.id)
-                return (
-                  <button
-                    key={`chip-${edge.id}`}
-                    type="button"
-                    data-testid={`dispatch-edge-chip-${edge.id}`}
-                    onClick={() => setSelected({ kind: 'edge', item: edge })}
-                    onMouseEnter={() => setHovered({ kind: 'edge', id: edge.id })}
-                    onMouseLeave={() => setHovered(null)}
-                    className={edgePillClasses(edge, isEmphasized, isDimmed)}
-                  >
-                    <span>{edgeKindLabel(edge.kind, t)}</span>
-                    <span className="font-mono text-[10px] opacity-75">{formatClockRange(edge.at)}</span>
-                  </button>
-                )
-              })}
-            </div>
-          )}
         </div>
+      )}
+
+      {/* Zone 2: Structured Causal Episode Feed */}
+      {episodes.length > 0 && (
+        <section className="space-y-2" aria-label={t('issues.dispatch.feedTitle')}>
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-xs font-semibold text-foreground">
+              {t('issues.dispatch.feedTitle')}
+            </h2>
+            <span className="text-[11px] tabular-nums text-muted-foreground">
+              {t('issues.dispatch.feedCount', { count: episodes.length })}
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {episodes.map((ep) => {
+              const emphasized = isEpisodeEmphasized(ep)
+              const cardRing = emphasized
+                ? 'border-primary/60 bg-primary/[0.04] ring-1 ring-primary/30'
+                : 'border-border/70 bg-background hover:border-border'
+              const dimClass = hasFocus && !emphasized ? 'opacity-65' : 'opacity-100'
+
+              if (ep.kind === 'orchestration') {
+                return (
+                  <article
+                    key={ep.id}
+                    ref={(el) => setEpisodeRef(ep.id, el)}
+                    data-testid={`dispatch-episode-${ep.id}`}
+                    onMouseEnter={() =>
+                      setHovered({
+                        kind: 'group',
+                        spanIds: ep.spanIds,
+                        edgeIds: ep.edgeIds,
+                        artifactIds: ep.artifactIds,
+                      })
+                    }
+                    onMouseLeave={() => setHovered(null)}
+                    className={`rounded-lg border transition-all ${cardRing} ${dimClass}`}
+                  >
+                    {/* Episode Header / Coordinator */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-3 py-2">
+                      {ep.coordinator ? (
+                        <button
+                          type="button"
+                          data-testid={`dispatch-feed-span-${ep.coordinator.span.id}`}
+                          onClick={() => {
+                            setFocusedEpisodeId(ep.id)
+                            setSelected({ kind: 'span', item: ep.coordinator!.span })
+                          }}
+                          className="flex min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                        >
+                          <GitFork size={13} className="shrink-0 text-primary" aria-hidden />
+                          <SpanStatusIcon status={ep.coordinator.span.status} />
+                          <span className="truncate text-xs font-semibold text-foreground">
+                            {spanTitle(ep.coordinator.span, t)}
+                          </span>
+                          <span className="shrink-0 rounded border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                            {t('issues.dispatch.episodeOrchestration')}
+                          </span>
+                          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                            {laneLabel(ep.coordinator.span.workspaceId)}
+                          </span>
+                          <span className="hidden shrink-0 text-[11px] text-muted-foreground sm:inline">
+                            {ep.coordinator.span.agent}
+                            {ep.coordinator.span.model ? ` · ${ep.coordinator.span.model}` : ''}
+                          </span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setFocusedEpisodeId((prev) => (prev === ep.id ? null : ep.id))}
+                          className="flex min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                        >
+                          <GitFork size={13} className="shrink-0 text-primary" aria-hidden />
+                          <span className="truncate text-xs font-semibold text-foreground">
+                            {t('issues.dispatch.coordinatorFallback')}
+                          </span>
+                          <span className="shrink-0 rounded border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                            {t('issues.dispatch.episodeOrchestration')}
+                          </span>
+                        </button>
+                      )}
+
+                      <div className="flex shrink-0 items-center gap-2 text-[11px] tabular-nums text-muted-foreground">
+                        {ep.coordinator && (
+                          <span>{formatDurationMs(ep.coordinator.span.durationMs)}</span>
+                        )}
+                        <span className="font-mono">
+                          {formatClockPoint(ep.latestAt, {
+                            includeDate: isDifferentCalendarDay(ep.latestAt, toMs),
+                            includeSeconds: true,
+                            locale,
+                          })}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Worker runs */}
+                    {ep.workers.length > 0 && (
+                      <div className="divide-y divide-border/40">
+                        {ep.workers.map(({ span }) => {
+                          const snippet = snippetText(span)
+                          return (
+                            <button
+                              key={span.id}
+                              type="button"
+                              data-testid={`dispatch-feed-span-${span.id}`}
+                              onClick={() => {
+                                setFocusedEpisodeId(ep.id)
+                                setSelected({ kind: 'span', item: span })
+                              }}
+                              className="flex w-full items-start justify-between gap-3 px-3 py-2 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              <div className="min-w-0 flex-1 space-y-0.5">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <SpanStatusIcon status={span.status} />
+                                  <span className="truncate text-xs font-medium text-foreground">
+                                    {spanTitle(span, t)}
+                                  </span>
+                                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                    {laneLabel(span.workspaceId)}
+                                  </span>
+                                  <span className="text-[11px] text-muted-foreground">
+                                    {span.agent}
+                                    {span.model ? ` · ${span.model}` : ''}
+                                  </span>
+                                </div>
+                                {snippet && (
+                                  <p className={`truncate text-[11px] ${span.error ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                    {snippet}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex shrink-0 items-center gap-2 text-[11px] tabular-nums text-muted-foreground">
+                                <span>{formatDurationMs(span.durationMs)}</span>
+                                <span className="font-mono">
+                                  {formatClockPoint(span.startedAt, {
+                                    includeDate: isDifferentCalendarDay(span.startedAt, toMs),
+                                    includeSeconds: true,
+                                    locale,
+                                  })}
+                                </span>
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {/* Inline message chips + attached outputs */}
+                    {(ep.edges.length > 0 || ep.artifacts.length > 0) && (
+                      <div className="flex flex-wrap items-center gap-1.5 border-t border-border/50 bg-muted/15 px-3 py-2">
+                        {ep.edges.map((edge, idx) => {
+                          const edgeEmphasized =
+                            selected?.kind === 'edge' && selected.item.id === edge.id
+                              ? true
+                              : hasFocus && trace.edgeIds.has(edge.id)
+                          const edgeDimmed = hasFocus && !trace.edgeIds.has(edge.id)
+                          return (
+                            <span key={edge.id} className="inline-flex items-center gap-1">
+                              {idx > 0 && (
+                                <span className="text-[10px] text-muted-foreground/60" aria-hidden>
+                                  →
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                data-testid={`dispatch-edge-chip-${edge.id}`}
+                                onClick={() => setSelected({ kind: 'edge', item: edge })}
+                                onMouseEnter={() => setHovered({ kind: 'edge', id: edge.id })}
+                                onMouseLeave={() => setHovered(null)}
+                                className={edgePillClasses(edge, edgeEmphasized, edgeDimmed)}
+                                title={edge.subject || edge.body || edge.spec}
+                              >
+                                <span>{edgeKindLabel(edge.kind, t)}</span>
+                                <span className="font-mono text-[10px] opacity-75">
+                                  {formatClockPoint(edge.at, {
+                                    includeDate: isDifferentCalendarDay(edge.at, toMs),
+                                    locale,
+                                  })}
+                                </span>
+                              </button>
+                            </span>
+                          )
+                        })}
+                        {ep.edges.length > 0 && ep.artifacts.length > 0 && (
+                          <span className="mx-1 h-3.5 w-px bg-border" aria-hidden />
+                        )}
+                        {ep.artifacts.map(renderArtifactChip)}
+                      </div>
+                    )}
+                  </article>
+                )
+              }
+
+              if (ep.kind === 'burst') {
+                const isExpanded = expandedBurstIds.has(ep.id)
+                const burstRange = formatBurstClockSpan(ep.startedAt, ep.endedAt, toMs, locale)
+                const burstBadgeText = t('issues.dispatch.burstStatusCount', {
+                  status: statusLabel(ep.status, t),
+                  count: ep.runs.length,
+                })
+
+                return (
+                  <article
+                    key={ep.id}
+                    ref={(el) => setEpisodeRef(ep.id, el)}
+                    data-testid={`dispatch-episode-${ep.id}`}
+                    onMouseEnter={() =>
+                      setHovered({
+                        kind: 'group',
+                        spanIds: ep.spanIds,
+                        edgeIds: [],
+                        artifactIds: ep.artifactIds,
+                      })
+                    }
+                    onMouseLeave={() => setHovered(null)}
+                    className={`rounded-lg border transition-all ${cardRing} ${dimClass}`}
+                  >
+                    <div className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                      <button
+                        type="button"
+                        aria-expanded={isExpanded}
+                        onClick={() => {
+                          setFocusedEpisodeId(ep.id)
+                          toggleBurstExpanded(ep.id)
+                        }}
+                        className="flex min-w-0 flex-1 items-start justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                      >
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${statusBadgeClasses(ep.status)}`}
+                            >
+                              {ep.status === 'failed' && <AlertTriangle size={11} aria-hidden />}
+                              {ep.status === 'running' && (
+                                <span
+                                  className="size-1.5 rounded-full bg-current animate-pulse motion-reduce:animate-none"
+                                  aria-hidden
+                                />
+                              )}
+                              <span>{burstBadgeText}</span>
+                            </span>
+                            <span className="truncate font-semibold text-foreground">
+                              {ep.title}
+                            </span>
+                            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                              {laneLabel(ep.workspaceId)}
+                            </span>
+                            <span className="text-[11px] text-muted-foreground">
+                              {ep.agent}
+                              {ep.model ? ` · ${ep.model}` : ''}
+                            </span>
+                            <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                              {burstRange}
+                            </span>
+                          </div>
+                          {(ep.error || ep.preview) && (
+                            <p className={`truncate text-[11px] ${ep.error ? 'text-destructive' : 'text-muted-foreground'}`}>
+                              {ep.error || ep.preview}
+                            </p>
+                          )}
+                        </div>
+
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border/70 bg-muted/40 px-2 py-1 text-[11px] font-medium text-foreground">
+                          {isExpanded
+                            ? t('issues.dispatch.collapseRuns')
+                            : t('issues.dispatch.showRuns', { count: ep.runs.length })}
+                          {isExpanded ? <ChevronUp size={12} aria-hidden /> : <ChevronDown size={12} aria-hidden />}
+                        </span>
+                      </button>
+
+                      {ep.artifacts.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {ep.artifacts.map(renderArtifactChip)}
+                        </div>
+                      )}
+                    </div>
+
+                    {isExpanded && (
+                      <div className="divide-y divide-border/50 border-t border-border/60 bg-muted/15">
+                        {ep.runs.map(({ span }) => {
+                          const runSnippet = snippetText(span)
+                          return (
+                            <button
+                              key={span.id}
+                              type="button"
+                              data-testid={`dispatch-feed-span-${span.id}`}
+                              onClick={() => setSelected({ kind: 'span', item: span })}
+                              className="flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-xs transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              <div className="flex min-w-0 flex-1 items-center gap-2">
+                                <SpanStatusIcon status={span.status} />
+                                <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+                                  {formatClockPoint(span.startedAt, {
+                                    includeDate: isDifferentCalendarDay(span.startedAt, toMs),
+                                    includeSeconds: true,
+                                    locale,
+                                  })}
+                                </span>
+                                <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                                  {formatDurationMs(span.durationMs)}
+                                </span>
+                                {span.sessionLabel && (
+                                  <span className="shrink-0 text-[11px] text-foreground/80">
+                                    {span.sessionLabel}
+                                  </span>
+                                )}
+                                {runSnippet && (
+                                  <span className={`min-w-0 flex-1 truncate text-[11px] ${span.error ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                    {runSnippet}
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </article>
+                )
+              }
+
+              if (ep.kind === 'execution') {
+                const { span, artifacts: runArtifacts }: DispatchExecutionItem = ep.execution
+                const snippet = snippetText(span)
+
+                return (
+                  <article
+                    key={ep.id}
+                    ref={(el) => setEpisodeRef(ep.id, el)}
+                    data-testid={`dispatch-episode-${ep.id}`}
+                    onMouseEnter={() =>
+                      setHovered({
+                        kind: 'group',
+                        spanIds: ep.spanIds,
+                        edgeIds: [],
+                        artifactIds: ep.artifactIds,
+                      })
+                    }
+                    onMouseLeave={() => setHovered(null)}
+                    className={`flex flex-col gap-2 rounded-lg border px-3 py-2.5 transition-all sm:flex-row sm:items-center sm:justify-between ${cardRing} ${dimClass}`}
+                  >
+                    <button
+                      type="button"
+                      data-testid={`dispatch-feed-span-${span.id}`}
+                      onClick={() => {
+                        setFocusedEpisodeId(ep.id)
+                        setSelected({ kind: 'span', item: span })
+                      }}
+                      className="flex min-w-0 flex-1 items-start justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                    >
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                          <SpanStatusIcon status={span.status} />
+                          <span className="truncate font-semibold text-foreground">
+                            {spanTitle(span, t)}
+                          </span>
+                          <span className="inline-flex items-center gap-1 rounded border border-border/70 bg-muted/40 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                            <SpanTriggerIcon trigger={span.trigger} />
+                            {triggerKindLabel(span.trigger.kind, t)}
+                          </span>
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                            {laneLabel(span.workspaceId)}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground">
+                            {span.agent}
+                            {span.model ? ` · ${span.model}` : ''}
+                          </span>
+                        </div>
+                        {snippet && (
+                          <p className={`truncate text-[11px] ${span.error ? 'text-destructive' : 'text-muted-foreground'}`}>
+                            {snippet}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-2 text-[11px] tabular-nums text-muted-foreground">
+                        <span>{formatDurationMs(span.durationMs)}</span>
+                        <span className="font-mono">
+                          {formatClockPoint(span.startedAt, {
+                            includeDate: isDifferentCalendarDay(span.startedAt, toMs),
+                            includeSeconds: true,
+                            locale,
+                          })}
+                        </span>
+                      </div>
+                    </button>
+
+                    {runArtifacts.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0">
+                        {runArtifacts.map(renderArtifactChip)}
+                      </div>
+                    )}
+                  </article>
+                )
+              }
+
+              // Standalone artifact output row
+              const art = ep.artifact
+              const summary = artifactSnippet(art)
+
+              return (
+                <article
+                  key={ep.id}
+                  ref={(el) => setEpisodeRef(ep.id, el)}
+                  data-testid={`dispatch-episode-${ep.id}`}
+                  onMouseEnter={() =>
+                    setHovered({
+                      kind: 'artifact',
+                      id: art.id,
+                    })
+                  }
+                  onMouseLeave={() => setHovered(null)}
+                  className={`rounded-lg border px-3 py-2.5 transition-all ${cardRing} ${dimClass}`}
+                >
+                  <button
+                    type="button"
+                    data-testid={`dispatch-artifact-${art.id}`}
+                    onClick={() => {
+                      setFocusedEpisodeId(ep.id)
+                      setSelected({ kind: 'artifact', item: art })
+                    }}
+                    className="flex w-full items-start justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                  >
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                        {art.kind === 'inbox' ? (
+                          <Inbox size={13} className="shrink-0 text-primary" aria-hidden />
+                        ) : (
+                          <FileText size={13} className="shrink-0 text-muted-foreground" aria-hidden />
+                        )}
+                        <span className="truncate font-semibold text-foreground">
+                          {art.kind === 'inbox' ? art.title : art.path}
+                        </span>
+                        <span className="rounded border border-border/70 bg-muted/40 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                          {art.kind === 'inbox'
+                            ? t('issues.dispatch.artifactInboxBadge')
+                            : t('issues.dispatch.artifactReportBadge')}
+                        </span>
+                        {art.kind === 'inbox' && art.unread && (
+                          <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                            {t('issues.dispatch.inboxUnread')}
+                          </span>
+                        )}
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                          {laneLabel(art.workspaceId)}
+                        </span>
+                      </div>
+                      {summary && (
+                        <p className="truncate text-[11px] text-muted-foreground">{summary}</p>
+                      )}
+                    </div>
+                    <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+                      {formatClockPoint(art.at, {
+                        includeDate: isDifferentCalendarDay(art.at, toMs),
+                        includeSeconds: true,
+                        locale,
+                      })}
+                    </span>
+                  </button>
+                </article>
+              )
+            })}
+          </div>
+        </section>
       )}
 
       <DispatchInspectorSheet
