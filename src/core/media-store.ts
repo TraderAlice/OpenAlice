@@ -9,7 +9,7 @@
 import { createHash } from 'node:crypto'
 import { readFile, copyFile, mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { extname, join, posix } from 'node:path'
+import { extname, isAbsolute, join, posix, relative, resolve } from 'node:path'
 import { dataPath } from '@/core/paths.js'
 
 /** 256 short, common English words — one per byte value. */
@@ -84,5 +84,13 @@ export async function persistMedia(filePath: string): Promise<string> {
 
 /** Resolve a media relative path to its absolute path on disk. */
 export function resolveMediaPath(name: string): string {
-  return join(MEDIA_DIR, name)
+  const base = resolve(MEDIA_DIR)
+  const full = resolve(base, name)
+  // `join` collapses `..` but does not stop it from leaving the directory, and
+  // the route hands us decoded URL segments — so `%2e%2e%2f` arrives as `../`.
+  const rel = relative(base, full)
+  if (rel.startsWith('..') || isAbsolute(rel)) {
+    throw new Error(`media path escapes media dir: ${name}`)
+  }
+  return full
 }
