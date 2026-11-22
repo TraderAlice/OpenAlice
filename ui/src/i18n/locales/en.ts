@@ -483,6 +483,8 @@ export const en = {
       showRuns: 'Show {{count}} runs',
       collapseRuns: 'Collapse',
       burstStatusCount: '{{status}} ×{{count}}',
+      scheduledWaveTitle: 'Scheduled wave ({{count}} issues)',
+      executionWaveTitle: 'Execution wave ({{count}} runs)',
       artifactInboxBadge: 'Inbox',
       artifactReportBadge: 'Report',
       runsInSequence: 'Run {{index}} of {{total}} in burst',

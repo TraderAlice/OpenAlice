@@ -45,11 +45,12 @@ import {
   formatDurationMs,
   isDifferentCalendarDay,
   localeForLanguage,
+  resolveSpanTitle,
   spanTriggerIdentity,
 } from './layout'
 
 export type DispatchSelectedItem =
-  | { readonly kind: 'span'; readonly item: DispatchSpan }
+  | { readonly kind: 'span'; readonly item: DispatchSpan; readonly siblings?: readonly DispatchSpan[] }
   | { readonly kind: 'edge'; readonly item: DispatchEdge }
   | { readonly kind: 'artifact'; readonly item: DispatchArtifact }
   | { readonly kind: 'schedule'; readonly item: DispatchScheduleMarker }
@@ -162,7 +163,7 @@ export function DispatchInspectorSheet({
   const subtitle = !selected
     ? ''
     : selected.kind === 'span'
-      ? `${laneLabel(selected.item.workspaceId)} · ${selected.item.sessionLabel || selected.item.resumeId}`
+      ? `${laneLabel(selected.item.workspaceId)} · ${resolveSpanTitle(selected.item, selected.item.sessionLabel || selected.item.resumeId)}`
       : selected.kind === 'edge'
         ? `${laneLabel(selected.item.fromWorkspaceId)} → ${laneLabel(selected.item.toWorkspaceId)}`
         : selected.kind === 'artifact'
@@ -187,6 +188,7 @@ export function DispatchInspectorSheet({
               {selected.kind === 'span' && (
                 <SpanDetail
                   span={selected.item}
+                  siblings={selected.siblings}
                   snapshot={snapshot}
                   referenceMs={referenceMs}
                   laneLabel={laneLabel}
@@ -238,17 +240,24 @@ export function DispatchInspectorSheet({
   )
 }
 
-function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
+function MetaRow({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) {
   return (
-    <div className="min-w-0">
+    <div className={`min-w-0 ${className ?? ''}`}>
       <dt className="text-[11px] text-muted-foreground">{label}</dt>
       <dd className="mt-0.5 break-words text-xs font-medium text-foreground">{value}</dd>
     </div>
   )
 }
 
+function isRawPromptSessionLabel(label: string | undefined): boolean {
+  if (!label) return true
+  const trimmed = label.trim()
+  return trimmed.length > 48 || trimmed.startsWith('#') || trimmed.includes('\n')
+}
+
 function SpanDetail({
   span,
+  siblings,
   snapshot,
   referenceMs,
   laneLabel,
@@ -261,6 +270,7 @@ function SpanDetail({
   onOpenReport,
 }: {
   span: DispatchSpan
+  siblings?: readonly DispatchSpan[]
   snapshot: DispatchBoardSnapshot | null
   referenceMs: number
   laneLabel: (wsId: string) => string
@@ -275,9 +285,12 @@ function SpanDetail({
   const { t, i18n } = useTranslation()
 
   const triggerIdentity = spanTriggerIdentity(span)
-  const siblingRuns = (snapshot?.spans ?? [])
-    .filter((s) => s.workspaceId === span.workspaceId && spanTriggerIdentity(s) === triggerIdentity)
-    .sort((a, b) => b.startedAt - a.startedAt || a.id.localeCompare(b.id))
+  const siblingRuns =
+    siblings && siblings.length > 1
+      ? [...siblings].sort((a, b) => b.startedAt - a.startedAt || a.id.localeCompare(b.id))
+      : (snapshot?.spans ?? [])
+          .filter((s) => s.workspaceId === span.workspaceId && spanTriggerIdentity(s) === triggerIdentity)
+          .sort((a, b) => b.startedAt - a.startedAt || a.id.localeCompare(b.id))
   const siblingIndex = siblingRuns.findIndex((s) => s.id === span.id)
 
   const triggerText = (() => {
@@ -358,7 +371,7 @@ function SpanDetail({
               variant="ghost"
               className="h-6 px-2 text-[11px]"
               disabled={siblingIndex >= siblingRuns.length - 1}
-              onClick={() => onSelect({ kind: 'span', item: siblingRuns[siblingIndex + 1]! })}
+              onClick={() => onSelect({ kind: 'span', item: siblingRuns[siblingIndex + 1]!, siblings })}
             >
               {t('issues.dispatch.previousRun')}
             </Button>
@@ -368,7 +381,7 @@ function SpanDetail({
               variant="ghost"
               className="h-6 px-2 text-[11px]"
               disabled={siblingIndex <= 0}
-              onClick={() => onSelect({ kind: 'span', item: siblingRuns[siblingIndex - 1]! })}
+              onClick={() => onSelect({ kind: 'span', item: siblingRuns[siblingIndex - 1]!, siblings })}
             >
               {t('issues.dispatch.nextRun')}
             </Button>
@@ -378,18 +391,20 @@ function SpanDetail({
 
       <dl className="grid grid-cols-2 gap-3 rounded-lg border border-border/70 bg-muted/30 p-3">
         <MetaRow label={t('issues.dispatch.workspaceLabel')} value={laneLabel(span.workspaceId)} />
-        <MetaRow label={t('issues.dispatch.sessionLabel')} value={span.sessionLabel || span.resumeId} />
         <MetaRow
-          label={t('issues.dispatch.agentLabel')}
+          label={t('issues.dispatch.sessionLabel')}
           value={
-            span.model ? (
-              <span className="inline-flex flex-wrap items-center gap-1.5">
-                <span>{span.agent}</span>
-                <span className="text-muted-foreground">·</span>
-                <ModelIdentity model={span.model} />
+            isRawPromptSessionLabel(span.sessionLabel) ? (
+              <span
+                className="block truncate font-mono text-[11px]"
+                title={span.sessionLabel || span.resumeId}
+              >
+                {span.resumeId}
               </span>
             ) : (
-              span.agent
+              <span className="line-clamp-1 break-all" title={span.sessionLabel}>
+                {span.sessionLabel}
+              </span>
             )
           }
         />
@@ -399,15 +414,33 @@ function SpanDetail({
           value={t('issues.dispatch.toolsSummary', { calls: span.toolCalls, failures: span.toolFailures })}
         />
         <MetaRow
+          className="col-span-2"
+          label={t('issues.dispatch.agentLabel')}
+          value={
+            span.model ? (
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap">
+                  <span>{span.agent}</span>
+                  <span className="text-muted-foreground" aria-hidden>·</span>
+                </span>
+                <ModelIdentity model={span.model} className="gap-1.5 [&>span]:break-words" />
+              </div>
+            ) : (
+              span.agent
+            )
+          }
+        />
+        <MetaRow
+          className="col-span-2"
           label={t('issues.dispatch.triggerLabel')}
           value={
-            <div className="flex items-center gap-1.5">
-              <span>{triggerText}</span>
+            <div className="flex items-start justify-between gap-2">
+              <span className="min-w-0 break-words">{triggerText}</span>
               {span.trigger.kind === 'scheduled-issue' && (
                 <button
                   type="button"
                   onClick={() => onOpenIssue(span.trigger.kind === 'scheduled-issue' ? span.trigger.workspaceId : span.workspaceId, span.trigger.kind === 'scheduled-issue' ? span.trigger.issueId : '')}
-                  className="inline-flex items-center gap-0.5 text-primary hover:underline"
+                  className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-primary hover:underline"
                 >
                   {t('issues.dispatch.openIssue')}
                   <ExternalLink size={10} aria-hidden />

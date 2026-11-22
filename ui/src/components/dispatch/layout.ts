@@ -77,6 +77,8 @@ export type DispatchEpisode =
   | {
       readonly kind: 'burst'
       readonly id: string
+      readonly burstKind: 'trigger' | 'wave'
+      readonly distinctIssueCount?: number
       readonly workspaceId: string
       readonly status: DispatchSpan['status']
       readonly title: string
@@ -981,10 +983,74 @@ export function buildDispatchEpisodes(
     })
   }
 
-  // 2) Remaining spans: attach remaining artifacts, then collapse consecutive same-workspace
-  //    runs sharing trigger identity and status into burst groups.
+  // 2) Remaining spans: attach remaining artifacts, then collapse:
+  //    (a) >= 2 consecutive runs in the same workspace sharing trigger identity & status
+  //    (b) >= 3 consecutive standalone runs in the same workspace & status starting within 120s
   const remainingSpans = spans.filter((s) => !consumedSpanIds.has(s.id))
   const remainingArtifactBySpan = claimArtifactsForSpans(remainingSpans)
+
+  const buildBurstEpisode = (
+    workspaceId: string,
+    group: readonly DispatchSpan[],
+    burstKind: 'trigger' | 'wave',
+  ): Extract<DispatchEpisode, { kind: 'burst' }> => {
+    const status = group[0]!.status
+    const groupArtifacts: DispatchArtifact[] = []
+    for (const s of group) {
+      groupArtifacts.push(...(remainingArtifactBySpan.get(s.id) ?? []))
+    }
+    groupArtifacts.sort((a, b) => b.at - a.at || a.id.localeCompare(b.id))
+
+    const runs: DispatchExecutionItem[] = [...group]
+      .sort((a, b) => b.startedAt - a.startedAt || a.id.localeCompare(b.id))
+      .map((s) => ({ span: s, artifacts: remainingArtifactBySpan.get(s.id) ?? [] }))
+
+    const latestSpan = runs[0]!.span
+    const endedAt = Math.max(
+      ...group.map(spanEndTimestamp),
+      ...groupArtifacts.map((a) => a.at),
+    )
+    const error = runs.find((r) => r.span.error)?.span.error
+    const preview = error ? undefined : runs.find((r) => r.span.assistantPreview)?.span.assistantPreview
+    const model = runs.find((r) => r.span.model)?.span.model
+
+    const allScheduled = group.every((s) => s.trigger.kind === 'scheduled-issue')
+    const distinctIssueCount = allScheduled
+      ? new Set(
+          group.map((s) =>
+            s.trigger.kind === 'scheduled-issue' ? s.trigger.issueId : s.id,
+          ),
+        ).size
+      : undefined
+    const title =
+      burstKind === 'wave'
+        ? distinctIssueCount !== undefined
+          ? `Scheduled wave (${distinctIssueCount} issues)`
+          : `Execution wave (${group.length} runs)`
+        : resolveSpanTitle(latestSpan)
+
+    return {
+      kind: 'burst',
+      id: `burst:${workspaceId}:${group[0]!.id}:${group.length}`,
+      burstKind,
+      ...(distinctIssueCount !== undefined ? { distinctIssueCount } : {}),
+      workspaceId,
+      status,
+      title,
+      triggerKind: allScheduled ? 'scheduled-issue' : latestSpan.trigger.kind,
+      agent: latestSpan.agent,
+      ...(model ? { model } : {}),
+      startedAt: group[0]!.startedAt,
+      endedAt,
+      latestAt: endedAt,
+      ...(error ? { error } : {}),
+      ...(preview ? { preview } : {}),
+      runs,
+      artifacts: groupArtifacts,
+      spanIds: group.map((s) => s.id),
+      artifactIds: groupArtifacts.map((a) => a.id),
+    }
+  }
 
   const spansByWorkspace = new Map<string, DispatchSpan[]>()
   for (const s of remainingSpans) {
@@ -993,8 +1059,16 @@ export function buildDispatchEpisodes(
     else spansByWorkspace.set(s.workspaceId, [s])
   }
 
+  const WAVE_GAP_MS = 120_000
+
   for (const [workspaceId, wsSpans] of spansByWorkspace) {
     wsSpans.sort((a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id))
+
+    // Pass A: collapse >= 2 consecutive runs with matching trigger identity & status
+    type PassAItem =
+      | { kind: 'burst'; group: DispatchSpan[] }
+      | { kind: 'single'; span: DispatchSpan }
+    const passA: PassAItem[] = []
 
     let cursor = 0
     while (cursor < wsSpans.length) {
@@ -1013,60 +1087,59 @@ export function buildDispatchEpisodes(
 
       const group = wsSpans.slice(cursor, endCursor)
       if (group.length >= 2) {
-        const groupArtifacts: DispatchArtifact[] = []
-        for (const s of group) {
-          groupArtifacts.push(...(remainingArtifactBySpan.get(s.id) ?? []))
-        }
-        groupArtifacts.sort((a, b) => b.at - a.at || a.id.localeCompare(b.id))
-
-        const runs: DispatchExecutionItem[] = [...group]
-          .reverse()
-          .map((s) => ({ span: s, artifacts: remainingArtifactBySpan.get(s.id) ?? [] }))
-
-        const latestSpan = runs[0]!.span
-        const endedAt = Math.max(
-          ...group.map(spanEndTimestamp),
-          ...groupArtifacts.map((a) => a.at),
-        )
-        const error = runs.find((r) => r.span.error)?.span.error
-        const preview = error ? undefined : runs.find((r) => r.span.assistantPreview)?.span.assistantPreview
-
-        episodes.push({
-          kind: 'burst',
-          id: `burst:${workspaceId}:${group[0]!.id}:${group.length}`,
-          workspaceId,
-          status,
-          title: resolveSpanTitle(latestSpan),
-          triggerKind: latestSpan.trigger.kind,
-          agent: latestSpan.agent,
-          ...(runs.find((r) => r.span.model)?.span.model
-            ? { model: runs.find((r) => r.span.model)!.span.model }
-            : {}),
-          startedAt: group[0]!.startedAt,
-          endedAt,
-          latestAt: endedAt,
-          ...(error ? { error } : {}),
-          ...(preview ? { preview } : {}),
-          runs,
-          artifacts: groupArtifacts,
-          spanIds: group.map((s) => s.id),
-          artifactIds: groupArtifacts.map((a) => a.id),
-        })
+        passA.push({ kind: 'burst', group })
       } else {
-        const art = remainingArtifactBySpan.get(first.id) ?? []
-        const latestAt = Math.max(spanEndTimestamp(first), ...art.map((a) => a.at))
+        passA.push({ kind: 'single', span: first })
+      }
+      cursor = endCursor
+    }
+
+    // Pass B: collapse >= 3 consecutive standalone runs in same (workspaceId, status) within 120s
+    let idx = 0
+    while (idx < passA.length) {
+      const item = passA[idx]!
+      if (item.kind === 'burst') {
+        episodes.push(buildBurstEpisode(workspaceId, item.group, 'trigger'))
+        idx += 1
+        continue
+      }
+
+      const waveGroup: DispatchSpan[] = [item.span]
+      let nextIdx = idx + 1
+      while (nextIdx < passA.length) {
+        const nextItem = passA[nextIdx]!
+        if (nextItem.kind !== 'single') break
+        const prevSpan = waveGroup[waveGroup.length - 1]!
+        if (
+          nextItem.span.status !== item.span.status
+          || nextItem.span.startedAt - prevSpan.startedAt > WAVE_GAP_MS
+        ) {
+          break
+        }
+        waveGroup.push(nextItem.span)
+        nextIdx += 1
+      }
+
+      if (waveGroup.length >= 3) {
+        episodes.push(buildBurstEpisode(workspaceId, waveGroup, 'wave'))
+        idx = nextIdx
+        continue
+      }
+
+      for (const s of waveGroup) {
+        const art = remainingArtifactBySpan.get(s.id) ?? []
+        const latestAt = Math.max(spanEndTimestamp(s), ...art.map((a) => a.at))
         episodes.push({
           kind: 'execution',
-          id: `exec:${first.id}`,
-          startedAt: first.startedAt,
+          id: `exec:${s.id}`,
+          startedAt: s.startedAt,
           latestAt,
-          execution: { span: first, artifacts: art },
-          spanIds: [first.id],
+          execution: { span: s, artifacts: art },
+          spanIds: [s.id],
           artifactIds: art.map((a) => a.id),
         })
       }
-
-      cursor = endCursor
+      idx = nextIdx
     }
   }
 
@@ -1092,4 +1165,103 @@ export function buildDispatchEpisodes(
   )
 
   return episodes
+}
+
+export interface RawDispatchEdgeEndpoint {
+  readonly edge: DispatchEdge
+  readonly x1: number
+  readonly y1: number
+  readonly x2: number
+  readonly y2: number
+}
+
+export interface ComputedDispatchEdgeGeometry extends RawDispatchEdgeEndpoint {
+  readonly ctrlX1: number
+  readonly ctrlX2: number
+  readonly mx: number
+  readonly my: number
+}
+
+/**
+ * Distributes Bezier control-point bows and pill midpoints across parallel
+ * or temporally close edges sharing the same lane pair so pills never pile up.
+ */
+export function layoutEdgeGeometries(
+  endpoints: readonly RawDispatchEdgeEndpoint[],
+  canvasWidth: number,
+): ComputedDispatchEdgeGeometry[] {
+  const byPair = new Map<string, RawDispatchEdgeEndpoint[]>()
+  for (const ep of endpoints) {
+    const key = [ep.edge.fromWorkspaceId, ep.edge.toWorkspaceId].sort().join('\0')
+    const list = byPair.get(key)
+    if (list) list.push(ep)
+    else byPair.set(key, [ep])
+  }
+
+  const resultById = new Map<string, ComputedDispatchEdgeGeometry>()
+  const clusterGapPx = 72
+
+  for (const group of byPair.values()) {
+    const sorted = [...group].sort((a, b) => {
+      const ax = (a.x1 + a.x2) / 2
+      const bx = (b.x1 + b.x2) / 2
+      return ax - bx || a.edge.at - b.edge.at || a.edge.id.localeCompare(b.edge.id)
+    })
+
+    let clusterStart = 0
+    while (clusterStart < sorted.length) {
+      let clusterEnd = clusterStart + 1
+      while (clusterEnd < sorted.length) {
+        const prevX = (sorted[clusterEnd - 1]!.x1 + sorted[clusterEnd - 1]!.x2) / 2
+        const currX = (sorted[clusterEnd]!.x1 + sorted[clusterEnd]!.x2) / 2
+        if (currX - prevX > clusterGapPx) break
+        clusterEnd += 1
+      }
+
+      const cluster = sorted.slice(clusterStart, clusterEnd)
+      if (cluster.length === 1) {
+        const item = cluster[0]!
+        const dx = Math.max(24, Math.abs(item.y2 - item.y1) * 0.25)
+        const dir = item.edge.kind === 'question' || item.edge.kind === 'worker_done' ? -1 : 1
+        const ctrlX1 = item.x1 + dir * dx
+        const ctrlX2 = item.x2 + dir * dx
+        const rawMx = 0.125 * item.x1 + 0.375 * ctrlX1 + 0.375 * ctrlX2 + 0.125 * item.x2
+        const mx = canvasWidth > 64 ? Math.max(28, Math.min(canvasWidth - 28, rawMx)) : rawMx
+        const my = (item.y1 + item.y2) / 2
+        resultById.set(item.edge.id, { ...item, ctrlX1, ctrlX2, mx, my })
+      } else {
+        // Fan parallel curves left/right and stagger pill positions along t in [0.34..0.66]
+        const tCycle = [0.35, 0.65, 0.65, 0.35] as const
+        for (let i = 0; i < cluster.length; i += 1) {
+          const item = cluster[i]!
+          const band = Math.floor(i / 2) + 1
+          const side = i % 2 === 0 ? -1 : 1
+          const baseBow = Math.max(38, Math.abs(item.y2 - item.y1) * 0.38)
+          const offset = side * band * baseBow
+          const ctrlX1 = item.x1 + offset
+          const ctrlX2 = item.x2 + offset
+          const t = tCycle[i % tCycle.length]!
+          const mt = 1 - t
+          const rawMx =
+            mt * mt * mt * item.x1
+            + 3 * mt * mt * t * ctrlX1
+            + 3 * mt * t * t * ctrlX2
+            + t * t * t * item.x2
+          const my =
+            mt * mt * mt * item.y1
+            + 3 * mt * mt * t * item.y1
+            + 3 * mt * t * t * item.y2
+            + t * t * t * item.y2
+          const mx = canvasWidth > 64 ? Math.max(28, Math.min(canvasWidth - 28, rawMx)) : rawMx
+          resultById.set(item.edge.id, { ...item, ctrlX1, ctrlX2, mx, my })
+        }
+      }
+
+      clusterStart = clusterEnd
+    }
+  }
+
+  return endpoints
+    .map((ep) => resultById.get(ep.edge.id))
+    .filter((item): item is ComputedDispatchEdgeGeometry => Boolean(item))
 }
