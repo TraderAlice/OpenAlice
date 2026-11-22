@@ -383,6 +383,7 @@ async function main(): Promise<void> {
     backendPort: ports.webPort,
     uiPort: ports.uiPort,
     vitePort,
+    explicitLocalTarget: explicitDataHome || Boolean(process.env['OPENALICE_PROJECT']),
   }) : null
 
   // ── Vite ──────────────────────────────────────────────────
