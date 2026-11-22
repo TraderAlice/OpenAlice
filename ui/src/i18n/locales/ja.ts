@@ -465,6 +465,8 @@ export const ja: Resources = {
       showRuns: '{{count}} 件の実行を表示',
       collapseRuns: '折りたたむ',
       burstStatusCount: '{{status}} ×{{count}}',
+      scheduledWaveTitle: 'スケジュール波（{{count}} 件）',
+      executionWaveTitle: '実行波（{{count}} 件）',
       artifactInboxBadge: 'Inbox',
       artifactReportBadge: 'レポート',
       runsInSequence: '連続実行 {{index}} / {{total}}',

@@ -15,6 +15,7 @@ import {
   collectConnectedTraceIds,
   formatTickTime,
   formatWindowRange,
+  layoutEdgeGeometries,
   packSpansIntoTracks,
 } from './layout'
 
@@ -577,6 +578,94 @@ describe('dispatch layout helpers', () => {
     expect(burstEpisodes.some((e) => e.kind === 'execution' && e.execution.span.id === 'burst-recover-11')).toBe(true)
     expect(burstEpisodes.some((e) => e.kind === 'execution' && e.execution.span.id === 'quant-interleaved')).toBe(true)
   })
+
+  it('collapses >= 3 consecutive same-workspace same-status standalone runs within 120s into a wave burst while keeping pairs individual', () => {
+    const waveAt = new Date(2026, 10, 22, 13, 49, 4).getTime()
+    const laterAt = new Date(2026, 10, 22, 17, 50, 3).getTime()
+
+    const waveSpans: DispatchSpan[] = Array.from({ length: 11 }, (_, idx) => ({
+      id: `wave-${idx + 1}`,
+      kind: 'headless',
+      workspaceId: 'ws-chat',
+      resumeId: `res-wave-${idx + 1}`,
+      sessionLabel: `# Issue ${idx + 1} Maintain this as a falsifiable thesis...`,
+      agent: 'omp',
+      model: 'opencode-go/muse-spark-1.3-contributor',
+      status: 'failed',
+      startedAt: waveAt + idx * 500,
+      finishedAt: waveAt + idx * 500 + 6_000,
+      durationMs: 6_000,
+      trigger: {
+        kind: 'scheduled-issue',
+        workspaceId: 'ws-chat',
+        issueId: `issue-${idx + 1}`,
+        issueTitle: `Scheduled Issue ${idx + 1}`,
+      },
+      error: '403 This model is not available in your country (type=RegionError)',
+      toolCalls: 0,
+      toolFailures: 0,
+    }))
+
+    const laterPair: DispatchSpan[] = ['telegram-phone-desk', 'feishu-phone-desk'].map((issueId, idx) => ({
+      id: `pair-${idx + 1}`,
+      kind: 'headless',
+      workspaceId: 'ws-chat',
+      resumeId: `res-pair-${idx + 1}`,
+      agent: 'omp',
+      model: 'opencode-go/muse-spark-1.3-contributor',
+      status: 'failed',
+      startedAt: laterAt + idx * 1_000,
+      finishedAt: laterAt + idx * 1_000 + 5_000,
+      durationMs: 5_000,
+      trigger: {
+        kind: 'scheduled-issue',
+        workspaceId: 'ws-chat',
+        issueId,
+        issueTitle: `#${issueId}`,
+      },
+      error: '403 This model is not available in your country (type=RegionError)',
+      toolCalls: 0,
+      toolFailures: 0,
+    }))
+
+    const episodes = buildDispatchEpisodes([...waveSpans, ...laterPair], [], [])
+    // 11-issue wave collapses into 1 wave burst; 2-issue pair stays 2 individual execution rows -> 3 total rows!
+    expect(episodes).toHaveLength(3)
+    expect(episodes.map((e) => e.kind)).toEqual(['execution', 'execution', 'burst'])
+    const waveEp = episodes[2]!
+    expect(waveEp.kind).toBe('burst')
+    if (waveEp.kind === 'burst') {
+      expect(waveEp.burstKind).toBe('wave')
+      expect(waveEp.distinctIssueCount).toBe(11)
+      expect(waveEp.runs).toHaveLength(11)
+      expect(waveEp.title).toBe('Scheduled wave (11 issues)')
+      expect(waveEp.error).toContain('RegionError')
+    }
+  })
+
+  it('staggers parallel SVG edge Bezier curves and pill midpoints so stacked lane-pair edges do not collide', () => {
+    const snap = sampleSnapshot()
+    const baseEdge = snap.edges[0]!
+    const endpoints = (['dispatch', 'question', 'reply', 'worker_done'] as const).map((kind, i) => ({
+      edge: { ...baseEdge, id: `e-${i}`, kind, at: FROM + 700_000 + i * 5_000 },
+      x1: 400 + i * 2,
+      y1: 36,
+      x2: 400 + i * 2,
+      y2: 108,
+    }))
+
+    const laidOut = layoutEdgeGeometries(endpoints, 900)
+    expect(laidOut).toHaveLength(4)
+
+    for (let i = 0; i < laidOut.length; i += 1) {
+      expect(laidOut[i]!.mx).toBeGreaterThanOrEqual(28)
+      expect(laidOut[i]!.mx).toBeLessThanOrEqual(900 - 28)
+      for (let j = i + 1; j < laidOut.length; j += 1) {
+        const dist = Math.hypot(laidOut[i]!.mx - laidOut[j]!.mx, laidOut[i]!.my - laidOut[j]!.my)
+        expect(dist).toBeGreaterThanOrEqual(24)
+      }
+    }
+  })
 })
 
 describe('Issues -> Dispatch integration & Inspector', () => {
@@ -745,5 +834,157 @@ describe('Issues -> Dispatch integration & Inspector', () => {
     expect(screen.getByTestId('dispatch-span-span-coord')).toBeTruthy()
     expect(screen.getByTestId('dispatch-span-span-worker')).toBeTruthy()
     expect(screen.queryByTestId('dispatch-span-span-sched')).toBeNull()
+  })
+
+  it('groups scheduled waves cleanly, resets cluster focus on escape/other clicks, and clamps prompt-like sessionLabel in Inspector', async () => {
+    const user = userEvent.setup()
+    const toMs = new Date(2026, 10, 22, 21, 45, 0).getTime()
+    const fromMs = toMs - 24 * 3_600_000
+    const waveAt = new Date(2026, 10, 22, 13, 49, 4).getTime()
+    const pairAt = new Date(2026, 10, 22, 17, 50, 3).getTime()
+
+    const longPromptSessionLabel =
+      '# Semis, oil and policy-cover thesis Maintain this as a falsifiable working hypothesis, never as an established claim: semiconductor/AI political support may strengthen when oil optics rise.'
+
+    const waveSpans: DispatchSpan[] = Array.from({ length: 11 }, (_, idx) => ({
+      id: `wave-span-${idx + 1}`,
+      kind: 'headless',
+      workspaceId: 'ws-chat',
+      resumeId: `res-semis-${idx + 1}`,
+      sessionLabel: idx === 10 ? longPromptSessionLabel : `# Thesis ${idx + 1} raw prompt...`,
+      agent: 'omp',
+      model: 'opencode-go/muse-spark-1.3-contributor',
+      status: 'failed',
+      startedAt: waveAt + idx * 400,
+      finishedAt: waveAt + idx * 400 + 6_000,
+      durationMs: 6_000,
+      trigger: {
+        kind: 'scheduled-issue',
+        workspaceId: 'ws-chat',
+        issueId: idx === 10 ? 'trump-semis-oil-thesis' : `issue-${idx + 1}`,
+        issueTitle: idx === 10 ? 'Semis, oil and policy-cover thesis' : `Issue ${idx + 1}`,
+      },
+      prompt: longPromptSessionLabel,
+      error: '403 This model is not available in your country (type=RegionError)',
+      toolCalls: 0,
+      toolFailures: 0,
+    }))
+
+    const pairSpans: DispatchSpan[] = [
+      {
+        id: 'pair-1',
+        kind: 'headless',
+        workspaceId: 'ws-chat',
+        resumeId: 'res-tg',
+        agent: 'omp',
+        model: 'opencode-go/muse-spark-1.3-contributor',
+        status: 'failed',
+        startedAt: pairAt,
+        finishedAt: pairAt + 5_000,
+        durationMs: 5_000,
+        trigger: {
+          kind: 'scheduled-issue',
+          workspaceId: 'ws-chat',
+          issueId: 'telegram-phone-desk',
+          issueTitle: '#telegram-phone-desk',
+        },
+        error: '403 This model is not available in your country (type=RegionError)',
+        toolCalls: 0,
+        toolFailures: 0,
+      },
+      {
+        id: 'pair-2',
+        kind: 'headless',
+        workspaceId: 'ws-chat',
+        resumeId: 'res-fs',
+        agent: 'omp',
+        model: 'opencode-go/muse-spark-1.3-contributor',
+        status: 'failed',
+        startedAt: pairAt + 1_000,
+        finishedAt: pairAt + 5_000,
+        durationMs: 4_000,
+        trigger: {
+          kind: 'scheduled-issue',
+          workspaceId: 'ws-chat',
+          issueId: 'feishu-phone-desk',
+          issueTitle: '#feishu-phone-desk',
+        },
+        error: '403 This model is not available in your country (type=RegionError)',
+        toolCalls: 0,
+        toolFailures: 0,
+      },
+    ]
+
+    mocks.getDispatch.mockResolvedValue({
+      fromMs,
+      toMs,
+      generatedAt: toMs,
+      lanes: [{ workspaceId: 'ws-chat', tag: 'chat-jun15', label: 'chat-jun15', template: 'chat', templateKind: 'chat' }],
+      spans: [...waveSpans, ...pairSpans],
+      edges: [],
+      artifacts: [],
+      scheduleMarkers: [],
+      summary: {
+        activeWorkspaceCount: 1,
+        runningSpanCount: 0,
+        totalSpanCount: 13,
+        edgeCount: 0,
+        artifactCount: 0,
+        errorSpanCount: 13,
+      },
+    })
+
+    Element.prototype.scrollIntoView = vi.fn()
+
+    render(<IssuesBoard />)
+    await user.click(screen.getByRole('button', { name: 'Dispatch' }))
+    await waitFor(() => expect(screen.getByTestId('dispatch-board')).toBeTruthy())
+
+    // 13 runs collapse into 3 crisp feed rows (2 individual + 1 scheduled wave)
+    expect(screen.getAllByTestId(/^dispatch-episode-/)).toHaveLength(3)
+    const waveEp = screen.getByTestId(/^dispatch-episode-burst:/)
+    expect(within(waveEp).getByText('Failed ×11')).toBeTruthy()
+    expect(within(waveEp).getByText('Scheduled wave (11 issues)')).toBeTruthy()
+
+    // Click cluster pill once -> highlights cluster & wave episode; Escape clears stuck ring cleanly!
+    const clusterPill = screen.getByTestId(/^dispatch-cluster-/)
+    await user.click(clusterPill)
+    expect(clusterPill.className).toContain('ring-primary/50')
+    expect(waveEp.className).toContain('ring-1')
+
+    await user.keyboard('{Escape}')
+    expect(clusterPill.className).not.toContain('ring-primary/50')
+    expect(waveEp.className).not.toContain('ring-1')
+
+    // Click cluster pill once, then click an unrelated Feed execution row -> cluster ring clears before/after closing Inspector!
+    await user.click(clusterPill)
+    expect(clusterPill.className).toContain('ring-primary/50')
+    await user.click(screen.getByTestId('dispatch-feed-span-pair-1'))
+    const pairDialog = await screen.findByRole('dialog')
+    expect(within(pairDialog).getByText('chat-jun15 · #telegram-phone-desk')).toBeTruthy()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(clusterPill.className).not.toContain('ring-primary/50')
+
+    // Click cluster pill twice -> opens newest run (wave-span-11) with clean Inspector header, compact Session, nowrap Open Issue
+    await user.click(clusterPill)
+    expect(clusterPill.className).toContain('ring-primary/50')
+    await user.click(clusterPill)
+    const dialog = await screen.findByRole('dialog')
+
+    // Header subtitle uses clean issue title, NOT 200-char prompt excerpt
+    expect(within(dialog).getByText('chat-jun15 · Semis, oil and policy-cover thesis')).toBeTruthy()
+    // Session MetaRow displays resumeId instead of 6-line raw prompt, preserving full label in title
+    expect(within(dialog).getByText('res-semis-11').getAttribute('title')).toBe(longPromptSessionLabel)
+    // Open Issue button never wraps
+    expect(within(dialog).getByRole('button', { name: 'Open Issue' }).className).toContain('whitespace-nowrap')
+    // Sibling cluster navigation works across all 11 wave runs
+    expect(within(dialog).getByText('Run 1 of 11 in burst')).toBeTruthy()
+
+    // Closing Inspector leaves ZERO stuck cluster focus rings!
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(clusterPill.className).not.toContain('ring-primary/50')
+    expect(waveEp.className).not.toContain('ring-1')
   })
 })

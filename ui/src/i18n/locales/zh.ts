@@ -468,6 +468,8 @@ export const zh: Resources = {
       showRuns: '展开 {{count}} 次运行',
       collapseRuns: '收起',
       burstStatusCount: '{{status}} ×{{count}}',
+      scheduledWaveTitle: '定时波次（{{count}} 个议题）',
+      executionWaveTitle: '并发波次（{{count}} 次运行）',
       artifactInboxBadge: 'Inbox',
       artifactReportBadge: '报告',
       runsInSequence: '连续运行第 {{index}} / {{total}} 次',

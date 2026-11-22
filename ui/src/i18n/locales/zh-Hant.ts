@@ -472,6 +472,8 @@ export const zhHant: Resources = {
       showRuns: '展開 {{count}} 次執行',
       collapseRuns: '摺疊',
       burstStatusCount: '{{status}} ×{{count}}',
+      scheduledWaveTitle: '定時波次（{{count}} 個議題）',
+      executionWaveTitle: '並發波次（{{count}} 次執行）',
       artifactInboxBadge: 'Inbox',
       artifactReportBadge: '報告',
       runsInSequence: '連續執行第 {{index}} / {{total}} 次',

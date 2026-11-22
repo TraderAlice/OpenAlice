@@ -45,13 +45,16 @@ import {
   formatTickTime,
   formatWindowRange,
   isDifferentCalendarDay,
+  layoutEdgeGeometries,
   localeForLanguage,
   resolveSpanTitle,
+  type ComputedDispatchEdgeGeometry,
   type DispatchEpisode,
   type DispatchExecutionItem,
   type DispatchFocusTarget,
   type DispatchSpanCluster,
   type PackedDispatchSpan,
+  type RawDispatchEdgeEndpoint,
 } from './layout'
 import type { DispatchWindowPreset, UseDispatchBoardResult } from './useDispatchBoard'
 
@@ -238,6 +241,17 @@ function snippetText(span: DispatchSpan): string | undefined {
   return undefined
 }
 
+function burstRunSessionLabel(
+  span: DispatchSpan,
+  runTitle: string,
+  runSnippet: string | undefined,
+): string | undefined {
+  const raw = span.sessionLabel?.trim()
+  if (!raw || raw.startsWith('#') || raw.includes('\n')) return undefined
+  if (raw === runTitle || raw === runSnippet) return undefined
+  return raw
+}
+
 function artifactSnippet(art: DispatchArtifact): string | undefined {
   if (art.kind === 'report') return art.summary
   const lines = art.body.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
@@ -332,16 +346,6 @@ export function DispatchToolbarControls({ board }: { board: UseDispatchBoardResu
   )
 }
 
-interface ComputedEdgeGeometry {
-  readonly edge: DispatchEdge
-  readonly x1: number
-  readonly y1: number
-  readonly x2: number
-  readonly y2: number
-  readonly mx: number
-  readonly my: number
-}
-
 export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
   const { t, i18n } = useTranslation()
   const locale = localeForLanguage(i18n.language)
@@ -361,7 +365,36 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
   const trackRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const episodeRefs = useRef<Map<string, HTMLElement>>(new Map())
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
-  const [edgeGeometries, setEdgeGeometries] = useState<ComputedEdgeGeometry[]>([])
+  const [edgeGeometries, setEdgeGeometries] = useState<ComputedDispatchEdgeGeometry[]>([])
+
+  const clearFocus = useCallback(() => {
+    setFocusedClusterId(null)
+    setFocusedEpisodeId(null)
+    setHovered(null)
+  }, [])
+
+  const openInspector = useCallback(
+    (item: DispatchSelectedItem) => {
+      clearFocus()
+      setSelected(item)
+    },
+    [clearFocus],
+  )
+
+  useEffect(() => {
+    clearFocus()
+  }, [fromMs, toMs, clearFocus])
+
+  useEffect(() => {
+    if (selected !== null || (focusedClusterId === null && focusedEpisodeId === null)) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        clearFocus()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [selected, focusedClusterId, focusedEpisodeId, clearFocus])
 
   const laneLabelMap = useMemo(() => {
     const map = new Map<string, string>()
@@ -564,7 +597,7 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
       return match?.track ?? 0
     }
 
-    const out: ComputedEdgeGeometry[] = []
+    const rawEndpoints: RawDispatchEdgeEndpoint[] = []
     for (const edge of visibleEdges) {
       const fromTrackEl = trackRefs.current.get(edge.fromWorkspaceId)
       const toTrackEl = trackRefs.current.get(edge.toWorkspaceId)
@@ -595,17 +628,9 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
         + toTrackIdx * (TRACK_HEIGHT_PX + TRACK_GAP_PX)
         + TRACK_HEIGHT_PX / 2
 
-      out.push({
-        edge,
-        x1,
-        y1,
-        x2,
-        y2,
-        mx: (x1 + x2) / 2,
-        my: (y1 + y2) / 2,
-      })
+      rawEndpoints.push({ edge, x1, y1, x2, y2 })
     }
-    setEdgeGeometries(out)
+    setEdgeGeometries(layoutEdgeGeometries(rawEndpoints, canvasRect.width))
   }, [laneLayouts, visibleEdges, fromMs, toMs])
 
   useLayoutEffect(() => {
@@ -630,27 +655,37 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
     else episodeRefs.current.delete(episodeId)
   }, [])
 
-  const handleFilterChange = useCallback((nextFilter: DispatchFilterKind) => {
-    setFilter(nextFilter)
-    setFocusedClusterId(null)
-    setFocusedEpisodeId(null)
-  }, [])
+  const handleFilterChange = useCallback(
+    (nextFilter: DispatchFilterKind) => {
+      setFilter(nextFilter)
+      clearFocus()
+    },
+    [clearFocus],
+  )
 
-  const toggleBurstExpanded = useCallback((episodeId: string) => {
-    setExpandedBurstIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(episodeId)) next.delete(episodeId)
-      else next.add(episodeId)
-      return next
-    })
-  }, [])
+  const toggleBurstExpanded = useCallback(
+    (episodeId: string) => {
+      clearFocus()
+      setExpandedBurstIds((prev) => {
+        const next = new Set(prev)
+        if (next.has(episodeId)) next.delete(episodeId)
+        else next.add(episodeId)
+        return next
+      })
+    },
+    [clearFocus],
+  )
 
   const handleClusterClick = useCallback(
     (cluster: DispatchSpanCluster) => {
       if (focusedClusterId === cluster.id) {
-        const latestSpan = cluster.spans[cluster.spans.length - 1]
-        if (latestSpan) {
-          setSelected({ kind: 'span', item: latestSpan })
+        const clusterRunsNewestFirst = [...cluster.spans].sort(
+          (a, b) => b.startedAt - a.startedAt || a.id.localeCompare(b.id),
+        )
+        const newestSpan = clusterRunsNewestFirst[0]
+        clearFocus()
+        if (newestSpan) {
+          setSelected({ kind: 'span', item: newestSpan, siblings: clusterRunsNewestFirst })
         }
         return
       }
@@ -680,7 +715,7 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
         el?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
       }
     },
-    [episodes, focusedClusterId],
+    [episodes, focusedClusterId, clearFocus],
   )
 
   if (board.loading && !snapshot) {
@@ -728,7 +763,7 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
         key={art.id}
         type="button"
         data-testid={`dispatch-artifact-${art.id}`}
-        onClick={() => setSelected({ kind: 'artifact', item: art })}
+        onClick={() => openInspector({ kind: 'artifact', item: art })}
         onMouseEnter={() => setHovered({ kind: 'artifact', id: art.id })}
         onMouseLeave={() => setHovered(null)}
         className={`inline-flex max-w-64 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
@@ -859,13 +894,25 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
             <div className="w-48 shrink-0 border-r border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
               {t('issues.dispatch.workspaceLabel')}
             </div>
-            <div className="relative flex-1 px-3 py-1.5">
-              <div className="flex justify-between font-mono text-[10px] tabular-nums text-muted-foreground">
-                {ticks.map((frac) => (
-                  <span key={frac} className="whitespace-nowrap">
-                    {formatTickTime(fromMs + spanMs * frac, spanMs, fromMs, toMs, locale)}
-                  </span>
-                ))}
+            <div className="relative flex-1 py-1.5">
+              <div className="relative h-4 font-mono text-[10px] tabular-nums text-muted-foreground">
+                {ticks.map((frac) => {
+                  const posClass =
+                    frac === 0
+                      ? 'left-3'
+                      : frac === 1
+                        ? 'right-3'
+                        : '-translate-x-1/2'
+                  return (
+                    <span
+                      key={frac}
+                      className={`absolute top-0 whitespace-nowrap ${posClass}`}
+                      style={frac > 0 && frac < 1 ? { left: `${frac * 100}%` } : undefined}
+                    >
+                      {formatTickTime(fromMs + spanMs * frac, spanMs, fromMs, toMs, locale)}
+                    </span>
+                  )
+                })}
               </div>
             </div>
           </div>
@@ -912,7 +959,7 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                         {skippedSchedule?.skipState && (
                           <button
                             type="button"
-                            onClick={() => setSelected({ kind: 'schedule', item: skippedSchedule })}
+                            onClick={() => openInspector({ kind: 'schedule', item: skippedSchedule })}
                             className="text-left"
                           >
                             <ScheduleSkipPill skipState={skippedSchedule.skipState} />
@@ -921,7 +968,7 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                         {nextDue && nextDue.nextDueAtMs !== null && (
                           <button
                             type="button"
-                            onClick={() => setSelected({ kind: 'schedule', item: nextDue })}
+                            onClick={() => openInspector({ kind: 'schedule', item: nextDue })}
                             className="inline-flex items-center gap-1 rounded bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
                             title={nextDue.title}
                           >
@@ -978,7 +1025,7 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                           <button
                             key={`sched-${marker.issueId}`}
                             type="button"
-                            onClick={() => setSelected({ kind: 'schedule', item: marker })}
+                            onClick={() => openInspector({ kind: 'schedule', item: marker })}
                             title={`${marker.title} · ${formattedDue}`}
                             className="absolute top-1 z-10 -translate-x-1/2 rounded-full border border-dashed border-border bg-background/90 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:border-foreground/50 hover:text-foreground"
                             style={{ left: `${pct}%` }}
@@ -1003,7 +1050,7 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                             key={span.id}
                             type="button"
                             data-testid={`dispatch-span-${span.id}`}
-                            onClick={() => setSelected({ kind: 'span', item: span })}
+                            onClick={() => openInspector({ kind: 'span', item: span })}
                             onMouseEnter={() => setHovered({ kind: 'span', id: span.id })}
                             onMouseLeave={() => setHovered(null)}
                             className={spanBarClasses(span, isEmphasized, isDimmed)}
@@ -1124,10 +1171,7 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                       <path d="M0,0 L6,3 L0,6 Z" className="fill-destructive" />
                     </marker>
                   </defs>
-                  {edgeGeometries.map(({ edge, x1, y1, x2, y2 }) => {
-                    const dx = Math.max(24, Math.abs(y2 - y1) * 0.25)
-                    const ctrlX1 = x1 + (edge.kind === 'question' || edge.kind === 'worker_done' ? -dx : dx)
-                    const ctrlX2 = x2 + (edge.kind === 'question' || edge.kind === 'worker_done' ? -dx : dx)
+                  {edgeGeometries.map(({ edge, x1, y1, x2, y2, ctrlX1, ctrlX2 }) => {
                     const d = `M ${x1} ${y1} C ${ctrlX1} ${y1}, ${ctrlX2} ${y2}, ${x2} ${y2}`
                     const isDimmed = hasFocus && !trace.edgeIds.has(edge.id)
                     const markerId =
@@ -1165,7 +1209,7 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                       key={`pill-${edge.id}`}
                       type="button"
                       data-testid={`dispatch-edge-${edge.id}`}
-                      onClick={() => setSelected({ kind: 'edge', item: edge })}
+                      onClick={() => openInspector({ kind: 'edge', item: edge })}
                       onMouseEnter={() => setHovered({ kind: 'edge', id: edge.id })}
                       onMouseLeave={() => setHovered(null)}
                       style={{ left: mx, top: my }}
@@ -1228,10 +1272,7 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                         <button
                           type="button"
                           data-testid={`dispatch-feed-span-${ep.coordinator.span.id}`}
-                          onClick={() => {
-                            setFocusedEpisodeId(ep.id)
-                            setSelected({ kind: 'span', item: ep.coordinator!.span })
-                          }}
+                          onClick={() => openInspector({ kind: 'span', item: ep.coordinator!.span })}
                           className="flex min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                         >
                           <GitFork size={13} className="shrink-0 text-primary" aria-hidden />
@@ -1253,7 +1294,7 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                       ) : (
                         <button
                           type="button"
-                          onClick={() => setFocusedEpisodeId((prev) => (prev === ep.id ? null : ep.id))}
+                          onClick={clearFocus}
                           className="flex min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                         >
                           <GitFork size={13} className="shrink-0 text-primary" aria-hidden />
@@ -1290,10 +1331,7 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                               key={span.id}
                               type="button"
                               data-testid={`dispatch-feed-span-${span.id}`}
-                              onClick={() => {
-                                setFocusedEpisodeId(ep.id)
-                                setSelected({ kind: 'span', item: span })
-                              }}
+                              onClick={() => openInspector({ kind: 'span', item: span })}
                               className="flex w-full items-start justify-between gap-3 px-3 py-2 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >
                               <div className="min-w-0 flex-1 space-y-0.5">
@@ -1351,7 +1389,7 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                               <button
                                 type="button"
                                 data-testid={`dispatch-edge-chip-${edge.id}`}
-                                onClick={() => setSelected({ kind: 'edge', item: edge })}
+                                onClick={() => openInspector({ kind: 'edge', item: edge })}
                                 onMouseEnter={() => setHovered({ kind: 'edge', id: edge.id })}
                                 onMouseLeave={() => setHovered(null)}
                                 className={edgePillClasses(edge, edgeEmphasized, edgeDimmed)}
@@ -1385,6 +1423,13 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                   status: statusLabel(ep.status, t),
                   count: ep.runs.length,
                 })
+                const burstTitle =
+                  ep.burstKind === 'wave'
+                    ? ep.distinctIssueCount !== undefined
+                      ? t('issues.dispatch.scheduledWaveTitle', { count: ep.distinctIssueCount })
+                      : t('issues.dispatch.executionWaveTitle', { count: ep.runs.length })
+                    : ep.title
+                const burstSiblings = ep.runs.map((r) => r.span)
 
                 return (
                   <article
@@ -1406,10 +1451,7 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                       <button
                         type="button"
                         aria-expanded={isExpanded}
-                        onClick={() => {
-                          setFocusedEpisodeId(ep.id)
-                          toggleBurstExpanded(ep.id)
-                        }}
+                        onClick={() => toggleBurstExpanded(ep.id)}
                         className="flex min-w-0 flex-1 items-start justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                       >
                         <div className="min-w-0 flex-1 space-y-1">
@@ -1427,7 +1469,7 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                               <span>{burstBadgeText}</span>
                             </span>
                             <span className="truncate font-semibold text-foreground">
-                              {ep.title}
+                              {burstTitle}
                             </span>
                             <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                               {laneLabel(ep.workspaceId)}
@@ -1465,13 +1507,15 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                     {isExpanded && (
                       <div className="divide-y divide-border/50 border-t border-border/60 bg-muted/15">
                         {ep.runs.map(({ span }) => {
+                          const runTitle = spanTitle(span, t)
                           const runSnippet = snippetText(span)
+                          const cleanSession = burstRunSessionLabel(span, runTitle, runSnippet)
                           return (
                             <button
                               key={span.id}
                               type="button"
                               data-testid={`dispatch-feed-span-${span.id}`}
-                              onClick={() => setSelected({ kind: 'span', item: span })}
+                              onClick={() => openInspector({ kind: 'span', item: span, siblings: burstSiblings })}
                               className="flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-xs transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >
                               <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -1486,9 +1530,14 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                                 <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
                                   {formatDurationMs(span.durationMs)}
                                 </span>
-                                {span.sessionLabel && (
-                                  <span className="shrink-0 text-[11px] text-foreground/80">
-                                    {span.sessionLabel}
+                                {(ep.burstKind === 'wave' || runTitle !== burstTitle) && (
+                                  <span className="max-w-52 shrink-0 truncate font-medium text-foreground">
+                                    {runTitle}
+                                  </span>
+                                )}
+                                {cleanSession && (
+                                  <span className="max-w-48 shrink-0 truncate text-[11px] text-foreground/80">
+                                    {cleanSession}
                                   </span>
                                 )}
                                 {runSnippet && (
@@ -1529,10 +1578,7 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                     <button
                       type="button"
                       data-testid={`dispatch-feed-span-${span.id}`}
-                      onClick={() => {
-                        setFocusedEpisodeId(ep.id)
-                        setSelected({ kind: 'span', item: span })
-                      }}
+                      onClick={() => openInspector({ kind: 'span', item: span })}
                       className="flex min-w-0 flex-1 items-start justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                     >
                       <div className="min-w-0 flex-1 space-y-0.5">
@@ -1602,10 +1648,7 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                   <button
                     type="button"
                     data-testid={`dispatch-artifact-${art.id}`}
-                    onClick={() => {
-                      setFocusedEpisodeId(ep.id)
-                      setSelected({ kind: 'artifact', item: art })
-                    }}
+                    onClick={() => openInspector({ kind: 'artifact', item: art })}
                     className="flex w-full items-start justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                   >
                     <div className="min-w-0 flex-1 space-y-0.5">
@@ -1655,7 +1698,10 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
         selected={selected}
         snapshot={snapshot}
         onSelect={setSelected}
-        onClose={() => setSelected(null)}
+        onClose={() => {
+          setSelected(null)
+          clearFocus()
+        }}
       />
     </div>
   )
