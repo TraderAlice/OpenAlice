@@ -40,6 +40,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from '../ui/sheet'
+import {
+  formatClockPoint,
+  formatDurationMs,
+  isDifferentCalendarDay,
+  localeForLanguage,
+  spanTriggerIdentity,
+} from './layout'
 
 export type DispatchSelectedItem =
   | { readonly kind: 'span'; readonly item: DispatchSpan }
@@ -48,23 +55,12 @@ export type DispatchSelectedItem =
   | { readonly kind: 'schedule'; readonly item: DispatchScheduleMarker }
   | null
 
-function formatDuration(ms: number): string {
-  if (!Number.isFinite(ms) || ms < 0) return '—'
-  if (ms < 1000) return `${Math.round(ms)}ms`
-  const sec = Math.round(ms / 1000)
-  if (sec < 60) return `${sec}s`
-  const min = Math.floor(sec / 60)
-  const remSec = sec % 60
-  return remSec ? `${min}m ${remSec}s` : `${min}m`
-}
-
-function formatClock(ms: number): string {
-  return new Intl.DateTimeFormat(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).format(new Date(ms))
+function formatClock(ms: number, referenceMs: number, language?: string): string {
+  return formatClockPoint(ms, {
+    includeDate: isDifferentCalendarDay(ms, referenceMs),
+    includeSeconds: true,
+    locale: localeForLanguage(language),
+  })
 }
 
 function fileViewerSourceForLane(kind: DispatchTemplateKind | undefined): FileViewerSource | undefined {
@@ -109,7 +105,8 @@ export function DispatchInspectorSheet({
   onSelect: (next: DispatchSelectedItem) => void
   onClose: () => void
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const referenceMs = snapshot?.toMs ?? Date.now()
   const { openHeadlessRun } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
@@ -169,7 +166,7 @@ export function DispatchInspectorSheet({
       : selected.kind === 'edge'
         ? `${laneLabel(selected.item.fromWorkspaceId)} → ${laneLabel(selected.item.toWorkspaceId)}`
         : selected.kind === 'artifact'
-          ? `${laneLabel(selected.item.workspaceId)} · ${formatClock(selected.item.at)}`
+          ? `${laneLabel(selected.item.workspaceId)} · ${formatClock(selected.item.at, referenceMs, i18n.language)}`
           : `${laneLabel(selected.item.workspaceId)} · #${selected.item.issueId}`
 
   return (
@@ -191,6 +188,7 @@ export function DispatchInspectorSheet({
                 <SpanDetail
                   span={selected.item}
                   snapshot={snapshot}
+                  referenceMs={referenceMs}
                   laneLabel={laneLabel}
                   promptTab={promptTab}
                   onPromptTab={setPromptTab}
@@ -227,6 +225,7 @@ export function DispatchInspectorSheet({
               {selected.kind === 'schedule' && (
                 <ScheduleDetail
                   marker={selected.item}
+                  referenceMs={referenceMs}
                   laneLabel={laneLabel}
                   onOpenIssue={openIssue}
                 />
@@ -251,6 +250,7 @@ function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
 function SpanDetail({
   span,
   snapshot,
+  referenceMs,
   laneLabel,
   promptTab,
   onPromptTab,
@@ -262,6 +262,7 @@ function SpanDetail({
 }: {
   span: DispatchSpan
   snapshot: DispatchBoardSnapshot | null
+  referenceMs: number
   laneLabel: (wsId: string) => string
   promptTab: 'delivered' | 'original'
   onPromptTab: (tab: 'delivered' | 'original') => void
@@ -271,7 +272,13 @@ function SpanDetail({
   onOpenInbox: (entryId: string) => void
   onOpenReport: (wsId: string, path: string) => void
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+
+  const triggerIdentity = spanTriggerIdentity(span)
+  const siblingRuns = (snapshot?.spans ?? [])
+    .filter((s) => s.workspaceId === span.workspaceId && spanTriggerIdentity(s) === triggerIdentity)
+    .sort((a, b) => b.startedAt - a.startedAt || a.id.localeCompare(b.id))
+  const siblingIndex = siblingRuns.findIndex((s) => s.id === span.id)
 
   const triggerText = (() => {
     switch (span.trigger.kind) {
@@ -323,8 +330,8 @@ function SpanDetail({
             {statusText}
           </span>
           <span className="text-[11px] tabular-nums text-muted-foreground">
-            {formatClock(span.startedAt)}
-            {span.finishedAt ? ` – ${formatClock(span.finishedAt)}` : ' – …'}
+            {formatClock(span.startedAt, referenceMs, i18n.language)}
+            {span.finishedAt ? ` – ${formatClock(span.finishedAt, referenceMs, i18n.language)}` : ' – …'}
           </span>
         </div>
         <Button
@@ -338,6 +345,36 @@ function SpanDetail({
           {t('issues.dispatch.openSession')}
         </Button>
       </div>
+
+      {siblingRuns.length > 1 && siblingIndex !== -1 && (
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-1.5 text-[11px]">
+          <span className="text-muted-foreground tabular-nums">
+            {t('issues.dispatch.runsInSequence', { index: siblingIndex + 1, total: siblingRuns.length })}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-[11px]"
+              disabled={siblingIndex >= siblingRuns.length - 1}
+              onClick={() => onSelect({ kind: 'span', item: siblingRuns[siblingIndex + 1]! })}
+            >
+              {t('issues.dispatch.previousRun')}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-[11px]"
+              disabled={siblingIndex <= 0}
+              onClick={() => onSelect({ kind: 'span', item: siblingRuns[siblingIndex - 1]! })}
+            >
+              {t('issues.dispatch.nextRun')}
+            </Button>
+          </div>
+        </div>
+      )}
 
       <dl className="grid grid-cols-2 gap-3 rounded-lg border border-border/70 bg-muted/30 p-3">
         <MetaRow label={t('issues.dispatch.workspaceLabel')} value={laneLabel(span.workspaceId)} />
@@ -356,7 +393,7 @@ function SpanDetail({
             )
           }
         />
-        <MetaRow label={t('issues.dispatch.durationLabel')} value={formatDuration(span.durationMs)} />
+        <MetaRow label={t('issues.dispatch.durationLabel')} value={formatDurationMs(span.durationMs)} />
         <MetaRow
           label={t('issues.dispatch.toolsLabel')}
           value={t('issues.dispatch.toolsSummary', { calls: span.toolCalls, failures: span.toolFailures })}
@@ -476,7 +513,7 @@ function SpanDetail({
                   )}
                 </div>
                 <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-                  {formatClock(edge.at)}
+                  {formatClock(edge.at, referenceMs, i18n.language)}
                 </span>
               </button>
             ))}
@@ -506,7 +543,7 @@ function SpanDetail({
                   </span>
                 </div>
                 <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-                  {formatClock(art.at)}
+                  {formatClock(art.at, referenceMs, i18n.language)}
                 </span>
               </button>
             ))}
@@ -514,7 +551,7 @@ function SpanDetail({
         </div>
       )}
 
-      {relatedArtifacts.some((art) => art.kind === 'inbox') && (
+      {relatedArtifacts.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {relatedArtifacts.filter((art) => art.kind === 'inbox').slice(0, 1).map((art) => (
             <Button
@@ -583,7 +620,7 @@ function EdgeDetail({
         {deliveryLabel && (
           <span className="text-[11px] text-muted-foreground">
             {deliveryLabel}
-            {edge.ackedAt ? ` · ${formatDuration(edge.ackedAt - edge.at)}` : ''}
+            {edge.ackedAt ? ` · ${formatDurationMs(edge.ackedAt - edge.at)}` : ''}
           </span>
         )}
       </div>
@@ -822,14 +859,16 @@ function ArtifactDetail({
 
 function ScheduleDetail({
   marker,
+  referenceMs,
   laneLabel,
   onOpenIssue,
 }: {
   marker: DispatchScheduleMarker
+  referenceMs: number
   laneLabel: (wsId: string) => string
   onOpenIssue: (wsId: string, issueId: string) => void
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -841,11 +880,11 @@ function ScheduleDetail({
         <MetaRow label={t('issues.dispatch.scheduleLabel')} value={`#${marker.issueId}`} />
         <MetaRow
           label={t('issues.dispatch.nextDue')}
-          value={marker.nextDueAtMs ? `${formatClock(marker.nextDueAtMs)} (${formatRelativeTime(marker.nextDueAtMs)})` : '—'}
+          value={marker.nextDueAtMs ? `${formatClock(marker.nextDueAtMs, referenceMs, i18n.language)} (${formatRelativeTime(marker.nextDueAtMs)})` : '—'}
         />
         <MetaRow
           label={t('issues.dispatch.lastFired')}
-          value={marker.lastFiredAtMs ? `${formatClock(marker.lastFiredAtMs)} (${formatRelativeTime(marker.lastFiredAtMs)})` : t('issues.dispatch.neverFired')}
+          value={marker.lastFiredAtMs ? `${formatClock(marker.lastFiredAtMs, referenceMs, i18n.language)} (${formatRelativeTime(marker.lastFiredAtMs)})` : t('issues.dispatch.neverFired')}
         />
       </dl>
       <Button type="button" size="sm" onClick={() => onOpenIssue(marker.workspaceId, marker.issueId)}>

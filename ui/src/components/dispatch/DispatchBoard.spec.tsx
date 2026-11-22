@@ -4,11 +4,19 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { DispatchBoardSnapshot } from '../../api/dispatch'
+import type { DispatchBoardSnapshot, DispatchSpan } from '../../api/dispatch'
 import type { IssueSnapshot } from '../../api/issues'
 import { i18n } from '../../i18n'
 import { IssuesBoard } from '../IssuesBoard'
-import { collectConnectedTraceIds, packSpansIntoTracks } from './layout'
+import { DispatchToolbarControls } from './DispatchBoard'
+import {
+  buildDispatchEpisodes,
+  clusterLaneSpans,
+  collectConnectedTraceIds,
+  formatTickTime,
+  formatWindowRange,
+  packSpansIntoTracks,
+} from './layout'
 
 const mocks = vi.hoisted(() => ({
   getDispatch: vi.fn<(opts?: { from?: number; to?: number }) => Promise<DispatchBoardSnapshot>>(),
@@ -52,6 +60,7 @@ vi.mock('../../contexts/workspaces-context', () => ({
     agents: [
       { id: 'claude', displayName: 'Claude Code', kind: 'agent' },
       { id: 'codex', displayName: 'Codex', kind: 'agent' },
+      { id: 'omp', displayName: 'OMP', kind: 'agent' },
     ],
     defaultAgent: 'claude',
     issueDefaultAgent: null,
@@ -239,6 +248,86 @@ function sampleSnapshot(): DispatchBoardSnapshot {
   }
 }
 
+function makeRetryBurstSnapshot(): {
+  snapshot: DispatchBoardSnapshot
+  fromMs: number
+  toMs: number
+} {
+  const toMs = new Date(2026, 10, 22, 20, 39, 0).getTime()
+  const fromMs = toMs - 24 * 3_600_000
+  const burstStart = new Date(2026, 10, 22, 14, 35, 0).getTime()
+
+  const failedSpans: DispatchSpan[] = Array.from({ length: 10 }, (_, idx) => {
+    const startedAt = burstStart + idx * 40_000
+    const finishedAt = startedAt + 12_000
+    return {
+      id: `burst-fail-${idx + 1}`,
+      kind: 'headless',
+      workspaceId: 'ws-chat',
+      resumeId: `res-burst-${idx + 1}`,
+      agent: 'omp',
+      status: 'failed',
+      startedAt,
+      finishedAt,
+      durationMs: 12_000,
+      trigger: {
+        kind: 'scheduled-issue',
+        workspaceId: 'ws-chat',
+        issueId: 'weekly-liquidity',
+        issueTitle: 'Weekly liquidity and macro backdrop',
+      },
+      prompt: 'Analyze global dollar liquidity and Fed balance sheet.',
+      error: `Upstream market data timeout (attempt ${idx + 1})`,
+      toolCalls: 1,
+      toolFailures: 1,
+    }
+  })
+
+  const longInteractiveSpan: DispatchSpan = {
+    id: 'span-chat-session',
+    kind: 'interactive',
+    workspaceId: 'ws-chat',
+    resumeId: 'res-chat-main',
+    sessionLabel: 'Desk Review',
+    agent: 'claude',
+    status: 'done',
+    startedAt: fromMs + 4 * 3_600_000,
+    finishedAt: fromMs + 20 * 3_600_000,
+    durationMs: 16 * 3_600_000,
+    trigger: { kind: 'interactive', surface: 'webpi' },
+    assistantPreview: 'Reviewed portfolio risk limits.',
+    toolCalls: 4,
+    toolFailures: 0,
+  }
+
+  return {
+    fromMs,
+    toMs,
+    snapshot: {
+      fromMs,
+      toMs,
+      generatedAt: toMs,
+      lanes: [
+        // tag === label intentionally to verify no duplicate label/tag line renders
+        { workspaceId: 'ws-chat', tag: 'chat-jun15', label: 'chat-jun15', template: 'chat', templateKind: 'chat' },
+        { workspaceId: 'ws-quant', tag: 'quant-main', label: 'Auto Quant', template: 'auto-quant-v2', templateKind: 'auto-quant' },
+      ],
+      spans: [longInteractiveSpan, ...failedSpans],
+      edges: [],
+      artifacts: [],
+      scheduleMarkers: [],
+      summary: {
+        activeWorkspaceCount: 2,
+        runningSpanCount: 0,
+        totalSpanCount: 11,
+        edgeCount: 0,
+        artifactCount: 0,
+        errorSpanCount: 10,
+      },
+    },
+  }
+}
+
 beforeEach(async () => {
   localStorage.removeItem('openalice-issue-list-view')
   await i18n.changeLanguage('en')
@@ -307,6 +396,187 @@ describe('dispatch layout helpers', () => {
     expect([...trace.edgeIds]).toEqual(expect.arrayContaining(['edge-dispatch', 'edge-question']))
     expect([...trace.artifactIds]).toEqual(['art-report-1'])
   })
+
+  it('clusters dense bursts within 2.5% window width while capping tracks to maxTracks = 2', () => {
+    const { snapshot, fromMs, toMs } = makeRetryBurstSnapshot()
+    const chatSpans = snapshot.spans.filter((s) => s.workspaceId === 'ws-chat')
+
+    const clustered = clusterLaneSpans(chatSpans, fromMs, toMs, { maxTracks: 2 })
+    expect(clustered.trackCount).toBe(2)
+    // Long interactive session stays intact on track 0; 10 failed retries collapse into 1 cluster pill on track 1
+    expect(clustered.spans).toHaveLength(1)
+    expect(clustered.spans[0]!.span.id).toBe('span-chat-session')
+    expect(clustered.spans[0]!.track).toBe(0)
+
+    expect(clustered.clusters).toHaveLength(1)
+    expect(clustered.clusters[0]!.count).toBe(10)
+    expect(clustered.clusters[0]!.worstStatus).toBe('failed')
+    expect(clustered.clusters[0]!.track).toBe(1)
+
+    // Without the long ongoing span, 10 clustered runs collapse cleanly onto track 0
+    const burstOnly = chatSpans.filter((s) => s.id.startsWith('burst-fail-'))
+    const soloClustered = clusterLaneSpans(burstOnly, fromMs, toMs, { maxTracks: 2 })
+    expect(soloClustered.trackCount).toBe(1)
+    expect(soloClustered.spans).toHaveLength(0)
+    expect(soloClustered.clusters).toHaveLength(1)
+    expect(soloClustered.clusters[0]!.count).toBe(10)
+    expect(soloClustered.clusters[0]!.track).toBe(0)
+  })
+
+  it('computes worst status in mixed clusters (failed > interrupted > running > done) and keeps distant bursts separate', () => {
+    const toMs = BASE
+    const fromMs = BASE - 24 * 3_600_000
+    const makeSpan = (id: string, offsetMin: number, status: DispatchSpan['status']): DispatchSpan => ({
+      id,
+      kind: 'headless',
+      workspaceId: 'ws-chat',
+      resumeId: `r-${id}`,
+      agent: 'claude',
+      status,
+      startedAt: fromMs + offsetMin * 60_000,
+      finishedAt: status === 'running' ? null : fromMs + offsetMin * 60_000 + 15_000,
+      durationMs: 15_000,
+      trigger: { kind: 'manual' },
+      toolCalls: 0,
+      toolFailures: 0,
+    })
+
+    const spans: DispatchSpan[] = [
+      // Cluster A around minute 120: done + interrupted + done -> worst is interrupted
+      makeSpan('a1', 120, 'done'),
+      makeSpan('a2', 121, 'interrupted'),
+      makeSpan('a3', 122, 'done'),
+      // Standalone span at minute 600
+      makeSpan('c1', 600, 'done'),
+      // Cluster B near live edge (minute 1434..1436): done + running (finishedAt: null) + failed -> worst is failed
+      makeSpan('b1', 1434, 'done'),
+      makeSpan('b2', 1435, 'running'),
+      makeSpan('b3', 1436, 'failed'),
+    ]
+
+    const clustered = clusterLaneSpans(spans, fromMs, toMs, { maxTracks: 2 })
+    expect(clustered.trackCount).toBeLessThanOrEqual(2)
+    expect(clustered.clusters).toHaveLength(2)
+    expect(clustered.clusters[0]!.worstStatus).toBe('interrupted')
+    expect(clustered.clusters[0]!.count).toBe(3)
+    expect(clustered.clusters[1]!.worstStatus).toBe('failed')
+    expect(clustered.clusters[1]!.count).toBe(3)
+    expect(clustered.spans.map((p) => p.span.id)).toEqual(['c1'])
+
+    // Conservation invariant: every input span appears exactly once across spans + clusters
+    const totalOutSpans =
+      clustered.spans.length + clustered.clusters.reduce((acc, c) => acc + c.spans.length, 0)
+    expect(totalOutSpans).toBe(spans.length)
+
+    // Running > done when no failed/interrupted exists in a live cluster
+    const liveCluster = clusterLaneSpans(
+      [makeSpan('r1', 1434, 'done'), makeSpan('r2', 1435, 'running'), makeSpan('r3', 1436, 'done')],
+      fromMs,
+      toMs,
+      { maxTracks: 2 },
+    )
+    expect(liveCluster.clusters).toHaveLength(1)
+    expect(liveCluster.clusters[0]!.worstStatus).toBe('running')
+  })
+
+  it('formats 24h and cross-day window ranges with short dates while keeping same-day short windows compact', () => {
+    const sameDayFrom = new Date(2026, 10, 22, 19, 39, 0).getTime()
+    const sameDayTo = new Date(2026, 10, 22, 20, 39, 0).getTime()
+    expect(formatWindowRange(sameDayFrom, sameDayTo, 'en-US')).toBe('19:39 – 20:39')
+
+    const dayBefore = new Date(2026, 10, 21, 20, 39, 0).getTime()
+    const dayAfter = new Date(2026, 10, 22, 20, 39, 0).getTime()
+    expect(formatWindowRange(dayBefore, dayAfter, 'en-US')).toBe('Nov 21, 20:39 – Nov 22, 20:39')
+
+    // Even < 12h spanning midnight includes short date
+    const midnightFrom = new Date(2026, 10, 21, 23, 30, 0).getTime()
+    const midnightTo = new Date(2026, 10, 22, 0, 30, 0).getTime()
+    expect(formatWindowRange(midnightFrom, midnightTo, 'en-US')).toBe('Nov 21, 23:30 – Nov 22, 00:30')
+
+    // 24h ruler ticks include numeric month/day
+    expect(formatTickTime(dayAfter, 24 * 3_600_000, dayBefore, dayAfter, 'en-US')).toBe('11/22, 20:39')
+    expect(formatTickTime(sameDayTo, 3_600_000, sameDayFrom, sameDayTo, 'en-US')).toBe('20:39')
+  })
+
+  it('builds structured orchestration, collapsed consecutive burst, execution, and standalone artifact episodes newest-first', () => {
+    const snap = sampleSnapshot()
+    const extraStandaloneArtifact = {
+      id: 'art-standalone-report',
+      kind: 'report' as const,
+      workspaceId: 'ws-quant',
+      at: BASE - 60_000,
+      path: 'reports/close-summary.md',
+      action: 'written',
+      summary: 'Close summary generated externally',
+    }
+
+    const episodes = buildDispatchEpisodes(
+      snap.spans,
+      snap.edges,
+      [...snap.artifacts, extraStandaloneArtifact],
+    )
+
+    // Newest-first: standalone report (BASE - 60s), orchestration (FROM + 2_200_000), sched execution (FROM + 1_500_000)
+    expect(episodes.map((e) => e.kind)).toEqual(['artifact', 'orchestration', 'execution'])
+    const orch = episodes[1]!
+    expect(orch.kind).toBe('orchestration')
+    if (orch.kind === 'orchestration') {
+      expect(orch.coordinator?.span.id).toBe('span-coord')
+      expect(orch.workers.map((w) => w.span.id)).toEqual(['span-worker'])
+      expect(orch.edges.map((e) => e.id)).toEqual(['edge-dispatch', 'edge-question'])
+      expect(orch.artifacts.map((a) => a.id)).toEqual(['art-report-1'])
+    }
+
+    // Consecutive retry burst collapsing (does not break across other workspaces, breaks on status change)
+    const { snapshot: burstSnap } = makeRetryBurstSnapshot()
+    const recoveryRun: DispatchSpan = {
+      ...burstSnap.spans[1]!,
+      id: 'burst-recover-11',
+      resumeId: 'res-recover-11',
+      status: 'done',
+      startedAt: burstSnap.spans[10]!.finishedAt! + 60_000,
+      finishedAt: burstSnap.spans[10]!.finishedAt! + 90_000,
+      durationMs: 30_000,
+      error: undefined,
+      assistantPreview: 'Recovered successfully.',
+    }
+    const unrelatedQuantRun: DispatchSpan = {
+      id: 'quant-interleaved',
+      kind: 'headless',
+      workspaceId: 'ws-quant',
+      resumeId: 'res-q-1',
+      agent: 'claude',
+      status: 'done',
+      startedAt: burstSnap.spans[5]!.startedAt,
+      finishedAt: burstSnap.spans[5]!.finishedAt,
+      durationMs: 12_000,
+      trigger: {
+        kind: 'scheduled-issue',
+        workspaceId: 'ws-quant',
+        issueId: 'other-scan',
+        issueTitle: 'Other Workspace Scan',
+      },
+      toolCalls: 1,
+      toolFailures: 0,
+    }
+
+    const burstEpisodes = buildDispatchEpisodes(
+      [...burstSnap.spans, unrelatedQuantRun, recoveryRun],
+      [],
+      [],
+    )
+    const burstEp = burstEpisodes.find((e) => e.kind === 'burst')
+    expect(burstEp).toBeDefined()
+    if (burstEp?.kind === 'burst') {
+      expect(burstEp.runs).toHaveLength(10)
+      expect(burstEp.status).toBe('failed')
+      expect(burstEp.title).toBe('Weekly liquidity and macro backdrop')
+      expect(burstEp.agent).toBe('omp')
+      expect(burstEp.error).toContain('Upstream market data timeout')
+    }
+    expect(burstEpisodes.some((e) => e.kind === 'execution' && e.execution.span.id === 'burst-recover-11')).toBe(true)
+    expect(burstEpisodes.some((e) => e.kind === 'execution' && e.execution.span.id === 'quant-interleaved')).toBe(true)
+  })
 })
 
 describe('Issues -> Dispatch integration & Inspector', () => {
@@ -320,6 +590,9 @@ describe('Issues -> Dispatch integration & Inspector', () => {
 
     expect(screen.getByTestId('dispatch-lane-ws-chat')).toBeTruthy()
     expect(screen.getByTestId('dispatch-lane-ws-quant')).toBeTruthy()
+
+    // No redundant 'active' badge on lanes
+    expect(screen.queryByText('active')).toBeNull()
 
     // 1) Inspect worker span: Original vs Delivered prompt toggle & Open Session
     await user.click(screen.getByTestId('dispatch-span-span-worker'))
@@ -335,7 +608,7 @@ describe('Issues -> Dispatch integration & Inspector', () => {
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 
-    // 2) Inspect orchestration question message
+    // 2) Inspect orchestration question message inside Zone 2 feed
     await user.click(screen.getByTestId('dispatch-edge-chip-edge-question'))
     const edgeDialog = await screen.findByRole('dialog')
     expect(within(edgeDialog).getByText('Include 10-delta wings?')).toBeTruthy()
@@ -362,5 +635,115 @@ describe('Issues -> Dispatch integration & Inspector', () => {
     await user.click(screen.getByRole('button', { name: 'All issues' }))
     expect(screen.queryByTestId('dispatch-board')).toBeNull()
     expect(screen.getByText('Morning Market Scan')).toBeTruthy()
+  })
+
+  it('renders 24h range with short dates, suppresses duplicate workspace tag, collapses/expands retry bursts, and links map cluster -> feed -> inspector', async () => {
+    const user = userEvent.setup()
+    const { snapshot, fromMs, toMs } = makeRetryBurstSnapshot()
+    mocks.getDispatch.mockResolvedValue(snapshot)
+
+    // Exact 24h toolbar formatting check
+    const { unmount: unmountToolbar } = render(
+      <DispatchToolbarControls
+        board={{
+          snapshot,
+          loading: false,
+          error: null,
+          preset: '24h',
+          live: true,
+          fromMs,
+          toMs,
+          setPreset: vi.fn(),
+          setLive: vi.fn(),
+          stepWindow: vi.fn(),
+          refresh: vi.fn().mockResolvedValue(undefined),
+        }}
+      />,
+    )
+    expect(screen.getByText('Nov 21, 20:39 – Nov 22, 20:39')).toBeTruthy()
+    unmountToolbar()
+
+    const scrollIntoViewMock = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoViewMock
+
+    render(<IssuesBoard />)
+    await user.click(screen.getByRole('button', { name: 'Dispatch' }))
+    await waitFor(() => expect(screen.getByTestId('dispatch-board')).toBeTruthy())
+
+    // Switch to 24h preset and verify toolbar date range shows distinct calendar dates (not HH:mm - HH:mm)
+    await user.click(screen.getByRole('button', { name: '24h' }))
+    await waitFor(() => expect(mocks.getDispatch).toHaveBeenCalled())
+    expect(screen.getByText(/[A-Z][a-z]{2} \d+, \d{2}:\d{2} – [A-Z][a-z]{2} \d+, \d{2}:\d{2}/)).toBeTruthy()
+
+    // Left lane header: chat-jun15 appears only once (tag === label suppressed) and no redundant active pill
+    const chatLane = screen.getByTestId('dispatch-lane-ws-chat')
+    expect(within(chatLane).getAllByText('chat-jun15')).toHaveLength(1)
+    expect(within(chatLane).queryByText('active')).toBeNull()
+
+    // Cluster pill renders on map instead of 10 individual failure bars
+    const clusterPill = within(chatLane).getByTestId(/^dispatch-cluster-/)
+    expect(clusterPill.textContent).toContain('×10')
+    expect(within(chatLane).queryByTestId('dispatch-span-burst-fail-1')).toBeNull()
+    expect(within(chatLane).getByTestId('dispatch-span-span-chat-session')).toBeTruthy()
+
+    // Zone 2 shows collapsed burst summary row with Show 10 runs toggle
+    const burstEp = screen.getByTestId(/^dispatch-episode-burst:/)
+    expect(within(burstEp).getByText('Failed ×10')).toBeTruthy()
+    expect(within(burstEp).getByText('Weekly liquidity and macro backdrop')).toBeTruthy()
+    expect(within(burstEp).getByText('omp')).toBeTruthy()
+    expect(within(burstEp).getByText('14:35–14:41')).toBeTruthy()
+
+    // Individual runs are collapsed until expanded
+    expect(within(burstEp).queryByTestId('dispatch-feed-span-burst-fail-10')).toBeNull()
+
+    // Manual expand & collapse
+    await user.click(within(burstEp).getByRole('button', { name: /Show 10 runs/i }))
+    expect(within(burstEp).getByTestId('dispatch-feed-span-burst-fail-10')).toBeTruthy()
+    expect(within(burstEp).getByTestId('dispatch-feed-span-burst-fail-1')).toBeTruthy()
+    await user.click(within(burstEp).getByRole('button', { name: /Collapse/i }))
+    expect(within(burstEp).queryByTestId('dispatch-feed-span-burst-fail-10')).toBeNull()
+
+    // Clicking cluster pill on map focuses & expands burst in Feed and scrolls into view
+    await user.click(clusterPill)
+    expect(scrollIntoViewMock).toHaveBeenCalled()
+    expect(within(burstEp).getByTestId('dispatch-feed-span-burst-fail-10')).toBeTruthy()
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    // Clicking the already-focused cluster pill a second time opens the latest run in Inspector
+    await user.click(clusterPill)
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Upstream market data timeout (attempt 10)')).toBeTruthy()
+    expect(within(dialog).getByText('Run 1 of 10 in burst')).toBeTruthy()
+
+    // Navigate to previous run right inside Inspector
+    await user.click(within(dialog).getByRole('button', { name: 'Previous' }))
+    expect(within(dialog).getByText('Upstream market data timeout (attempt 9)')).toBeTruthy()
+    expect(within(dialog).getByText('Run 2 of 10 in burst')).toBeTruthy()
+  })
+
+  it('supports bidirectional hover highlighting and preserves coordinator + worker under Orchestration filter', async () => {
+    const user = userEvent.setup()
+    render(<IssuesBoard />)
+    await user.click(screen.getByRole('button', { name: 'Dispatch' }))
+    await waitFor(() => expect(screen.getByTestId('dispatch-board')).toBeTruthy())
+
+    // Hovering the orchestration episode in Zone 2 emphasizes coordinator & worker spans on Map while dimming unrelated span-sched
+    const orchEpisode = screen.getByTestId('dispatch-episode-orch:span-coord')
+    const schedSpanBar = screen.getByTestId('dispatch-span-span-sched')
+    const coordSpanBar = screen.getByTestId('dispatch-span-span-coord')
+    expect(schedSpanBar.className).toContain('opacity-100')
+
+    await user.hover(orchEpisode)
+    expect(coordSpanBar.className).toContain('ring-2')
+    expect(schedSpanBar.className).toContain('opacity-30')
+
+    await user.unhover(orchEpisode)
+    expect(schedSpanBar.className).toContain('opacity-100')
+
+    // Orchestration filter preserves BOTH coordinator and worker spans while hiding scheduled-only runs
+    await user.click(screen.getByRole('button', { name: 'Orchestration' }))
+    expect(screen.getByTestId('dispatch-span-span-coord')).toBeTruthy()
+    expect(screen.getByTestId('dispatch-span-span-worker')).toBeTruthy()
+    expect(screen.queryByTestId('dispatch-span-span-sched')).toBeNull()
   })
 })
