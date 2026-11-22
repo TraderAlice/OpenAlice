@@ -607,6 +607,12 @@ export class IbkrBroker implements IBroker {
     this._ensureAlive()
     const download = this.bridge.getAccountCache()
     if (!download) throw new BrokerError('NETWORK', 'Account data not yet available')
+    // No balance tags at all means the cache holds no account download —
+    // report it as unavailable instead of defaulting every field to 0
+    // (which showed up as a $0.00 Total Equity, −100% "today").
+    if (!download.values.has('NetLiquidation') && !download.values.has('TotalCashValue')) {
+      throw new BrokerError('NETWORK', 'Account data incomplete: TWS/Gateway sent no NetLiquidation or TotalCashValue')
+    }
 
     const baseCurrency = download.values.get('BaseCurrency') ?? 'USD'
     const totalCashValue = new Decimal(download.values.get('TotalCashValue') ?? '0')
