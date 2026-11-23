@@ -26,8 +26,7 @@ import {
 } from '../theme/styleProfiles'
 import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
 import { VersionOverviewSection } from '../components/settings/VersionOverviewSection'
-import { UpdateLifecycleSection } from '../components/settings/UpdateLifecycleSection'
-import { AliceLocationSection } from '../components/settings/AliceLocationSection'
+import { OverviewStatusCards } from '../components/settings/OverviewStatusCards'
 import {
   DataHomeSection,
   WorkspaceShellSection,
@@ -587,18 +586,9 @@ export { DataHomeSection, WorkspaceShellSection }
 
 function SettingsSection() {
   return (
-    <div className="mx-auto w-full max-w-[1100px]">
-      <AliceLocationSection />
-
-      {/* Installation and update ownership */}
+    <div className="mx-auto w-full max-w-[1100px] space-y-6">
       <VersionOverviewSection />
-      <UpdateLifecycleSection />
-
-      {/* Complete OpenAlice home + runtime lock boundary */}
-      <DataHomeSection />
-
-      {/* Windows-only workspace shell */}
-      <WorkspaceShellSection />
+      <OverviewStatusCards />
     </div>
   )
 }

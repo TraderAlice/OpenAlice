@@ -1,5 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { ArrowRight, BarChart3, ChevronDown, ExternalLink, FlaskConical, Folder, Info, LoaderCircle, MessageCircle, Monitor, RefreshCw, Server } from 'lucide-react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
+import { ArrowRight, BarChart3, ChevronDown, ExternalLink, FlaskConical, Folder, Info, LoaderCircle, MessageCircle, Monitor, RefreshCw, Server, SlidersHorizontal } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Resources } from '../../i18n/locales/en'
 import { useUpdateLifecycle } from '../../hooks/useUpdateLifecycle'
@@ -7,16 +7,18 @@ import { projectSetupFailures, useSharedProjectWorkspaceSetup } from '../../hook
 import { useAliceProject } from '../../hooks/useAliceProject'
 import { getBackendConnection } from '../../auth/backendConnection'
 import { useBackendRecoverySignal } from '../../auth/AuthContext'
+import { useWorkspace } from '../../tabs/store'
 import { Button } from '../ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../ui/dialog'
 import { MachineUpgradeDialog } from './MachineUpgradeDialog'
 import { ProjectUpdateReview } from './ProjectUpdateReview'
+import { UpdatePreferencesPanel } from './UpdateLifecycleSection'
 import { claimUpgradeDialog, shouldRestoreUpgradeDialog } from './upgrade-dialog-owner'
 import { VERSION_OVERVIEW_ID } from '../../lib/updates/focusVersionOverview'
 
 const version = (value?: string | null) => value ? `v${value.replace(/^v/, '')}` : '—'
-type View = 'app' | 'backend' | 'project' | 'native-review' | 'native-progress' | 'backend-review' | null
+type View = 'app' | 'backend' | 'project' | 'native-review' | 'native-progress' | 'backend-review' | 'preferences' | null
 
 export function VersionOverviewSection() {
   const { t } = useTranslation()
@@ -27,20 +29,23 @@ export function VersionOverviewSection() {
   const { machines, nativeStatus } = updates
   const { project } = useAliceProject()
   const { backendUnavailable, backendRecoveryGeneration } = useBackendRecoverySignal()
+  const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const [view, setView] = useState<View>(null)
   const [expanded, setExpanded] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
+  const versionRowsId = useId()
   const integrated = getBackendConnection().kind === 'electron'
-  const target = machines.status?.target
+  const target = machines?.status?.target
   const remote = Boolean(target && target.machine !== 'local')
   const appVersion = updates.client?.currentVersion
-  const appCandidate = updates.nativeReady?.version ?? updates.client?.discovery.value?.latestVersion
-  const appAvailable = !updates.clientError && !updates.nativeError && Boolean(updates.nativeReady || updates.client?.discovery.value?.status === 'available')
+  const appCandidate = updates.nativeReady?.version ?? updates.client?.discovery?.value?.latestVersion
+  const appAvailable = !updates.clientError && !updates.nativeError && Boolean(updates.nativeReady || updates.client?.discovery?.value?.status === 'available')
   const backend = updates.versionInfo
   const projectName = project?.displayName ?? target?.projectName ?? text('projectUnknown')
   const machineName = target?.machineName ?? t('settings.backendConnection.thisMachine')
   const nativeBusy = updates.nativeInstalling || nativeStatus?.phase === 'installing'
-  const backendBusy = machines.applying || machines.operation?.phase === 'running'
+  const backendBusy = Boolean(machines?.applying || machines?.operation?.phase === 'running')
   const activeOperation = updates.operation && updates.operation.phase !== 'succeeded'
   const rows = updates.projectWorkspaces.map(item => {
     const workspace = item.workspace
@@ -62,9 +67,28 @@ export function VersionOverviewSection() {
     : rows.some(row => row.status === text('updating')) ? text('updating') : projectAvailable ? text('available')
       : rows.some(row => !row.loaded) ? text('loading') : rows.every(row => !row.workspace) ? text('notConfigured')
         : rows.some(row => row.workspace && row.status === text('unknown')) ? text('unknown') : text('current')
+  const hasActionableState = Boolean(
+    appAvailable
+    || backend?.hasUpdate
+    || projectAvailable
+    || activeOperation
+    || updates.clientError
+    || updates.nativeError
+    || updates.versionError
+    || backend?.error
+    || projectError
+    || setupFailures.length > 0
+    || rows.some(row => row.attention)
+    || updates.client?.discovery?.value?.status === 'blocked'
+    || backend?.decision?.status === 'blocked'
+    || nativeBusy
+    || backendBusy
+    || nativeStatus?.phase === 'downloading',
+  )
+  const showRows = hasActionableState || detailsOpen
   useEffect(() => {
-    if (machines.operation?.mode === 'upgrade' && machines.operation.phase === 'running' && shouldRestoreUpgradeDialog('about')) setView('backend-review')
-  }, [machines.operation?.id, machines.operation?.phase, machines.operation?.mode])
+    if (machines?.operation?.mode === 'upgrade' && machines.operation.phase === 'running' && shouldRestoreUpgradeDialog('about')) setView('backend-review')
+  }, [machines?.operation?.id, machines?.operation?.phase, machines?.operation?.mode])
   useEffect(() => { if (!backendBusy && !nativeBusy) setView(null); setExpanded(false) }, [backendRecoveryGeneration]) // eslint-disable-line react-hooks/exhaustive-deps
   const open = (next: View) => { setLocalError(null); setView(next) }
   const reviewBackend = (force = false) => {
@@ -74,13 +98,13 @@ export function VersionOverviewSection() {
   }
   const appStatus = updates.clientError || updates.nativeError ? text('checkFailed')
     : nativeStatus?.phase === 'downloading' ? text('downloading')
-      : appAvailable ? text('available') : updates.client?.discovery.value?.status === 'blocked' ? text('needsAttention') : updates.client?.discovery.value?.status === 'current' ? text('current') : text('unknown')
+      : appAvailable ? text('available') : updates.client?.discovery?.value?.status === 'blocked' ? text('needsAttention') : updates.client?.discovery?.value?.status === 'current' ? text('current') : text('unknown')
   const backendStatus = updates.versionError || backend?.error ? text('checkFailed')
     : backend?.decision?.status === 'blocked' ? text('needsAttention') : backend?.hasUpdate ? text('available') : backend?.updateAuthority === 'service' ? t('settings.about.status.serviceManaged')
       : backend?.updateAuthority === 'none' ? t('settings.about.status.noUpdater')
         : backend?.updateAuthority === 'source' ? text('sourceManaged') : backend?.decision?.status === 'current' ? text('current') : text('unknown')
   const row = (kind: 'app' | 'backend' | 'project', icon: ReactNode, subtitle: string, identity: string, status: string, available: boolean, action: () => void, children?: ReactNode) => <section id={`settings-version-${kind}`} tabIndex={-1} className="min-w-0 scroll-mt-5 outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">
-    <div className="grid grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-3 px-4 py-5 @[40rem]:grid-cols-[1.5rem_minmax(12rem,1fr)_minmax(0,auto)] @[40rem]:px-5">
+    <div className="grid grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-3 px-4 py-4 @[40rem]:grid-cols-[1.5rem_minmax(12rem,1fr)_minmax(0,auto)] @[40rem]:px-5">
       <div className={`self-start pt-0.5 ${available ? 'text-primary' : 'text-muted-foreground'}`} aria-hidden>{icon}</div>
       <div className="min-w-0"><h3 className="text-sm font-semibold">{text(kind)}</h3><p className="mt-1 break-words text-xs text-muted-foreground">{subtitle}</p></div>
       <div className="col-start-2 flex flex-wrap items-center gap-x-4 gap-y-2 @[40rem]:col-start-3 @[40rem]:row-start-1 @[40rem]:justify-end">
@@ -105,24 +129,113 @@ export function VersionOverviewSection() {
       {updates.error && <p role="alert" className="break-words text-xs text-warning">{updates.error}</p>}
     </div></CollapsibleContent>
   </Collapsible>
-  return <section className="border-t border-border/60 py-7">
-    <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><h2 id={VERSION_OVERVIEW_ID} tabIndex={-1} className="w-fit scroll-mt-5 rounded-sm text-lg font-semibold outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">{text('title')}</h2><Button variant="ghost" size="sm" disabled={updates.checking} onClick={() => { void updates.refresh().catch(error => setLocalError(String(error))) }}><RefreshCw className={`size-3.5 ${updates.checking ? 'animate-spin motion-reduce:animate-none' : ''}`} />{text('checkAgain')}</Button></div>
-    <div className="@container divide-y divide-border/70 overflow-hidden rounded-lg border border-border/70">
-      {row('app', <Monitor className="size-5" />, window.openAlice?.updater ? text('desktop') : text('browser'), version(appVersion), appStatus, appAvailable, () => open(updates.nativeReady ? 'native-review' : 'app'))}
-      {row('backend', <Server className="size-5" />, `${machineName} · ${backendUnavailable ? text('offline') : text('connected')}`, version(backend?.current), integrated ? text('integrated') : backendStatus, Boolean(backend?.hasUpdate), integrated ? () => open(updates.nativeReady ? 'native-review' : 'app') : remote && backend?.hasUpdate ? () => reviewBackend() : () => open('backend'))}
-      {row('project', <Folder className="size-5" />, projectName, '', projectStatus, projectAvailable, () => open('project'), projectDetails)}
+  return <section className="@container overflow-hidden rounded-xl border border-border/70 bg-card">
+    <div className="divide-y divide-border/70">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-secondary/20 px-4 py-3.5 @[40rem]:px-5">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-background/80 text-muted-foreground" aria-hidden>
+            {remote ? <Server className="size-4" /> : <Monitor className="size-4" />}
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium text-muted-foreground">
+              {t('settings.overview.environmentTitle')}
+            </p>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <span className="min-w-0 truncate text-sm font-semibold text-foreground">
+                {`${machineName} / ${projectName}`}
+              </span>
+              <span
+                role="status"
+                className={`inline-flex items-center gap-1.5 text-xs ${backendUnavailable ? 'text-warning' : 'text-muted-foreground'}`}
+              >
+                <span
+                  className={`size-1.5 shrink-0 rounded-full ${backendUnavailable ? 'bg-warning' : 'bg-success'}`}
+                  aria-hidden
+                />
+                {backendUnavailable ? text('offline') : text('connected')}
+              </span>
+            </div>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => openOrFocus({ kind: 'settings', params: { category: 'machines' } })}
+        >
+          {t('settings.overview.manageMachines')}
+        </Button>
+      </div>
+
+      <div>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 @[40rem]:px-5">
+          <h2 id={VERSION_OVERVIEW_ID} tabIndex={-1} className="w-fit scroll-mt-5 rounded-sm text-sm font-semibold text-foreground outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">{text('title')}</h2>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {!hasActionableState && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-expanded={showRows}
+                aria-controls={versionRowsId}
+                onClick={() => setDetailsOpen(current => !current)}
+              >
+                {t(showRows ? 'settings.overview.hideVersionDetails' : 'settings.overview.showVersionDetails')}
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" disabled={updates.checking} onClick={() => { void updates.refresh().catch(error => setLocalError(String(error))) }}>
+              <RefreshCw className={`size-3.5 ${updates.checking ? 'animate-spin motion-reduce:animate-none' : ''}`} aria-hidden />
+              {text('checkAgain')}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={text('preferences')}
+              title={text('preferences')}
+              onClick={() => open('preferences')}
+            >
+              <SlidersHorizontal className="size-4" aria-hidden />
+            </Button>
+          </div>
+        </div>
+
+        {!showRows ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 px-4 py-3 @[40rem]:px-5">
+            <span className="inline-flex items-center gap-2 text-xs font-medium text-foreground">
+              <span className="size-2 shrink-0 rounded-full bg-success" aria-hidden />
+              {t('settings.overview.allUpToDate')}
+            </span>
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {t('settings.overview.summaryVersions', {
+                app: version(appVersion),
+                backend: version(backend?.current),
+              })}
+            </span>
+          </div>
+        ) : (
+          <div id={versionRowsId} className="divide-y divide-border/70 border-t border-border/70">
+            {row('app', <Monitor className="size-5" />, window.openAlice?.updater ? text('desktop') : text('browser'), version(appVersion), appStatus, appAvailable, () => open(updates.nativeReady ? 'native-review' : 'app'))}
+            {row('backend', <Server className="size-5" />, `${machineName} · ${backendUnavailable ? text('offline') : text('connected')}`, version(backend?.current), integrated ? text('integrated') : backendStatus, Boolean(backend?.hasUpdate), integrated ? () => open(updates.nativeReady ? 'native-review' : 'app') : remote && backend?.hasUpdate ? () => reviewBackend() : () => open('backend'))}
+            {row('project', <Folder className="size-5" />, projectName, '', projectStatus, projectAvailable, () => open('project'), projectDetails)}
+          </div>
+        )}
+      </div>
+
+      {localError && view === null && <p role="alert" className="px-4 py-3 text-sm text-destructive @[40rem]:px-5">{localError}</p>}
     </div>
-    {localError && view === null && <p role="alert" className="mt-3 text-sm text-destructive">{localError}</p>}
+
     {view === 'backend-review' ? <MachineUpgradeDialog open plan={machines.plan?.mode === 'upgrade' ? machines.plan : null} operation={machines.operation} busy={machines.applying} checking={machines.probing} error={machines.operationError} onClose={() => setView(null)} onApply={() => { void machines.apply().then(() => updates.refresh()).catch(() => undefined) }} onRetry={() => reviewBackend(true)} /> : <Dialog open={view !== null} onOpenChange={next => { if (!next && !nativeBusy) setView(null) }}>
       <DialogContent showCloseButton={!nativeBusy} className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0" style={{ width: 'calc(100vw - 2rem)', maxWidth: 600 }}>
-        <div className="border-b border-border px-5 py-5 pr-14 sm:px-6"><DialogTitle className="text-lg">{text(view === 'project' ? 'updateProject' : view === 'native-review' ? 'reviewApp' : view === 'native-progress' ? 'appProgress' : view === 'backend' ? 'backendDetails' : 'appDetails')}</DialogTitle><DialogDescription className="mt-1 text-sm">{view === 'project' ? projectName : text(view === 'native-review' ? 'restartNote' : view === 'native-progress' ? 'handoffNote' : 'detailsDescription')}</DialogDescription></div>
+        <div className="border-b border-border px-5 py-5 pr-14 sm:px-6"><DialogTitle className="text-lg">{text(view === 'project' ? 'updateProject' : view === 'native-review' ? 'reviewApp' : view === 'native-progress' ? 'appProgress' : view === 'backend' ? 'backendDetails' : view === 'preferences' ? 'preferences' : 'appDetails')}</DialogTitle><DialogDescription className="mt-1 text-sm">{view === 'project' ? projectName : text(view === 'native-review' ? 'restartNote' : view === 'native-progress' ? 'handoffNote' : view === 'preferences' ? 'managePreferences' : 'detailsDescription')}</DialogDescription></div>
         {view === 'project' ? <ProjectUpdateReview onClose={() => setView(null)} /> : <>
         <div className="min-h-0 overflow-y-auto p-5 sm:p-6">
+          {view === 'preferences' && <UpdatePreferencesPanel />}
           {(view === 'app' || view === 'backend') && <>
-            <div className="mb-6 flex flex-wrap items-center gap-3"><span className="text-3xl font-semibold tabular-nums">{version(view === 'app' ? appVersion : backend?.current)}</span><span className="rounded-full border border-border px-3 py-1 text-xs">{view === 'app' ? updates.client?.discovery.value?.channel ?? '—' : backend?.channel ?? '—'}</span></div>
+            <div className="mb-6 flex flex-wrap items-center gap-3"><span className="text-3xl font-semibold tabular-nums">{version(view === 'app' ? appVersion : backend?.current)}</span><span className="rounded-full border border-border px-3 py-1 text-xs">{view === 'app' ? updates.client?.discovery?.value?.channel ?? '—' : backend?.channel ?? '—'}</span></div>
             <dl className="grid gap-5 border-y border-border py-5 sm:grid-cols-2"><Fact label={text('runningVersion')} value={version(view === 'app' ? appVersion : backend?.current)}/><Fact label={text('installedVersion')} value={text('notReported')}/><Fact label={text('location')} value={view === 'app' ? t('settings.backendConnection.thisMachine') : machineName}/><Fact label={text('updateStatus')} value={view === 'app' ? appStatus : backendStatus}/></dl>
-            {(view === 'app' ? updates.client?.discovery.value?.reason : backend?.decision?.reason) === 'older-release' && <p role="status" className="mt-4 text-sm text-warning">{text('olderRelease')}</p>}
-            {view === 'app' && updates.client?.discovery.value?.message && <p className="mt-4 text-sm text-muted-foreground">{updates.client.discovery.value.message}</p>}
+            {(view === 'app' ? updates.client?.discovery?.value?.reason : backend?.decision?.reason) === 'older-release' && <p role="status" className="mt-4 text-sm text-warning">{text('olderRelease')}</p>}
+            {view === 'app' && updates.client?.discovery?.value?.message && <p className="mt-4 text-sm text-muted-foreground">{updates.client.discovery.value.message}</p>}
             {integrated && <p className="mt-4 rounded-lg bg-primary/5 p-3 text-sm">{text('integrated')}</p>}
             {view === 'app' && updates.client?.kind === 'cli' && <p className="mt-4 text-sm text-muted-foreground">{text('cliManaged')}</p>}
             {view === 'backend' && !remote && !integrated && <p className="mt-4 text-sm text-muted-foreground">{text('localManaged')}</p>}
@@ -130,7 +243,7 @@ export function VersionOverviewSection() {
           </>}
           {view === 'native-review' && <><ReviewRow title={text('app')} detail={`${version(appVersion)} → ${version(updates.nativeReady?.version)}`}/><p className="mt-4 rounded-lg bg-primary/5 p-4 text-sm">{text('restartNote')}</p>{remote && <p className="mt-3 text-xs text-muted-foreground">{text('backendOptional')}</p>}</>}
           {view === 'native-progress' && <div role="status" className="space-y-5"><div className="flex items-center gap-3"><LoaderCircle className="size-6 animate-spin motion-reduce:animate-none text-primary"/><p>{nativeStatus?.phase === 'installing' ? t(`settings.about.status.installing.${nativeStatus.stage}`) : updates.nativeError || text('handoffNote')}</p></div><p className="text-sm text-muted-foreground">{text('handoffNote')}</p></div>}
-          {(localError || updates.nativeError) && <p role="alert" className="mt-4 text-sm text-destructive">{localError || updates.nativeError}</p>}
+          {view !== 'preferences' && (localError || updates.nativeError) && <p role="alert" className="mt-4 text-sm text-destructive">{localError || updates.nativeError}</p>}
         </div>
         <div className="flex flex-wrap justify-end gap-2 border-t border-border px-5 py-4 sm:px-6">
           {!nativeBusy && <Button variant="outline" onClick={() => setView(null)}>{text('close')}</Button>}
