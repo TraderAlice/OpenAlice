@@ -110,15 +110,21 @@ export function MachineManagementSection() {
                 ? 'bg-warning'
                 : 'bg-muted-foreground/60'
 
+            const projectTarget = manager.status?.target?.project
+            const sortedProjects = [...machine.projects].sort((a, b) => {
+              const rank = (project: RelayProject) => (current && projectTarget === project.key ? 0 : isProjectRunnable(project) ? 1 : 2)
+              return rank(a) - rank(b)
+            })
+
             return (
               <div key={machine.key} className="min-w-0">
-                <div className="flex min-h-[4.25rem] w-full min-w-0 items-center gap-2 px-3 py-2 sm:px-4">
+                <div className="flex min-h-[4.25rem] w-full min-w-0 items-center gap-2 px-3 py-2 transition-colors hover:bg-secondary/35 sm:px-4">
                   <button
                     type="button"
                     onClick={() => toggleExpanded(machine.key)}
                     disabled={!canExpand || busy}
                     aria-expanded={canExpand ? open : undefined}
-                    className="-mx-1.5 flex min-w-0 flex-1 items-center gap-3 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-secondary/50 focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)] disabled:cursor-default disabled:hover:bg-transparent"
+                    className="-mx-1.5 flex min-w-0 flex-1 items-center gap-3 rounded-md px-1.5 py-1 text-left focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)] disabled:cursor-default"
                   >
                     {local
                       ? <Monitor className="size-4 shrink-0 text-muted-foreground" aria-hidden />
@@ -145,44 +151,57 @@ export function MachineManagementSection() {
                       <span className={`mr-1.5 inline-block size-1.5 rounded-full ${statusDotColor}`} aria-hidden />
                       {machine.connection}
                     </span>
-                    {canExpand && (
-                      <ChevronDown
-                        className={`size-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
-                        aria-hidden
-                      />
-                    )}
                   </button>
-                  {canSwitch && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => {
-                        if (runnableProjects.length === 1) {
-                          void manager.connect?.(machine.key, runnableProjects[0].key).catch(() => undefined)
-                        } else {
-                          manager.clearPlan()
-                          setExpanded(machine.key)
-                        }
-                      }}
-                    >
-                      {switching
-                        ? t('settings.machines.switching', 'Switching…')
-                        : t('settings.machines.switch', 'Switch')}
-                    </Button>
-                  )}
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {canSwitch && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => {
+                          if (runnableProjects.length === 1) {
+                            void manager.connect?.(machine.key, runnableProjects[0].key).catch(() => undefined)
+                          } else {
+                            manager.clearPlan()
+                            setExpanded(machine.key)
+                          }
+                        }}
+                      >
+                        {switching
+                          ? t('settings.machines.switching', 'Switching…')
+                          : t('settings.machines.switch', 'Switch')}
+                      </Button>
+                    )}
+                    {canExpand ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleExpanded(machine.key)}
+                        disabled={busy}
+                        aria-expanded={open}
+                        aria-label={open ? t('common.close', 'Close') : t('settings.versions.details', 'Details')}
+                        className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)] disabled:opacity-50"
+                      >
+                        <ChevronDown
+                          className={`size-4 transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
+                          aria-hidden
+                        />
+                      </button>
+                    ) : (
+                      <span className="size-8 shrink-0" aria-hidden />
+                    )}
+                  </div>
                 </div>
 
                 {open && (
                   <div className="space-y-4 border-t border-border/70 bg-secondary/20 px-3 py-4 sm:px-4">
-                    {machine.projects.length > 0 && (
+                    {sortedProjects.length > 0 && (
                       <div className="space-y-2">
                         <h4 className="text-[12px] font-medium text-foreground">
                           {t('settings.machines.projectsHeading', 'AliceProjects on this Machine')}
                         </h4>
                         <ul className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border/70 bg-background/70">
-                          {machine.projects.map((project) => {
+                          {sortedProjects.map((project) => {
                             const projectRunnable = isProjectRunnable(project)
                             const isCurrentProject = current && manager.status?.target?.project === project.key
                             return (

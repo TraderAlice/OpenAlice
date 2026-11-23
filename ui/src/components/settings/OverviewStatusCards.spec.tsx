@@ -170,8 +170,8 @@ describe('OverviewStatusCards', () => {
 
     await waitFor(() => {
       expect(screen.getByText('2 API credentials saved')).toBeTruthy()
-      expect(screen.getByText('1 connected · 1 need attention')).toBeTruthy()
-      expect(screen.getByText('1 active · 1 need attention')).toBeTruthy()
+      expect(screen.getByText('1 connected · 1 needing attention')).toBeTruthy()
+      expect(screen.getByText('1 active · 1 needing attention')).toBeTruthy()
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Agent runtimes' }))

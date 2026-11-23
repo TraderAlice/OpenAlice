@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { getBackendConnection } from '../../auth/backendConnection'
 import { useAliceProject } from '../../hooks/useAliceProject'
 import { useRelayConnection } from '../../hooks/useRelayConnection'
+import { useUpdateLifecycle } from '../../hooks/useUpdateLifecycle'
 import { Button } from '../ui/button'
 import { DataHomeSection, WorkspaceShellSection } from './LocalEnvironmentSections'
 
@@ -15,15 +16,19 @@ export function AliceLocationSection() {
   const detailsId = useId()
   const connection = getBackendConnection()
   const { project, loading, error, refresh } = useAliceProject()
-  const relay = useRelayConnection()
+  const sharedMachines = useUpdateLifecycle({ optional: true })?.machines
+  const localRelay = useRelayConnection()
+  const relay = sharedMachines ?? localRelay
   const [showDetails, setShowDetails] = useState(false)
   const [returningIntegrated, setReturningIntegrated] = useState(false)
   const [switchError, setSwitchError] = useState<string | null>(null)
   const desktopConnection = window.openAlice?.desktopConnection
 
   useEffect(() => {
-    if (desktopConnection || relay.status) void relay.refresh()
-  }, [desktopConnection, relay.status?.target?.machine, relay.status?.target?.project, relay.refresh])
+    if (!sharedMachines && (desktopConnection || localRelay.status)) {
+      void localRelay.refresh()
+    }
+  }, [sharedMachines, desktopConnection, localRelay.status?.target?.machine, localRelay.status?.target?.project, localRelay.refresh])
 
   const canChoose = Boolean(relay.status || desktopConnection || connection.kind === 'electron')
   const remote = relay.status?.target?.machine !== undefined && relay.status.target.machine !== 'local'
@@ -59,12 +64,20 @@ export function AliceLocationSection() {
   const startupMachine = startupTarget
     ? relay.fleet.find((item) => item.key === startupTarget.machine)
     : undefined
+  const matchesActiveStartupMachine = Boolean(startupTarget && startupTarget.machine === relay.status?.target?.machine)
+  const matchesActiveStartupProject = Boolean(
+    matchesActiveStartupMachine
+    && startupTarget
+    && startupTarget.project === (project?.key ?? relay.status?.target?.project),
+  )
   const startupMachineName = startupTarget
     ? startupMachine?.displayName
+      ?? (matchesActiveStartupMachine ? relay.status?.target?.machineName : undefined)
       ?? (startupTarget.machine === 'local' ? t('settings.backendConnection.thisMachine') : startupTarget.machine)
     : null
   const startupProjectName = startupTarget
     ? startupMachine?.projects.find((item) => item.key === startupTarget.project)?.displayName
+      ?? (matchesActiveStartupProject ? (project?.displayName ?? relay.status?.target?.projectName) : undefined)
       ?? startupTarget.project
     : null
   const showActions = (desktopConnection && !electron) || (!loading && !project)
@@ -139,9 +152,11 @@ export function AliceLocationSection() {
               {t('settings.backendConnection.startupDefault')}:
             </span>
             <span className="min-w-0 truncate text-muted-foreground">
-              {startupTarget
-                ? `${startupMachineName} / ${startupProjectName}`
-                : t('settings.backendConnection.noStartupDefault', 'Choose a location on the next launch')}
+              {!relay.startup
+                ? t('settings.backendConnection.checking')
+                : startupTarget
+                  ? `${startupMachineName} / ${startupProjectName}`
+                  : t('settings.backendConnection.noStartupDefault', 'Choose a location on the next launch')}
             </span>
           </div>
           {relay.startup?.error && (

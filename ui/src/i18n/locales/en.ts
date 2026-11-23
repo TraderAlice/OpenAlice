@@ -1212,7 +1212,7 @@ export const en = {
       tradingCard: {
         title: 'Trading & Brokers',
         currentMode: 'Mode: {{mode}}',
-        brokersSummary: '{{connected}} connected · {{attention}} need attention',
+        brokersSummary: '{{connected}} connected · {{attention}} needing attention',
         brokersHealthy: '{{connected}} broker accounts connected',
         noBrokers: 'No broker accounts configured',
         openMode: 'Mode',
@@ -1220,7 +1220,7 @@ export const en = {
       },
       connectorsCard: {
         title: 'Connectors',
-        activeSummary: '{{connected}} active · {{attention}} need attention',
+        activeSummary: '{{connected}} active · {{attention}} needing attention',
         healthySummary: '{{connected}} active channels',
         noneConfigured: 'No active connectors configured',
         openConnectors: 'Manage connectors',

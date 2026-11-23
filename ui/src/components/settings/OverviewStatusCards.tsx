@@ -130,7 +130,7 @@ export function OverviewStatusCards() {
 
   return (
     <div className="@container space-y-5">
-      <div className={`grid gap-4 ${hideTrading ? '@[36rem]:grid-cols-2' : '@[48rem]:grid-cols-3'}`}>
+      <div className={`grid gap-4 ${hideTrading ? '@[32rem]:grid-cols-2' : '@[32rem]:grid-cols-2 @[42rem]:grid-cols-3'}`}>
         <article className="@container flex flex-col justify-between gap-4 rounded-xl border border-border/70 bg-card p-4">
           <header className="flex items-center gap-2.5">
             <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-secondary/40 text-muted-foreground" aria-hidden>
