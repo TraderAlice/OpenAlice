@@ -1,5 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { CandlestickChart, Cpu, Languages, Palette, Plug } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowRight, Cpu, Plug } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { api, type ConnectorSettingsSnapshot, type UTASummary } from '../../api'
@@ -13,23 +13,6 @@ import { useWorkspace } from '../../tabs/store'
 import { THEME_PALETTES } from '../../theme/palettes'
 import { useThemeStore } from '../../theme/store'
 import { useEffectivePalette } from '../../theme/useEffectiveTheme'
-import { Button } from '../ui/button'
-
-type StatusTone = 'healthy' | 'warning' | 'muted'
-
-function StatusLine({ tone, children }: { tone: StatusTone; children: ReactNode }) {
-  const dotClass = tone === 'healthy'
-    ? 'bg-success'
-    : tone === 'warning'
-      ? 'bg-warning'
-      : 'bg-muted-foreground/50'
-  return (
-    <p className="flex items-center gap-2 text-xs text-foreground">
-      <span className={`size-1.5 shrink-0 rounded-full ${dotClass}`} aria-hidden />
-      <span className="min-w-0 break-words">{children}</span>
-    </p>
-  )
-}
 
 export function OverviewStatusCards() {
   const { t } = useTranslation()
@@ -106,6 +89,7 @@ export function OverviewStatusCards() {
   const readyRuntimes = catalog.filter(
     (agent) => readiness?.agents?.[agent.id]?.status === 'ready',
   ).length
+  const runtimesReadyKnown = catalog.length > 0 && Boolean(readiness)
 
   const enabledUtas = utas?.filter((uta) => !uta.health.disabled) ?? []
   const connectedBrokers = enabledUtas.filter((uta) => uta.health.status === 'healthy').length
@@ -129,216 +113,286 @@ export function OverviewStatusCards() {
         : 0
 
   return (
-    <div className="@container space-y-5">
-      <div className={`grid gap-4 ${hideTrading ? '@[32rem]:grid-cols-2' : '@[32rem]:grid-cols-2 @[42rem]:grid-cols-3'}`}>
-        <article className="@container flex flex-col justify-between gap-4 rounded-xl border border-border/70 bg-card p-4">
-          <header className="flex items-center gap-2.5">
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-secondary/40 text-muted-foreground" aria-hidden>
-              <Cpu className="size-3.5" />
-            </span>
-            <h3 className="min-w-0 truncate text-sm font-semibold text-foreground">
-              {t('settings.overview.agentsCard.title')}
-            </h3>
-          </header>
-          <div className="flex-1 space-y-2 text-xs">
-            {runtimesLoading && catalog.length === 0 ? (
-              <StatusLine tone="muted">
-                {t('settings.overview.agentsCard.runtimesLoading')}
-              </StatusLine>
-            ) : catalog.length === 0 || !readiness ? (
-              <StatusLine tone="muted">
-                {t('settings.overview.agentsCard.runtimesUnavailable')}
-              </StatusLine>
-            ) : (
-              <StatusLine tone={readyRuntimes > 0 ? 'healthy' : 'warning'}>
-                {t('settings.overview.agentsCard.runtimesReady', {
-                  ready: readyRuntimes,
-                  total: catalog.length,
-                })}
-              </StatusLine>
-            )}
-            {credentialCount !== null && (
-              <p className="text-muted-foreground">
-                {credentialCount > 0
-                  ? t('settings.overview.agentsCard.credentialsSaved', { count: credentialCount })
-                  : t('settings.overview.agentsCard.noCredentials')}
-              </p>
-            )}
-          </div>
-          <footer className="flex flex-wrap items-center gap-2 border-t border-border/50 pt-3">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => openOrFocus({ kind: 'settings', params: { category: 'agent-runtimes' } })}
-            >
-              {t('settings.overview.agentsCard.openRuntimes')}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })}
-            >
-              {t('settings.overview.agentsCard.openProviders')}
-            </Button>
-          </footer>
-        </article>
-
+    <div className="@container space-y-3.5">
+      <div
+        className={`grid gap-3.5 @[28rem]:grid-cols-2 ${
+          hideTrading
+            ? '@[42rem]:grid-cols-[1.45fr_1fr]'
+            : '@[42rem]:grid-cols-[1.35fr_1.45fr_1fr]'
+        }`}
+      >
         {!hideTrading && (
-          <article className="@container flex flex-col justify-between gap-4 rounded-xl border border-border/70 bg-card p-4">
-            <header className="flex items-center gap-2.5">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-secondary/40 text-muted-foreground" aria-hidden>
-                <CandlestickChart className="size-3.5" />
-              </span>
-              <h3 className="min-w-0 truncate text-sm font-semibold text-foreground">
+          <article className="flex min-w-0 flex-col justify-between gap-3.5 rounded-2xl border border-border/70 bg-card p-4 sm:p-5 @[42rem]:p-4 @[28rem]:col-span-2 @[42rem]:col-span-1">
+            <header className="flex items-center justify-between gap-2">
+              <h3 className="min-w-0 truncate text-xs font-medium text-muted-foreground">
                 {t('settings.overview.tradingCard.title')}
               </h3>
+              <button
+                type="button"
+                onClick={() => openOrFocus({ kind: 'settings', params: { category: 'agent-permissions' } })}
+                className="inline-flex shrink-0 items-center rounded-full border border-border/70 bg-secondary/50 px-2.5 py-0.5 text-xs font-medium text-foreground transition-colors hover:border-foreground/25 focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
+              >
+                {t('settings.overview.tradingCard.currentMode', {
+                  mode: t(`settings.agentPermissions.mode.${tradingMode}.label`),
+                })}
+              </button>
             </header>
-            <div className="flex-1 space-y-2 text-xs">
-              <div>
-                <span className="inline-flex items-center rounded-full border border-border/70 bg-secondary/50 px-2.5 py-0.5 text-xs font-medium text-foreground">
-                  {t('settings.overview.tradingCard.currentMode', {
-                    mode: t(`settings.agentPermissions.mode.${tradingMode}.label`),
-                  })}
+
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <span className="text-2xl font-semibold tracking-tight tabular-nums text-foreground">
+                  {utas === null ? '—' : connectedBrokers}
                 </span>
+                {enabledUtas.length > 0 && (
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    / {enabledUtas.length} {t('settings.overview.tradingCard.brokersFractionLabel')}
+                  </span>
+                )}
               </div>
+
+              {enabledUtas.length > 0 && (
+                <div className="flex items-center gap-1" aria-hidden>
+                  {enabledUtas.slice(0, 12).map((uta) => (
+                    <span
+                      key={uta.id}
+                      title={`${uta.label}: ${uta.health.status}`}
+                      className={`h-2 flex-1 rounded-full ${uta.health.status === 'healthy' ? 'bg-success' : 'bg-warning'}`}
+                    />
+                  ))}
+                </div>
+              )}
+
               {utas !== null && (
                 enabledUtas.length === 0 ? (
-                  <StatusLine tone="muted">
+                  <p className="text-xs text-muted-foreground">
                     {t('settings.overview.tradingCard.noBrokers')}
-                  </StatusLine>
+                  </p>
                 ) : attentionBrokers > 0 ? (
-                  <StatusLine tone="warning">
+                  <p className="text-xs text-warning">
                     {t('settings.overview.tradingCard.brokersSummary', {
                       connected: connectedBrokers,
                       attention: attentionBrokers,
                     })}
-                  </StatusLine>
+                  </p>
                 ) : (
-                  <StatusLine tone="healthy">
+                  <p className="text-xs text-muted-foreground">
                     {t('settings.overview.tradingCard.brokersHealthy', {
                       connected: connectedBrokers,
                     })}
-                  </StatusLine>
+                  </p>
                 )
               )}
             </div>
-            <footer className="flex flex-wrap items-center gap-2 border-t border-border/50 pt-3">
-              <Button
+
+            <footer className="flex items-center justify-between gap-2 border-t border-border/55 pt-3 text-xs">
+              <button
                 type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => openOrFocus({ kind: 'settings', params: { category: 'agent-permissions' } })}
-              >
-                {t('settings.overview.tradingCard.openMode')}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
                 onClick={() => openOrFocus({ kind: 'settings', params: { category: 'trading' } })}
+                className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap font-medium text-foreground transition-colors hover:text-primary focus-visible:rounded-sm focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
               >
-                {t('settings.overview.tradingCard.openBrokers')}
-              </Button>
+                <span>{t('settings.overview.tradingCard.openBrokers')}</span>
+                <ArrowRight className="size-3.5" aria-hidden />
+              </button>
+              <button
+                type="button"
+                onClick={() => openOrFocus({ kind: 'settings', params: { category: 'agent-permissions' } })}
+                className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
+              >
+                <span>{t('settings.overview.tradingCard.openMode')}</span>
+                <ArrowRight className="size-3.5" aria-hidden />
+              </button>
             </footer>
           </article>
         )}
 
-        <article className="@container flex flex-col justify-between gap-4 rounded-xl border border-border/70 bg-card p-4">
-          <header className="flex items-center gap-2.5">
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-secondary/40 text-muted-foreground" aria-hidden>
-              <Plug className="size-3.5" />
-            </span>
-            <h3 className="min-w-0 truncate text-sm font-semibold text-foreground">
+        <article className="flex min-w-0 flex-col justify-between gap-3.5 rounded-2xl border border-border/70 bg-card p-4 sm:p-5 @[42rem]:p-4">
+          <header className="flex items-center justify-between gap-2">
+            <h3 className="min-w-0 truncate text-xs font-medium text-muted-foreground">
+              {t('settings.overview.agentsCard.title')}
+            </h3>
+            <Cpu className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          </header>
+
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => openOrFocus({ kind: 'settings', params: { category: 'agent-runtimes' } })}
+                className="min-w-0 rounded-xl border border-border/65 bg-background/60 p-3 text-left transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
+              >
+                <span
+                  className={`block text-lg font-semibold tracking-tight tabular-nums ${
+                    !runtimesReadyKnown
+                      ? 'text-foreground'
+                      : readyRuntimes > 0
+                        ? 'text-success'
+                        : 'text-warning'
+                  }`}
+                >
+                  {runtimesReadyKnown ? `${readyRuntimes}/${catalog.length}` : '—'}
+                </span>
+                <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                  {t('settings.overview.agentsCard.cliReadyLabel')}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })}
+                className="min-w-0 rounded-xl border border-border/65 bg-background/60 p-3 text-left transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
+              >
+                <span className="block text-lg font-semibold tracking-tight tabular-nums text-foreground">
+                  {credentialCount !== null ? String(credentialCount) : '—'}
+                </span>
+                <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                  {t('settings.overview.agentsCard.apiKeysLabel')}
+                </span>
+              </button>
+            </div>
+
+            {runtimesLoading && catalog.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {t('settings.overview.agentsCard.runtimesLoading')}
+              </p>
+            ) : !runtimesReadyKnown ? (
+              <p className="text-xs text-muted-foreground">
+                {t('settings.overview.agentsCard.runtimesUnavailable')}
+              </p>
+            ) : credentialCount === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {t('settings.overview.agentsCard.noCredentials')}
+              </p>
+            ) : null}
+          </div>
+
+          <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border/55 pt-3 text-xs">
+            <button
+              type="button"
+              onClick={() => openOrFocus({ kind: 'settings', params: { category: 'agent-runtimes' } })}
+              className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap font-medium text-foreground transition-colors hover:text-primary focus-visible:rounded-sm focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
+            >
+              <span>{t('settings.overview.agentsCard.openRuntimes')}</span>
+              <ArrowRight className="size-3.5" aria-hidden />
+            </button>
+            <button
+              type="button"
+              onClick={() => openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })}
+              className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
+            >
+              <span>{t('settings.overview.agentsCard.openProviders')}</span>
+              <ArrowRight className="size-3.5" aria-hidden />
+            </button>
+          </footer>
+        </article>
+
+        <article className="flex min-w-0 flex-col justify-between gap-3.5 rounded-2xl border border-border/70 bg-card p-4 sm:p-5 @[42rem]:p-4">
+          <header className="flex items-center justify-between gap-2">
+            <h3 className="min-w-0 truncate text-xs font-medium text-muted-foreground">
               {t('settings.overview.connectorsCard.title')}
             </h3>
+            <Plug className="size-4 shrink-0 text-muted-foreground" aria-hidden />
           </header>
-          <div className="flex-1 space-y-2 text-xs">
+
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <span
+                className={`text-2xl font-semibold tracking-tight tabular-nums ${
+                  connectorAttention > 0
+                    ? 'text-warning'
+                    : connectedConnectors > 0
+                      ? 'text-success'
+                      : 'text-foreground'
+                }`}
+              >
+                {connectorSnapshot === null ? '—' : connectedConnectors}
+              </span>
+              {connectorSnapshot !== null && (
+                <span className="text-xs text-muted-foreground">
+                  {t('settings.overview.connectorsCard.activeChannelsLabel')}
+                </span>
+              )}
+            </div>
+
             {connectorSnapshot !== null && (
               enabledAdapters.length === 0 && connectorAttention === 0 ? (
-                <StatusLine tone="muted">
+                <p className="text-xs text-muted-foreground">
                   {t('settings.overview.connectorsCard.noneConfigured')}
-                </StatusLine>
+                </p>
               ) : connectorAttention > 0 ? (
-                <StatusLine tone="warning">
+                <p className="text-xs text-warning">
                   {t('settings.overview.connectorsCard.activeSummary', {
                     connected: connectedConnectors,
                     attention: connectorAttention,
                   })}
-                </StatusLine>
+                </p>
               ) : (
-                <StatusLine tone="healthy">
+                <p className="text-xs text-muted-foreground">
                   {t('settings.overview.connectorsCard.healthySummary', {
                     connected: connectedConnectors,
                   })}
-                </StatusLine>
+                </p>
               )
             )}
           </div>
-          <footer className="flex flex-wrap items-center gap-2 border-t border-border/50 pt-3">
-            <Button
+
+          <footer className="flex items-center justify-between gap-2 border-t border-border/55 pt-3 text-xs">
+            <button
               type="button"
-              variant="outline"
-              size="sm"
               onClick={() => openOrFocus({ kind: 'settings', params: { category: 'connectors' } })}
+              className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap font-medium text-foreground transition-colors hover:text-primary focus-visible:rounded-sm focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
             >
-              {t('settings.overview.connectorsCard.openConnectors')}
-            </Button>
+              <span>{t('settings.overview.connectorsCard.openConnectors')}</span>
+              <ArrowRight className="size-3.5" aria-hidden />
+            </button>
           </footer>
         </article>
       </div>
 
-      <article className="divide-y divide-border/60 rounded-xl border border-border/70 bg-card">
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <div className="flex items-center gap-2 text-xs font-medium text-foreground">
-            <Palette className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-            <span>{t('settings.overview.quickPrefs.appearance')}</span>
+      <article className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-2xl border border-border/70 bg-card px-4 py-3 sm:px-5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="text-xs font-medium text-muted-foreground">
+            {t('settings.overview.quickPrefs.appearance')}
+          </span>
+          <div
+            className="inline-flex items-center rounded-lg border border-border/70 bg-background p-0.5"
+            role="group"
+            aria-label={t('settings.overview.quickPrefs.appearance')}
+          >
+            {(['auto', 'day', 'night'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setTheme(mode)}
+                aria-pressed={theme === mode}
+                className={`oa-pressable h-7 rounded-md border px-2.5 text-xs font-medium transition-colors ${
+                  theme === mode
+                    ? 'border-border/80 bg-card text-foreground shadow-2xs'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {t(`theme.mode.${mode}`)}
+              </button>
+            ))}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div
-              className="flex flex-wrap items-center gap-1.5"
-              role="group"
-              aria-label={t('settings.overview.quickPrefs.appearance')}
-            >
-              {(['auto', 'day', 'night'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setTheme(mode)}
-                  aria-pressed={theme === mode}
-                  className={`oa-pressable h-7 rounded-md border px-2.5 text-xs font-medium transition-colors ${
-                    theme === mode
-                      ? 'border-primary bg-primary-muted text-primary'
-                      : 'border-border bg-background text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {t(`theme.mode.${mode}`)}
-                </button>
-              ))}
-            </div>
-            <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border/70 bg-secondary/50 px-2.5 text-xs text-muted-foreground">
-              <span className="size-2 shrink-0 rounded-full bg-primary" aria-hidden />
-              <span>{activePaletteLabel}</span>
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => openOrFocus({ kind: 'settings', params: { category: 'appearance' } })}
-            >
-              {t('settings.overview.quickPrefs.customizeSkin')}
-            </Button>
-          </div>
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="size-2 shrink-0 rounded-full bg-primary" aria-hidden />
+            <span>{activePaletteLabel}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => openOrFocus({ kind: 'settings', params: { category: 'appearance' } })}
+            className="text-xs font-medium text-primary hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
+          >
+            {t('settings.overview.quickPrefs.customizeSkin')}
+          </button>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <div className="flex items-center gap-2 text-xs font-medium text-foreground">
-            <Languages className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-            <span>{t('settings.overview.quickPrefs.language')}</span>
-          </div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="text-xs font-medium text-muted-foreground">
+            {t('settings.overview.quickPrefs.language')}
+          </span>
           <div
-            className="flex flex-wrap items-center gap-1.5"
+            className="inline-flex flex-wrap items-center rounded-lg border border-border/70 bg-background p-0.5"
             role="group"
             aria-label={t('settings.overview.quickPrefs.language')}
           >
@@ -350,8 +404,8 @@ export function OverviewStatusCards() {
                 aria-pressed={locale === l}
                 className={`oa-pressable h-7 rounded-md border px-2.5 text-xs font-medium transition-colors ${
                   locale === l
-                    ? 'border-primary bg-primary-muted text-primary'
-                    : 'border-border bg-background text-muted-foreground hover:text-foreground'
+                    ? 'border-border/80 bg-card text-foreground shadow-2xs'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {LOCALE_LABELS[l]}

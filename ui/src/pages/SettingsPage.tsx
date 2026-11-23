@@ -586,7 +586,7 @@ export { DataHomeSection, WorkspaceShellSection }
 
 function SettingsSection() {
   return (
-    <div className="mx-auto w-full max-w-[1100px] space-y-6">
+    <div className="mx-auto w-full max-w-[1100px] space-y-3.5">
       <VersionOverviewSection />
       <OverviewStatusCards />
     </div>

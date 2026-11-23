@@ -78,7 +78,7 @@ describe('SettingsPage loading', () => {
 
     expect(screen.getByRole('heading', { name: 'Versions & updates' })).toBeTruthy()
     expect(screen.getByText('Current environment')).toBeTruthy()
-    expect(screen.getByText('All up to date')).toBeTruthy()
+    expect(screen.getByText('Current')).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Agents & Models' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Trading & Brokers' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Connectors' })).toBeTruthy()

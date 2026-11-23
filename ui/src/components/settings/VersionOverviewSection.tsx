@@ -67,11 +67,10 @@ export function VersionOverviewSection() {
     : rows.some(row => row.status === text('updating')) ? text('updating') : projectAvailable ? text('available')
       : rows.some(row => !row.loaded) ? text('loading') : rows.every(row => !row.workspace) ? text('notConfigured')
         : rows.some(row => row.workspace && row.status === text('unknown')) ? text('unknown') : text('current')
-  const hasActionableState = Boolean(
-    appAvailable
-    || backend?.hasUpdate
-    || projectAvailable
-    || activeOperation
+  const backendHasUpdate = !updates.versionError && !backend?.error && Boolean(backend?.hasUpdate)
+  const hasAvailableUpdate = Boolean(appAvailable || backendHasUpdate || projectAvailable)
+  const hasUrgentBreakdown = Boolean(
+    activeOperation
     || updates.clientError
     || updates.nativeError
     || updates.versionError
@@ -85,7 +84,7 @@ export function VersionOverviewSection() {
     || backendBusy
     || nativeStatus?.phase === 'downloading',
   )
-  const showRows = hasActionableState || detailsOpen
+  const showRows = hasUrgentBreakdown || detailsOpen
   useEffect(() => {
     if (machines?.operation?.mode === 'upgrade' && machines.operation.phase === 'running' && shouldRestoreUpgradeDialog('about')) setView('backend-review')
   }, [machines?.operation?.id, machines?.operation?.phase, machines?.operation?.mode])
@@ -95,6 +94,36 @@ export function VersionOverviewSection() {
     if (!remote || !target) return
     claimUpgradeDialog('about'); open('backend-review')
     void machines.probe({ mode: 'upgrade', machineKey: target.machine, projectKey: target.project }, { force }).catch(() => undefined)
+  }
+  const openAppUpdate = () => open(updates.nativeReady ? 'native-review' : 'app')
+  const openBackendAction = () => {
+    if (integrated) openAppUpdate()
+    else if (remote && backendHasUpdate) reviewBackend()
+    else open('backend')
+  }
+  const firstProjectCandidate = rows.find(row => row.candidate)?.candidate
+  const kpiVersion = appAvailable
+    ? version(appCandidate ?? appVersion)
+    : backendHasUpdate && backend?.latest
+      ? version(backend.latest)
+      : projectAvailable && firstProjectCandidate
+        ? version(firstProjectCandidate)
+        : version(appVersion ?? backend?.current)
+  const availableActions: Array<() => void> = [
+    ...(appAvailable ? [openAppUpdate] : []),
+    ...(backendHasUpdate ? [openBackendAction] : []),
+    ...(projectAvailable ? [() => open('project')] : []),
+  ]
+  const triggerPrimaryHeroUpdate = () => {
+    if (activeOperation) {
+      open('project')
+      return
+    }
+    if (availableActions.length === 1) {
+      availableActions[0]()
+      return
+    }
+    setDetailsOpen(true)
   }
   const appStatus = updates.clientError || updates.nativeError ? text('checkFailed')
     : nativeStatus?.phase === 'downloading' ? text('downloading')
@@ -129,63 +158,101 @@ export function VersionOverviewSection() {
       {updates.error && <p role="alert" className="break-words text-xs text-warning">{updates.error}</p>}
     </div></CollapsibleContent>
   </Collapsible>
-  return <section className="@container overflow-hidden rounded-xl border border-border/70 bg-card">
-    <div className="divide-y divide-border/70">
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-secondary/20 px-4 py-3.5 @[40rem]:px-5">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-background/80 text-muted-foreground" aria-hidden>
-            {remote ? <Server className="size-4" /> : <Monitor className="size-4" />}
-          </span>
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium text-muted-foreground">
-              {t('settings.overview.environmentTitle')}
-            </p>
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-              <span className="min-w-0 truncate text-sm font-semibold text-foreground">
-                {`${machineName} / ${projectName}`}
-              </span>
-              <span
-                role="status"
-                className={`inline-flex items-center gap-1.5 text-xs ${backendUnavailable ? 'text-warning' : 'text-muted-foreground'}`}
-              >
-                <span
-                  className={`size-1.5 shrink-0 rounded-full ${backendUnavailable ? 'bg-warning' : 'bg-success'}`}
-                  aria-hidden
-                />
-                {backendUnavailable ? text('offline') : text('connected')}
-              </span>
+  const updateCardSurface = hasUrgentBreakdown
+    ? 'border-warning/35 bg-warning/[0.04]'
+    : hasAvailableUpdate
+      ? 'border-primary/35 bg-primary/[0.04]'
+      : 'border-border/70 bg-card'
+
+  return <section className="@container space-y-3.5">
+    <div className="grid gap-3.5 @[38rem]:grid-cols-12">
+      <article className="flex min-w-0 flex-col justify-between gap-4 rounded-2xl border border-border/70 bg-card p-4 sm:p-5 @[38rem]:col-span-7">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <span
+              className={`flex size-9 shrink-0 items-center justify-center rounded-xl border ${
+                backendUnavailable
+                  ? 'border-warning/30 bg-warning/10 text-warning'
+                  : 'border-success/25 bg-success/10 text-success'
+              }`}
+              aria-hidden
+            >
+              {remote ? <Server className="size-4" /> : <Monitor className="size-4" />}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-xs text-muted-foreground">{machineName}</p>
+              <p className="mt-0.5 truncate text-[15px] font-semibold tracking-tight text-foreground">{projectName}</p>
             </div>
           </div>
+          <span
+            role="status"
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${
+              backendUnavailable
+                ? 'border-warning/30 bg-warning/10 text-warning'
+                : 'border-success/25 bg-success/10 text-success'
+            }`}
+          >
+            <span className={`size-1.5 shrink-0 rounded-full ${backendUnavailable ? 'bg-warning' : 'bg-success'}`} aria-hidden />
+            {backendUnavailable ? text('offline') : text('connected')}
+          </span>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => openOrFocus({ kind: 'settings', params: { category: 'machines' } })}
-        >
-          {t('settings.overview.manageMachines')}
-        </Button>
-      </div>
 
-      <div>
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 @[40rem]:px-5">
-          <h2 id={VERSION_OVERVIEW_ID} tabIndex={-1} className="w-fit scroll-mt-5 rounded-sm text-sm font-semibold text-foreground outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">{text('title')}</h2>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {!hasActionableState && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                aria-expanded={showRows}
-                aria-controls={versionRowsId}
-                onClick={() => setDetailsOpen(current => !current)}
-              >
-                {t(showRows ? 'settings.overview.hideVersionDetails' : 'settings.overview.showVersionDetails')}
-              </Button>
-            )}
-            <Button variant="ghost" size="sm" disabled={updates.checking} onClick={() => { void updates.refresh().catch(error => setLocalError(String(error))) }}>
+        <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border/55 pt-3 text-xs">
+          <span className="truncate tabular-nums text-muted-foreground">
+            {backend?.current
+              ? `${text('backend')} ${version(backend.current)}${backend.channel ? ` · ${backend.channel}` : ''}`
+              : t('settings.overview.environmentTitle')}
+          </span>
+          <button
+            type="button"
+            onClick={() => openOrFocus({ kind: 'settings', params: { category: 'machines' } })}
+            className="inline-flex shrink-0 items-center gap-1 font-medium text-foreground transition-colors hover:text-primary focus-visible:rounded-sm focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
+          >
+            <span>{t('settings.overview.manageMachines')}</span>
+            <ArrowRight className="size-3.5" aria-hidden />
+          </button>
+        </footer>
+      </article>
+
+      <article className={`flex min-w-0 flex-col justify-between gap-4 rounded-2xl border p-4 sm:p-5 @[38rem]:col-span-5 ${updateCardSurface}`}>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h2
+              id={VERSION_OVERVIEW_ID}
+              tabIndex={-1}
+              className={`w-fit scroll-mt-5 rounded-sm text-xs font-medium outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)] ${
+                hasUrgentBreakdown ? 'text-warning' : hasAvailableUpdate ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            >
+              {text('title')}
+            </h2>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <span className="text-2xl font-semibold tracking-tight tabular-nums text-foreground">
+                {kpiVersion}
+              </span>
+              {hasUrgentBreakdown ? (
+                <span className="inline-flex items-center rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
+                  {text('needsAttention')}
+                </span>
+              ) : hasAvailableUpdate ? (
+                <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                  {t('settings.overview.updateReadyBadge')}
+                </span>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              disabled={updates.checking}
+              aria-label={text('checkAgain')}
+              title={text('checkAgain')}
+              onClick={() => { void updates.refresh().catch(error => setLocalError(String(error))) }}
+            >
               <RefreshCw className={`size-3.5 ${updates.checking ? 'animate-spin motion-reduce:animate-none' : ''}`} aria-hidden />
-              {text('checkAgain')}
             </Button>
             <Button
               type="button"
@@ -195,35 +262,49 @@ export function VersionOverviewSection() {
               title={text('preferences')}
               onClick={() => open('preferences')}
             >
-              <SlidersHorizontal className="size-4" aria-hidden />
+              <SlidersHorizontal className="size-3.5" aria-hidden />
             </Button>
           </div>
         </div>
 
-        {!showRows ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 px-4 py-3 @[40rem]:px-5">
-            <span className="inline-flex items-center gap-2 text-xs font-medium text-foreground">
-              <span className="size-2 shrink-0 rounded-full bg-success" aria-hidden />
-              {t('settings.overview.allUpToDate')}
-            </span>
-            <span className="text-xs tabular-nums text-muted-foreground">
-              {t('settings.overview.summaryVersions', {
-                app: version(appVersion),
-                backend: version(backend?.current),
-              })}
-            </span>
-          </div>
-        ) : (
-          <div id={versionRowsId} className="divide-y divide-border/70 border-t border-border/70">
-            {row('app', <Monitor className="size-5" />, window.openAlice?.updater ? text('desktop') : text('browser'), version(appVersion), appStatus, appAvailable, () => open(updates.nativeReady ? 'native-review' : 'app'))}
-            {row('backend', <Server className="size-5" />, `${machineName} · ${backendUnavailable ? text('offline') : text('connected')}`, version(backend?.current), integrated ? text('integrated') : backendStatus, Boolean(backend?.hasUpdate), integrated ? () => open(updates.nativeReady ? 'native-review' : 'app') : remote && backend?.hasUpdate ? () => reviewBackend() : () => open('backend'))}
-            {row('project', <Folder className="size-5" />, projectName, '', projectStatus, projectAvailable, () => open('project'), projectDetails)}
-          </div>
-        )}
-      </div>
+        <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border/55 pt-3 text-xs">
+          {!hasUrgentBreakdown ? (
+            <button
+              type="button"
+              aria-expanded={showRows}
+              aria-controls={versionRowsId}
+              onClick={() => setDetailsOpen(current => !current)}
+              className="inline-flex items-center gap-1 font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:rounded-sm focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
+            >
+              {t(showRows ? 'settings.overview.hideVersionDetails' : 'settings.overview.showVersionDetails')}
+            </button>
+          ) : (
+            <span className="font-medium text-warning">{text('needsAttention')}</span>
+          )}
 
-      {localError && view === null && <p role="alert" className="px-4 py-3 text-sm text-destructive @[40rem]:px-5">{localError}</p>}
+          {!hasUrgentBreakdown && hasAvailableUpdate ? (
+            <Button type="button" size="sm" onClick={triggerPrimaryHeroUpdate}>
+              {text('viewUpdate')}
+            </Button>
+          ) : !hasUrgentBreakdown ? (
+            <span className="inline-flex items-center gap-1.5 font-medium text-success">
+              <span className="size-1.5 shrink-0 rounded-full bg-success" aria-hidden />
+              {t('settings.overview.upToDateShort')}
+            </span>
+          ) : null}
+        </footer>
+      </article>
     </div>
+
+    {showRows && (
+      <div id={versionRowsId} className="overflow-hidden rounded-2xl border border-border/70 bg-card divide-y divide-border/70">
+        {row('app', <Monitor className="size-5" />, window.openAlice?.updater ? text('desktop') : text('browser'), version(appVersion), appStatus, appAvailable, openAppUpdate)}
+        {row('backend', <Server className="size-5" />, `${machineName} · ${backendUnavailable ? text('offline') : text('connected')}`, version(backend?.current), integrated ? text('integrated') : backendStatus, backendHasUpdate, openBackendAction)}
+        {row('project', <Folder className="size-5" />, projectName, '', projectStatus, projectAvailable, () => open('project'), projectDetails)}
+      </div>
+    )}
+
+    {localError && view === null && <p role="alert" className="text-sm text-destructive">{localError}</p>}
 
     {view === 'backend-review' ? <MachineUpgradeDialog open plan={machines.plan?.mode === 'upgrade' ? machines.plan : null} operation={machines.operation} busy={machines.applying} checking={machines.probing} error={machines.operationError} onClose={() => setView(null)} onApply={() => { void machines.apply().then(() => updates.refresh()).catch(() => undefined) }} onRetry={() => reviewBackend(true)} /> : <Dialog open={view !== null} onOpenChange={next => { if (!next && !nativeBusy) setView(null) }}>
       <DialogContent showCloseButton={!nativeBusy} className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0" style={{ width: 'calc(100vw - 2rem)', maxWidth: 600 }}>

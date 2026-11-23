@@ -165,11 +165,13 @@ describe('OverviewStatusCards', () => {
     expect(screen.getByRole('heading', { name: 'Connectors' })).toBeTruthy()
     expect(mocks.ensureTradingModePolling).toHaveBeenCalledOnce()
 
-    expect(screen.getByText('2 of 3 runtimes ready')).toBeTruthy()
+    expect(screen.getByText('2/3')).toBeTruthy()
+    expect(screen.getByText('CLI ready')).toBeTruthy()
     expect(screen.getByText('Mode: Pro')).toBeTruthy()
 
     await waitFor(() => {
-      expect(screen.getByText('2 API credentials saved')).toBeTruthy()
+      expect(screen.getByText('2')).toBeTruthy()
+      expect(screen.getByText('API keys')).toBeTruthy()
       expect(screen.getByText('1 connected · 1 needing attention')).toBeTruthy()
       expect(screen.getByText('1 active · 1 needing attention')).toBeTruthy()
     })
@@ -179,6 +181,9 @@ describe('OverviewStatusCards', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'AI Provider' }))
     expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'settings', params: { category: 'ai-provider' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mode: Pro' }))
+    expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'settings', params: { category: 'agent-permissions' } })
 
     fireEvent.click(screen.getByRole('button', { name: 'Mode' }))
     expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'settings', params: { category: 'agent-permissions' } })
