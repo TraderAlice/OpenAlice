@@ -11,6 +11,7 @@ vi.mock('../../auth/AuthContext', () => ({ useBackendRecoverySignal: () => ({ ba
 import '../../i18n'
 import { i18n } from '../../i18n'
 import { WorkspacePlanStore } from '../../lib/updates/workspacePlans'
+import { useWorkspace } from '../../tabs/store'
 import { VersionOverviewSection } from './VersionOverviewSection'
 beforeAll(async () => { await i18n.changeLanguage('en') })
 beforeEach(async () => {
@@ -129,4 +130,71 @@ it('does not offer installation from a retained candidate after discovery fails'
   const app = within(document.getElementById('settings-version-app')!)
   expect(app.getByText('Update check failed')).toBeTruthy()
   expect(app.queryByRole('button', { name: 'View update' })).toBeNull()
+})
+
+it('collapses version rows into a calm summary when up to date and toggles details on demand', () => {
+  mocks.updates.versionInfo = { current: '0.94.1', latest: '0.94.1', hasUpdate: false, channel: 'stable', updateAuthority: 'cli' }
+  mocks.updates.workspaceStates = [{ workspaceId: 'chat', template: 'chat', phase: 'current', fromVersion: '2' }]
+  render(<VersionOverviewSection />)
+
+  expect(screen.getByText('All up to date')).toBeTruthy()
+  expect(screen.getByText('App v0.94.1 · Backend v0.94.1')).toBeTruthy()
+  expect(document.getElementById('settings-version-app')).toBeNull()
+  expect(document.getElementById('settings-version-backend')).toBeNull()
+  expect(document.getElementById('settings-version-project')).toBeNull()
+
+  const toggle = screen.getByRole('button', { name: 'Version details' })
+  expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  fireEvent.click(toggle)
+
+  expect(screen.getByRole('button', { name: 'Hide details' }).getAttribute('aria-expanded')).toBe('true')
+  expect(screen.getAllByRole('heading', { level: 3 }).map(node => node.textContent)).toEqual(['App', 'Backend', 'Alice Project'])
+
+  fireEvent.click(screen.getByRole('button', { name: 'Hide details' }))
+  expect(document.getElementById('settings-version-app')).toBeNull()
+})
+
+it('opens the Update preferences dialog cleanly even with partial update mocks', async () => {
+  const savePreferences = vi.fn(async () => undefined)
+  const saveClientPreferences = vi.fn(async () => undefined)
+  mocks.updates.client = {
+    kind: 'cli',
+    currentVersion: '0.94.1',
+    preferences: { autoCheck: true },
+    discovery: { value: { status: 'current', channel: 'stable' } },
+  }
+  mocks.updates.preferences = { autoCheckApp: true, autoUpdateAutoQuant: false, autoUpdateAutoPrediction: false }
+  mocks.updates.savePreferences = savePreferences
+  mocks.updates.saveClientPreferences = saveClientPreferences
+
+  render(<VersionOverviewSection />)
+  fireEvent.click(screen.getByRole('button', { name: 'Update preferences' }))
+
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByText('Update preferences')).toBeTruthy()
+  const appToggle = within(dialog).getByRole('switch', { name: 'Check this app for updates automatically' })
+  expect(appToggle.getAttribute('aria-checked')).toBe('true')
+  fireEvent.click(appToggle)
+  await waitFor(() => expect(saveClientPreferences).toHaveBeenCalledWith({ autoCheck: false }))
+
+  const quantToggle = within(dialog).getByRole('switch', { name: 'Auto-update Auto Quant' })
+  fireEvent.click(quantToggle)
+  await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({
+    autoCheckApp: true,
+    autoUpdateAutoQuant: true,
+    autoUpdateAutoPrediction: false,
+  }))
+})
+
+it('shows current environment strip and navigates to Machines on Manage in Machines', () => {
+  const openOrFocus = vi.spyOn(useWorkspace.getState(), 'openOrFocus')
+  render(<VersionOverviewSection />)
+
+  expect(screen.getByText('Current environment')).toBeTruthy()
+  expect(screen.getByText('Railway Linux / Main Cloud')).toBeTruthy()
+  expect(screen.getByText('Connected')).toBeTruthy()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Manage in Machines' }))
+  expect(openOrFocus).toHaveBeenCalledWith({ kind: 'settings', params: { category: 'machines' } })
+  openOrFocus.mockRestore()
 })
