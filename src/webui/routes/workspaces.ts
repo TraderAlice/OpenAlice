@@ -28,6 +28,7 @@ import type { SessionRecord } from '../../workspaces/session-registry.js';
 import type { WorkspaceMeta } from '../../workspaces/workspace-registry.js';
 import { HeadlessCapacityError, resumeFromRecord, type SessionFactoryContext, type WorkspaceService } from '../../workspaces/service.js';
 import type { WorkspaceAiCred } from '../../workspaces/cli-adapter.js';
+import { AiSpendCeilingError } from '../../core/ai-spend.js';
 import { addCredential, readCredentials, credentialWires, credentialWireShapeEnum, type Credential } from '../../core/config.js';
 import { inferCredentialVendor, resolveAnthropicAuthMode } from '../../core/credential-inference.js';
 
@@ -991,6 +992,9 @@ export function createWorkspaceRoutes(svc: WorkspaceService): Hono {
         const result = await svc.runHeadlessTask(meta, adapter, prompt, timeoutMs);
         return c.json(result);
       } catch (err) {
+        if (err instanceof AiSpendCeilingError) {
+          return c.json({ error: 'ai_spend_ceiling', message: err.message }, 429);
+        }
         launcherLogger.error('workspace.headless_failed', { id, agent: adapter.id, err });
         return c.json({ error: 'headless_failed', message: (err as Error).message }, 500);
       }
@@ -1004,6 +1008,9 @@ export function createWorkspaceRoutes(svc: WorkspaceService): Hono {
     } catch (err) {
       if (err instanceof HeadlessCapacityError) {
         return c.json({ error: 'capacity', message: err.message }, 429);
+      }
+      if (err instanceof AiSpendCeilingError) {
+        return c.json({ error: 'ai_spend_ceiling', message: err.message }, 429);
       }
       launcherLogger.error('workspace.headless_failed', { id, agent: adapter.id, err });
       return c.json({ error: 'headless_failed', message: (err as Error).message }, 500);

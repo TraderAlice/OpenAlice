@@ -1,7 +1,30 @@
 import { headers } from './client'
 import type { AppConfig, Profile, Preset, Credential, SdkAdapterInfo, WireShape } from './types'
 
+export interface AiSpendStatus {
+  day: string
+  ceilingCents: number
+  mode: 'block' | 'alert'
+  spentCents: number
+  reservedCents: number
+  hitAt: string | null
+  level: 'none' | 'approaching' | 'over'
+}
+
 export const configApi = {
+  async getAiSpend(): Promise<AiSpendStatus> {
+    const res = await fetch('/api/config/ai-spend')
+    if (!res.ok) throw new Error('Failed to load AI spend')
+    return res.json()
+  },
+
+  async updateAiSpend(input: { ceilingDollars?: number; mode?: 'block' | 'alert' }): Promise<AiSpendStatus> {
+    const res = await fetch('/api/config/ai-spend', { method: 'PUT', headers, body: JSON.stringify(input) })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(body.error || 'Save failed')
+    return body
+  },
+
   async load(): Promise<AppConfig> {
     const res = await fetch('/api/config')
     if (!res.ok) throw new Error('Failed to load config')

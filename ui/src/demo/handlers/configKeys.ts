@@ -1,6 +1,18 @@
 import { http, HttpResponse } from 'msw'
+import type { AiSpendStatus } from '../../api/config'
+
+const demoAiSpend: AiSpendStatus = {
+  day: '2026-01-01', ceilingCents: 2000, mode: 'block', spentCents: 340, reservedCents: 0, hitAt: null, level: 'none',
+}
 
 export const configKeysHandlers = [
+  http.get('/api/config/ai-spend', () => HttpResponse.json(demoAiSpend)),
+  http.put('/api/config/ai-spend', async ({ request }) => {
+    const b = (await request.json()) as { ceilingDollars?: number; mode?: 'block' | 'alert' }
+    if (b.ceilingDollars !== undefined) demoAiSpend.ceilingCents = Math.round(b.ceilingDollars * 100)
+    if (b.mode) demoAiSpend.mode = b.mode
+    return HttpResponse.json(demoAiSpend)
+  }),
   http.get('/api/config/api-keys/status', () => HttpResponse.json({})),
   http.put('/api/config/apiKeys', () => new HttpResponse(null, { status: 204 })),
   // Echo the body back — the real route returns the validated section,

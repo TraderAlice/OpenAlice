@@ -5,6 +5,7 @@ import { Toggle } from '../components/Toggle'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { ConfigSection, Field, inputClass } from '../components/form'
 import { useAutoSave } from '../hooks/useAutoSave'
+import { AiSpendCard } from '../components/AiSpendCard'
 import { PageHeader } from '../components/PageHeader'
 import { PageLoading, EmptyState } from '../components/StateViews'
 import { useTranslation } from 'react-i18next'
@@ -81,6 +82,11 @@ function SettingsSection() {
               }}
             />
           </div>
+        </ConfigSection>
+
+        {/* AI spend ceiling */}
+        <ConfigSection title="AI spend" description="Daily cap on paid AI calls. Alerts at 80% and 100%; block mode hard-stops at 100%.">
+          <AiSpendCard />
         </ConfigSection>
 
         {/* Persona */}

@@ -22,6 +22,7 @@ import { triggerUTARestart } from '../../services/uta-supervisor/restart-trigger
 import { BUILTIN_PRESETS } from '../../ai-providers/presets.js'
 import type { WireShape } from '../../ai-providers/preset-catalog.js'
 import { resolveAnthropicAuthMode } from '../../core/credential-inference.js'
+import { AiSpendCeilingError, readAiSpendStatus, writeAiSpendSettings } from '../../core/ai-spend.js'
 import { probeByWireShape } from '../../workspaces/agent-probe.js'
 
 interface ConfigRouteOpts {
@@ -153,7 +154,27 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       })
       return c.json({ ok: true, response: r.text })
     } catch (err) {
+      if (err instanceof AiSpendCeilingError) return c.json({ ok: false, error: err.message })
       return c.json({ ok: false, error: err instanceof Error ? err.message : String(err) })
+    }
+  })
+
+  // ==================== AI spend ceiling ====================
+  // Daily $ cap on paid AI calls (see core/ai-spend.ts). Declared BEFORE the
+  // generic `/:section` writer so it isn't swallowed as a config section.
+
+  app.get('/ai-spend', async (c) => c.json(await readAiSpendStatus()))
+
+  app.put('/ai-spend', async (c) => {
+    try {
+      const body = await c.req.json<{ ceilingDollars?: number; mode?: string }>()
+      await writeAiSpendSettings({
+        ...(body.ceilingDollars !== undefined ? { ceilingCents: Math.round(Number(body.ceilingDollars) * 100) } : {}),
+        ...(body.mode !== undefined ? { mode: body.mode } : {}),
+      })
+      return c.json(await readAiSpendStatus())
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 400)
     }
   })
 

@@ -37,6 +37,7 @@ export class HeadlessCapacityError extends Error {
   }
 }
 import { ScrollbackStore } from './scrollback-store.js';
+import { assertAiSpendAllowed, headlessRunCents, withAiSpend } from '../core/ai-spend.js';
 import { SessionPool, type SessionFactoryContext } from './session-pool.js';
 import { SessionRegistry, type SessionRecord } from './session-registry.js';
 import { buildSpawnEnv } from './spawn-env.js';
@@ -389,7 +390,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     const { cwd, env } = composeSpawnInputs(ws, adapter, undefined);
     const command = adapter.composeHeadlessCommand(config.command, { cwd, env }, prompt);
     const logPaths = opts.taskId ? headlessLogPaths(headlessLogsDir, opts.taskId) : null;
-    return runHeadlessTask({
+    // Daily AI-spend gate: a headless run spawns a CLI that bills the injected
+    // API key and can't report its own cost, so charge a flat per-run estimate.
+    // Throws AiSpendCeilingError (block mode at the ceiling) before spawning.
+    return withAiSpend(headlessRunCents(), () => runHeadlessTask({
       command,
       cwd,
       env,
@@ -400,7 +404,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         ? { extractSessionId: adapter.extractHeadlessSessionId.bind(adapter) }
         : {}),
       ...(opts.onSessionId ? { onSessionId: opts.onSessionId } : {}),
-    });
+    }));
   };
 
   /**
@@ -422,6 +426,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     if (headlessTasks.runningCount() >= MAX_CONCURRENT_HEADLESS) {
       throw new HeadlessCapacityError(MAX_CONCURRENT_HEADLESS);
     }
+    // Fail fast (caller sees the ceiling error) instead of recording a task that
+    // would immediately fail inside runHeadlessTaskMethod's own reservation.
+    await assertAiSpendAllowed();
     const rec = await headlessTasks.create({
       wsId: ws.id,
       agent: adapter.id,

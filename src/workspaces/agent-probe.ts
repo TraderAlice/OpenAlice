@@ -12,6 +12,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 
 import type { WireShape } from '../ai-providers/preset-catalog.js';
+import { costCents, estimateReserveCents, withAiSpend } from '../core/ai-spend.js';
 
 export interface ProbeResult {
   text: string;
@@ -51,6 +52,23 @@ function isThinkingRequiredError(err: unknown): boolean {
   return e?.status === 400 && typeof e?.message === 'string' && /thinking/i.test(e.message);
 }
 
+/**
+ * Daily AI-spend gate for the probes (the only in-process paid calls Alice makes).
+ * Reserves a worst-case estimate, runs the call, settles the real cost from the
+ * provider's reported usage. Throws AiSpendCeilingError in block mode at the ceiling.
+ */
+function spendGuard<T>(
+  model: string,
+  maxTokens: number,
+  call: () => Promise<T>,
+  usage: (r: T) => { input_tokens?: number | null; output_tokens?: number | null } | null | undefined,
+): Promise<T> {
+  return withAiSpend(estimateReserveCents(model, maxTokens, 'Hi'.length), call, (r) => {
+    const u = usage(r);
+    return u ? costCents(model, u.input_tokens ?? 0, u.output_tokens ?? 0) : estimateReserveCents(model, maxTokens, 'Hi'.length);
+  });
+}
+
 export async function probeAnthropic(input: ClaudeProbeInput): Promise<ProbeResult> {
   // `authToken` makes the SDK send `Authorization: Bearer`; `apiKey` makes it
   // send `x-api-key`. Pick exactly one — sending both can trip gateways that
@@ -65,25 +83,25 @@ export async function probeAnthropic(input: ClaudeProbeInput): Promise<ProbeResu
     .join('');
 
   try {
-    const msg = await client.messages.create({
+    const msg = await spendGuard(input.model, 512, () => client.messages.create({
       model: input.model,
       // Enough room for a reasoning model to finish thinking AND emit a visible
       // reply on a trivial prompt — a tiny budget gets spent entirely on reasoning,
       // leaving empty content (the "(empty reply)" the user saw). One-off per Test.
       max_tokens: 512,
       messages: [{ role: 'user', content: 'Hi' }],
-    });
+    }), (m) => m.usage);
     return { text: extract(msg) };
   } catch (err) {
     if (!isThinkingRequiredError(err)) throw err;
     // Thinking-mandatory model: retry with it enabled. budget_tokens must be
     // < max_tokens and Anthropic's floor is 1024, so bump max_tokens to match.
-    const msg = await client.messages.create({
+    const msg = await spendGuard(input.model, 2048, () => client.messages.create({
       model: input.model,
       max_tokens: 2048,
       thinking: { type: 'enabled', budget_tokens: 1024 },
       messages: [{ role: 'user', content: 'Hi' }],
-    });
+    }), (m) => m.usage);
     return { text: extract(msg) };
   }
 }
@@ -91,18 +109,18 @@ export async function probeAnthropic(input: ClaudeProbeInput): Promise<ProbeResu
 export async function probeOpenAI(input: CodexProbeInput): Promise<ProbeResult> {
   const client = new OpenAI({ apiKey: input.apiKey, baseURL: input.baseUrl });
   if (input.wireApi === 'responses') {
-    const resp = await client.responses.create({
+    const resp = await spendGuard(input.model, 512, () => client.responses.create({
       model: input.model,
       input: 'Hi',
       max_output_tokens: 512,
-    });
+    }), (r) => r.usage && { input_tokens: r.usage.input_tokens, output_tokens: r.usage.output_tokens });
     return { text: resp.output_text ?? '' };
   }
-  const resp = await client.chat.completions.create({
+  const resp = await spendGuard(input.model, 512, () => client.chat.completions.create({
     model: input.model,
     messages: [{ role: 'user', content: 'Hi' }],
     max_tokens: 512,
-  });
+  }), (r) => r.usage && { input_tokens: r.usage.prompt_tokens, output_tokens: r.usage.completion_tokens });
   const choice = resp.choices[0]?.message as { content?: string | null; reasoning_content?: string | null } | undefined;
   // Prefer the final answer; fall back to the reasoning trace so a reasoning
   // model that returned only thinking still shows it spoke (not "(empty reply)").
