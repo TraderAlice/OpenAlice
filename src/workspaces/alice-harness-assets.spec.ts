@@ -55,3 +55,16 @@ it('projects market-data into both mirrors and supports exclusion and restoratio
     expect(await readFile(join(dir, root, 'skills/market-data/SKILL.md'), 'utf8')).toBe('# market-data')
   }
 })
+
+it('projects orchestration into both mirrors and supports exclusion and restoration', async () => {
+  const dir = join(paths.root, 'orch-workspace')
+  const config = { schemaVersion: 1 as const, cli: {}, skills: { orchestration: false } }
+  await injectAliceHarnessSkills(dir, true, config)
+  for (const root of ['.agents', '.claude']) {
+    await expect(readFile(join(dir, root, 'skills/orchestration/SKILL.md'))).rejects.toMatchObject({ code: 'ENOENT' })
+  }
+  await injectAliceHarnessSkills(dir, true, { ...config, skills: { orchestration: true } })
+  for (const root of ['.agents', '.claude']) {
+    expect(await readFile(join(dir, root, 'skills/orchestration/SKILL.md'), 'utf8')).toBe('# orchestration')
+  }
+})

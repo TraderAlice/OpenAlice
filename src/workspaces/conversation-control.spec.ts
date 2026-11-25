@@ -567,4 +567,41 @@ describe('Workspace conversation control', () => {
     const reloaded = await SessionMailbox.load(join(stateDir, 'session-mailbox.json'))
     expect(reloaded.pendingFor('resume-caller')).toEqual([])
   })
+
+  it('ackTasks acknowledges specific mailbox taskIds and clears the recipient watermark', async () => {
+    const stateDir = await mkdtemp(join(tmpdir(), 'conversation-ack-'))
+    dirs.push(stateDir)
+    const sessionMailbox = await SessionMailbox.load(join(stateDir, 'session-mailbox.json'))
+    const first = await sessionMailbox.enqueue({
+      recipientResumeId: 'resume-caller',
+      recipientWorkspaceId: 'ws-caller',
+      taskId: 'task-1',
+      childResumeId: 'resume-1',
+      childWorkspaceId: 'ws-peer',
+      childAgent: 'pi',
+      taskStatus: 'done',
+      assistantPreview: 'first reply',
+      createdAt: 10,
+    })
+    await sessionMailbox.enqueue({
+      recipientResumeId: 'resume-caller',
+      recipientWorkspaceId: 'ws-caller',
+      taskId: 'task-2',
+      childResumeId: 'resume-2',
+      childWorkspaceId: 'ws-peer',
+      childAgent: 'pi',
+      taskStatus: 'done',
+      assistantPreview: 'second reply',
+      createdAt: 20,
+    })
+    await sessionMailbox.markNotified('resume-caller', [first.id])
+    expect(sessionMailbox.hasActiveWatermark('resume-caller')).toBe(true)
+
+    const { svc } = fakeService({ logsDir: stateDir, sessionMailbox })
+    const control = createWorkspaceConversationControl(svc)
+    await control.ackTasks?.({ recipientResumeId: 'resume-caller', taskIds: ['task-1'] })
+
+    expect(sessionMailbox.hasActiveWatermark('resume-caller')).toBe(false)
+    expect(sessionMailbox.pendingFor('resume-caller').map((m) => m.taskId)).toEqual(['task-2'])
+  })
 })

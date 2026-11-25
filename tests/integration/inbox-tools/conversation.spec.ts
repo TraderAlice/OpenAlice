@@ -438,6 +438,119 @@ describe('conversation_read', () => {
         blocks: completedTask.structured.blocks,
       })
   })
+
+  it('auto-acks mailbox entries and clears watermark when reading completed results', async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const { SessionMailbox } = await import('../../../src/workspaces/session-mailbox.js')
+
+    const dir = await mkdtemp(join(tmpdir(), 'conv-read-ack-'))
+    try {
+      const mailbox = await SessionMailbox.load(join(dir, 'session-mailbox.json'))
+      const msg = await mailbox.enqueue({
+        recipientResumeId: 'resume-caller',
+        recipientWorkspaceId: 'ws-caller',
+        taskId: completedTask.taskId,
+        childResumeId: completedTask.resumeId,
+        childWorkspaceId: completedTask.workspaceId,
+        childAgent: completedTask.agent,
+        taskStatus: 'done',
+        assistantPreview: 'preview',
+      })
+      await mailbox.markNotified('resume-caller', [msg.id])
+      expect(mailbox.hasActiveWatermark('resume-caller')).toBe(true)
+
+      const conversation = {
+        ask: vi.fn(),
+        read: vi.fn(async () => completedTask),
+        ackTasks: vi.fn(async ({ recipientResumeId, taskIds }: { recipientResumeId: string; taskIds: readonly string[] }) => {
+          await mailbox.ackByTaskIds(recipientResumeId, taskIds)
+        }),
+      }
+      const tool = conversationReadFactory.build(context({
+        origin: { kind: 'headless', runId: 'run-caller', resumeId: 'resume-caller', agent: 'codex' },
+        conversation,
+      }))
+
+      await expect(run(tool, { taskId: completedTask.taskId })).resolves.toMatchObject({
+        ok: true,
+        status: 'done',
+      })
+      expect(conversation.ackTasks).toHaveBeenCalledWith({
+        recipientResumeId: 'resume-caller',
+        taskIds: [completedTask.taskId],
+      })
+      expect(mailbox.hasActiveWatermark('resume-caller')).toBe(false)
+      expect(mailbox.pendingFor('resume-caller')).toEqual([])
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('auto-acks completed tasks across await, collect, and ask --await without acking running tasks', async () => {
+    const callerOrigin = {
+      kind: 'headless' as const,
+      runId: 'run-caller',
+      resumeId: 'resume-caller',
+      agent: 'codex',
+    }
+    const runningTask = { ...completedTask, taskId: 'run-busy', status: 'running' as const, structured: null }
+
+    const ackAwait = vi.fn(async () => {})
+    const awaitTool = conversationAwaitFactory.build(context({
+      origin: callerOrigin,
+      conversation: { ask: vi.fn(), read: vi.fn(async () => completedTask), ackTasks: ackAwait },
+    }))
+    await run(awaitTool, { taskId: completedTask.taskId })
+    expect(ackAwait).toHaveBeenCalledWith({ recipientResumeId: 'resume-caller', taskIds: [completedTask.taskId] })
+
+    const ackRunning = vi.fn(async () => {})
+    const awaitRunningTool = conversationAwaitFactory.build(context({
+      origin: callerOrigin,
+      conversation: { ask: vi.fn(), read: vi.fn(async () => runningTask), ackTasks: ackRunning },
+    }))
+    await run(awaitRunningTool, { taskId: runningTask.taskId, timeoutMs: 1 })
+    expect(ackRunning).not.toHaveBeenCalled()
+
+    const ackCollect = vi.fn(async () => {})
+    const collectTool = conversationCollectFactory.build(context({
+      origin: callerOrigin,
+      conversation: {
+        ask: vi.fn(),
+        read: vi.fn(async (id: string) => (id === 'run-busy' ? runningTask : { ...completedTask, taskId: id })),
+        ackTasks: ackCollect,
+      },
+    }))
+    await run(collectTool, { taskId: ['run-a', 'run-busy', 'run-b'], timeoutMs: 1 })
+    expect(ackCollect).toHaveBeenCalledWith({
+      recipientResumeId: 'resume-caller',
+      taskIds: ['run-a', 'run-b'],
+    })
+
+    const ackAsk = vi.fn(async () => {})
+    const askTool = conversationAskFactory.build(context({
+      origin: callerOrigin,
+      conversation: {
+        ask: vi.fn(async () => ({
+          status: 'dispatched' as const,
+          taskId: completedTask.taskId,
+          resumeId: completedTask.resumeId,
+          workspaceId: completedTask.workspaceId,
+          workspace: 'peer',
+          agent: completedTask.agent,
+          resolution: { mode: 'exact' as const, origin: { kind: 'session' as const, workspaceId: 'ws-peer', resumeId: 'resume-1', agent: 'pi' } },
+        })),
+        read: vi.fn(async () => completedTask),
+        ackTasks: ackAsk,
+      },
+    }))
+    await run(askTool, { resumeId: completedTask.resumeId, prompt: 'ping', await: true })
+    expect(ackAsk).toHaveBeenCalledWith({
+      recipientResumeId: 'resume-caller',
+      taskIds: [completedTask.taskId],
+    })
+  })
 })
 
 

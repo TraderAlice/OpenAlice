@@ -302,6 +302,11 @@ export async function runRendererWorkspaceAcceptanceSmoke(
         body: JSON.stringify({ tag, template: 'chat' }),
       }))
       workspaceId = created.workspace.id
+      if (created.workspace.activationState !== 'active') {
+        await json(await fetch('/api/workspaces/' + encodeURIComponent(workspaceId) + '/activate', {
+          method: 'POST',
+        }))
+      }
       checks.workspaceCreated = true
       const inventory = await json(await fetch('/api/updates/inventory?force=1'))
       if (!inventory.units.some(unit => unit.id === 'alice-harness:' + workspaceId)) throw new Error('Shared update inventory omitted injected Skills')

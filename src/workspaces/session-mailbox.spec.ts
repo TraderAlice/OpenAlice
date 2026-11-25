@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
+  DEFAULT_WATERMARK_TTL_MS,
   SessionMailbox,
   type SessionMailboxMessage,
 } from './session-mailbox.js'
@@ -81,20 +82,20 @@ describe('SessionMailbox', () => {
 
     const pending = await mailbox.markNotified('resume-parent', undefined, 500)
     expect(pending.map((m) => m.taskId).sort()).toEqual(['run-1', 'run-2'])
-    expect(mailbox.hasActiveWatermark('resume-parent')).toBe(true)
+    expect(mailbox.hasActiveWatermark('resume-parent', 500)).toBe(true)
     expect(mailbox.unreadFor('resume-parent')).toEqual([])
 
     // A third completion while watermarked stays unread (coalescing).
     await mailbox.enqueue(input({ taskId: 'run-3', createdAt: 3 }))
-    expect(mailbox.hasActiveWatermark('resume-parent')).toBe(true)
+    expect(mailbox.hasActiveWatermark('resume-parent', 600)).toBe(true)
     expect(mailbox.unreadFor('resume-parent').map((m) => m.taskId)).toEqual(['run-3'])
-    expect(mailbox.recipientsWithUnread()).toEqual([])
+    expect(mailbox.recipientsWithUnread(600)).toEqual([])
 
     const acked = await mailbox.checkAndAck('resume-parent', 900)
     expect(acked.map((m) => m.taskId).sort()).toEqual(['run-1', 'run-2', 'run-3'])
     expect(acked.every((m) => m.status === 'acked' && m.ackedAt === 900)).toBe(true)
 
-    expect(mailbox.hasActiveWatermark('resume-parent')).toBe(false)
+    expect(mailbox.hasActiveWatermark('resume-parent', 900)).toBe(false)
     expect(mailbox.pendingFor('resume-parent')).toEqual([])
 
     // Persistence of the ack transition.
@@ -107,8 +108,51 @@ describe('SessionMailbox', () => {
     const a = await mailbox.enqueue(input({ taskId: 'run-a' }))
     await mailbox.enqueue(input({ taskId: 'run-b' }))
     await mailbox.markNotified('resume-parent', [a.id], 10)
-    expect(mailbox.hasActiveWatermark('resume-parent')).toBe(true)
+    expect(mailbox.hasActiveWatermark('resume-parent', 10)).toBe(true)
     expect(mailbox.unreadFor('resume-parent').map((m) => m.taskId)).toEqual(['run-b'])
+  })
+
+  it('expires watermarks after the lease TTL and allows re-notifying expired entries', async () => {
+    const mailbox = await SessionMailbox.load(path)
+    const msg = await mailbox.enqueue(input({ taskId: 'run-1', createdAt: 100 }))
+    await mailbox.markNotified('resume-parent', [msg.id], 1_000)
+
+    expect(mailbox.hasActiveWatermark('resume-parent', 1_000 + DEFAULT_WATERMARK_TTL_MS - 1)).toBe(true)
+    expect(mailbox.hasActiveWatermark('resume-parent', 1_000 + DEFAULT_WATERMARK_TTL_MS)).toBe(false)
+
+    // Unread work becomes eligible for wakeup once the previous watermark expires.
+    await mailbox.enqueue(input({ taskId: 'run-2', createdAt: 2_000 }))
+    expect(mailbox.recipientsWithUnread(1_000 + DEFAULT_WATERMARK_TTL_MS - 1)).toEqual([])
+    expect(mailbox.recipientsWithUnread(1_000 + DEFAULT_WATERMARK_TTL_MS)).toEqual(['resume-parent'])
+
+    // Re-notifying an already-notified expired entry refreshes its watermark lease.
+    const refreshedAt = 1_000 + DEFAULT_WATERMARK_TTL_MS + 500
+    await mailbox.markNotified('resume-parent', [msg.id], refreshedAt)
+    expect(mailbox.hasActiveWatermark('resume-parent', refreshedAt)).toBe(true)
+    expect(mailbox.unreadFor('resume-parent').map((m) => m.taskId)).toEqual(['run-2'])
+  })
+
+  it('ackByTaskIds acks only matching recipient tasks and clears watermark', async () => {
+    const mailbox = await SessionMailbox.load(path)
+    const first = await mailbox.enqueue(input({ taskId: 'run-1', createdAt: 10 }))
+    await mailbox.enqueue(input({ taskId: 'run-2', createdAt: 20 }))
+    await mailbox.enqueue(input({ recipientResumeId: 'resume-other', taskId: 'run-1', createdAt: 30 }))
+
+    await mailbox.markNotified('resume-parent', [first.id], 1_000)
+    expect(mailbox.hasActiveWatermark('resume-parent', 1_000)).toBe(true)
+
+    const acked = await mailbox.ackByTaskIds('resume-parent', ['run-1', 'run-missing'], 1_500)
+    expect(acked.map((m) => m.taskId)).toEqual(['run-1'])
+    expect(acked[0]).toMatchObject({ status: 'acked', ackedAt: 1_500 })
+
+    // Watermark cleared because run-1 was the only notified message; run-2 remains unread.
+    expect(mailbox.hasActiveWatermark('resume-parent', 1_500)).toBe(false)
+    expect(mailbox.unreadFor('resume-parent').map((m) => m.taskId)).toEqual(['run-2'])
+    expect(mailbox.pendingFor('resume-other').map((m) => m.taskId)).toEqual(['run-1'])
+
+    // Persisted across reload.
+    const reloaded = await SessionMailbox.load(path)
+    expect(reloaded.pendingFor('resume-parent').map((m) => m.taskId)).toEqual(['run-2'])
   })
 
   it('recipientsWithUnread lists only watermark-free recipients', async () => {

@@ -55,6 +55,10 @@ export interface WorkspaceLifecycleManagerDeps {
   operationGuard?: WorkspaceOperationGuard
   /** Remove runtime state projected outside a checkout before its final purge. */
   cleanupWorkspaceState?: (record: WorkspaceCatalogRecord, cwd: string) => Promise<void>
+  /** Converge active Workspace slots after a Workspace leaves the active registry. */
+  onWorkspaceOffboarded?: (workspace: WorkspaceMeta) => Promise<void>
+  /** Converge active Workspace slots after a departed Workspace is restored. */
+  onWorkspaceRestored?: (workspace: WorkspaceMeta) => Promise<void>
   logger: Logger
 }
 
@@ -229,6 +233,9 @@ export class WorkspaceLifecycleManager {
         ...(input.successors ? { successors: input.successors } : {}),
       })
       const record = await this.deps.catalog.markDeparted(meta.id, preparedAt)
+      await this.deps.onWorkspaceOffboarded?.(meta).catch((err) =>
+        this.deps.logger.warn('workspace.offboard_post_hook_failed', { id: meta.id, err }),
+      )
       this.deps.logger.info('workspace.offboarded', {
         id: meta.id,
         tag: meta.tag,
@@ -275,6 +282,10 @@ export class WorkspaceLifecycleManager {
       await this.deps.registry.add(catalogRecordToMeta(record))
       await this.deps.resumeRegistry.recallWorkspace(id)
       const active = await this.deps.catalog.markActive(id)
+      const restoredMeta = catalogRecordToMeta(record)
+      await this.deps.onWorkspaceRestored?.(restoredMeta).catch((err) =>
+        this.deps.logger.warn('workspace.restore_post_hook_failed', { id, err }),
+      )
       const assessment = await this.assess(id)
       if (!assessment) throw new Error('restored workspace did not re-enter the active registry')
       this.deps.logger.info('workspace.restored', { id, dir: record.activeDir })
@@ -340,6 +351,9 @@ export class WorkspaceLifecycleManager {
         ...(record.handoff?.successors ? { successors: record.handoff.successors } : {}),
       })
       await this.deps.catalog.markDeparted(record.id)
+      await this.deps.onWorkspaceOffboarded?.(catalogRecordToMeta(record)).catch((err) =>
+        this.deps.logger.warn('workspace.offboard_post_hook_failed', { id: record.id, err }),
+      )
       return
     }
     if (record.lifecycle === 'restoring') {

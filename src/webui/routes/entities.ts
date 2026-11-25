@@ -15,12 +15,14 @@ import { Hono } from 'hono'
 
 import type { IEntityStore } from '../../core/entity-store.js'
 import type { WorkspaceRegistry } from '../../workspaces/workspace-registry.js'
-import { scanBacklinks, warmBacklinks } from '../../core/entity-backlinks.js'
+import { scanBacklinks, warmBacklinks, type BacklinkWorkspaceLister } from '../../core/entity-backlinks.js'
 import { buildEntityGraph } from '../../core/entity-graph.js'
 
 export interface EntityRoutesDeps {
   entityStore: IEntityStore
   registry: WorkspaceRegistry
+  /** Optional active-workspace filter; when provided, standby workspaces are excluded. */
+  listActiveWorkspaces?: BacklinkWorkspaceLister
 }
 
 export function createEntityRoutes(deps: EntityRoutesDeps) {
@@ -28,12 +30,12 @@ export function createEntityRoutes(deps: EntityRoutesDeps) {
 
   // Warm the backlink cache at startup so the first Tracked open doesn't pay
   // for a cold full-corpus scan (the slow path the user hit).
-  warmBacklinks(deps.registry)
+  warmBacklinks(deps.registry, deps.listActiveWorkspaces)
 
   app.get('/', async (c) => {
     const [entities, backlinks] = await Promise.all([
       deps.entityStore.list(),
-      scanBacklinks(deps.registry),
+      scanBacklinks(deps.registry, deps.listActiveWorkspaces),
     ])
     const items = entities.map((e) => ({
       ...e,
@@ -45,7 +47,7 @@ export function createEntityRoutes(deps: EntityRoutesDeps) {
   app.get('/relationships/graph', async (c) => {
     const [entities, backlinks] = await Promise.all([
       deps.entityStore.list(),
-      scanBacklinks(deps.registry),
+      scanBacklinks(deps.registry, deps.listActiveWorkspaces),
     ])
     return c.json(buildEntityGraph(entities, backlinks))
   })
@@ -53,7 +55,7 @@ export function createEntityRoutes(deps: EntityRoutesDeps) {
   app.get('/:name', async (c) => {
     const entity = await deps.entityStore.get(c.req.param('name'))
     if (!entity) return c.json({ error: 'not_found' }, 404)
-    const backlinks = await scanBacklinks(deps.registry)
+    const backlinks = await scanBacklinks(deps.registry, deps.listActiveWorkspaces)
     return c.json({ entity, backlinks: backlinks.get(entity.name.toLowerCase()) ?? [] })
   })
 

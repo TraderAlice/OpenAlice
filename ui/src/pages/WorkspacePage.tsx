@@ -32,6 +32,7 @@ import { agentSupportsWeb } from '../components/workspace/api'
 import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
 import { HarnessLandingPage } from './ChatLandingPage'
 import { WorkspaceView } from '../components/workspace/WorkspaceView'
+import { StandbyWorkspaceBanner } from '../components/workspace/StandbyWorkspaceBanner'
 import { PageTopBar } from '../components/PageTopBar'
 import { WorkspaceFilesToggle } from '../components/workspace/WorkspaceFilesToggle'
 import { Button } from '../components/ui/button'
@@ -185,6 +186,7 @@ export function WorkspacePage({ spec, visible }: Props) {
       <PageTopBar title={workspaceName} titleHint={workspaceDisplayTitle(workspace)} actions={workspaceActions}>
         {hasCustomName && <span className="hidden font-mono text-sm text-muted-foreground/70 sm:inline">{workspace.tag}</span>}
       </PageTopBar>
+      <StandbyWorkspaceBanner workspace={workspace} />
       <HarnessLandingPage key={wsId} mode={source ?? 'chat'} spec={{ params: { targetWsId: wsId } }} showHeader={false} />
     </div>
   )
@@ -202,6 +204,8 @@ export function WorkspacePage({ spec, visible }: Props) {
             )}
         </PageTopBar>
       )}
+
+      <StandbyWorkspaceBanner workspace={workspace} />
 
       {handedOver && takeover && <div role="status" className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/40 px-4 py-2 text-xs">
         <button className="text-left text-muted-foreground hover:text-foreground" onClick={() => takeovers?.select(takeover.id)}>{t(takeover.state === 'completed' ? 'takeover.complete' : 'takeover.occupied')} · {takeover.origin.issueId ?? takeover.origin.entry}</button>

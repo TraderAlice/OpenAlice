@@ -30,10 +30,20 @@ import {
   type ArtifactOrigin,
 } from '@/core/provenance-store.js';
 import {
+  readAutoPredictionPreferences,
+  readAutoQuantPreferences,
   readHarnessPreferences,
   readQuickChatPreferences,
   rememberRecentChatWorkspace,
 } from '@/core/preferences.js';
+import {
+  OrchestrationDelivery,
+  OrchestrationError,
+  OrchestrationManager,
+  OrchestrationStore,
+  type OrchestrationReplyRoute,
+  type OrchestrationReplySurface,
+} from './orchestration/index.js';
 
 import { createBuiltinAdapterRegistry } from './adapters/index.js';
 import { piAdapter } from './adapters/pi.js';
@@ -143,6 +153,7 @@ import {
   issueAssigneeClaimsFirstSession,
   issueAssigneeResumeId,
   isConnectorDeskIssue,
+  isTerminalStatus,
   type IssueRecord,
 } from './issues/declaration.js';
 import {
@@ -199,11 +210,20 @@ import { WorkspaceSessionRuntimeStore } from './session-runtime-store.js';
 import {
   AUTO_PREDICTION_WORKSPACE_TEMPLATE,
   AUTO_QUANT_WORKSPACE_TEMPLATE,
+  CHAT_WORKSPACE_TEMPLATE,
   ChatWorkspaceResolver,
   TemplateWorkspaceResolver,
   type ChatWorkspaceResolution,
   type TemplateWorkspaceResolution,
 } from './chat-workspace-resolver.js';
+import {
+  ActiveWorkspaceSlotManager,
+  createPreferenceWorkspaceSlotStore,
+  workspaceTemplateSlot,
+  type ActiveWorkspaceSlotStore,
+  type WorkspaceActivationState,
+} from './active-workspace-slots.js';
+import { invalidateBacklinks } from '@/core/entity-backlinks.js';
 
 function automationLatestRun(task: HeadlessTaskRecord) {
   const failure = issueRunFailure(task);
@@ -250,6 +270,37 @@ export class IssueRetryError extends Error {
     super(message);
     this.name = 'IssueRetryError';
   }
+}
+
+export class WorkspaceActivationError extends Error {
+  constructor(
+    public readonly code: 'not_found' | 'departed',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'WorkspaceActivationError';
+  }
+}
+
+export interface WorkspaceActivationCurrentActive {
+  readonly id: string;
+  readonly tag: string;
+  readonly displayName?: string;
+  readonly openIssueCount: number;
+  readonly scheduledIssueCount: number;
+  readonly inFlightRunCount: number;
+}
+
+export interface WorkspaceActivationPreview {
+  readonly workspaceId: string;
+  readonly template: string;
+  readonly alreadyActive: boolean;
+  readonly currentActive: WorkspaceActivationCurrentActive | null;
+}
+
+export interface WorkspaceActivationResult {
+  readonly workspace: unknown;
+  readonly previousActiveId: string | null;
 }
 
 export type SpawnEnvironmentSource = 'terminal' | 'workspace' | 'tools' | 'adapter';
@@ -439,6 +490,7 @@ export interface WorkspaceService {
   readonly sessionRegistry: SessionRegistry;
   readonly sessionMailbox: SessionMailbox;
   readonly sessionWakeDelivery: SessionWakeDelivery;
+  readonly orchestration: OrchestrationManager;
   readonly sessionCoordinator: ProductSessionCoordinator;
   readonly scrollbackStore: ScrollbackStore;
   readonly templates: TemplateRegistry;
@@ -513,6 +565,14 @@ export interface WorkspaceService {
   /** Best-effort background reconciliation of native runtime Session titles. */
   refreshSessionTitles?(meta: WorkspaceMeta): Promise<void>;
   publicMeta(w: WorkspaceMeta): Promise<unknown>;
+  /** Canonical active Workspaces (at most one per template slot). */
+  listActiveWorkspaces(): Promise<WorkspaceMeta[]>;
+  /** Synchronous snapshot of active Workspaces for background polling hooks. */
+  listActiveWorkspacesSync(): WorkspaceMeta[];
+  /** Preview switching a template's active Workspace slot to `workspaceId`. */
+  previewWorkspaceActivation(workspaceId: string): Promise<WorkspaceActivationPreview | null>;
+  /** Activate `workspaceId` in its template slot (stops previous Studio, refreshes scanner). */
+  activateWorkspace(workspaceId: string): Promise<WorkspaceActivationResult>;
   /**
    * Probe the host PATH for each registered adapter's CLI binary. Keyed by
    * adapter id. Adapters without a `binary` (shell) report installed:true.
@@ -684,6 +744,8 @@ export interface CreateWorkspaceServiceOptions {
    *  every surface (HTTP / CLI / MCP) gets the join, not just the route.
    *  Optional: when absent, `issueDetail` returns `inboxReports: []`. */
   readonly inboxStore?: IInboxStore;
+  /** Internal test seam for active Workspace slot persistence. */
+  readonly activeWorkspaceSlotStore?: ActiveWorkspaceSlotStore;
 }
 
 /**
@@ -723,6 +785,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     launcherLogger.child({ scope: 'registry' }),
   );
   const harnessSurfaces = new HarnessSurfaceManager(registry);
+  const activeSlots = new ActiveWorkspaceSlotManager(
+    registry,
+    opts.activeWorkspaceSlotStore ?? createPreferenceWorkspaceSlotStore(),
+  );
+  let refreshScheduleScanner: (() => Promise<void>) | null = null;
   const catalog = await WorkspaceCatalog.load(
     join(config.launcherRoot, 'state', 'workspace-catalog.json'),
     registry.list(),
@@ -745,6 +812,20 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     join(config.launcherRoot, 'state', 'headless-tasks.json'),
     launcherLogger.child({ scope: 'headless-registry' }),
   );
+  const orchestrationStore = await OrchestrationStore.load(
+    join(config.launcherRoot, 'state', 'orchestration-state.json'),
+    { logger: launcherLogger.child({ scope: 'orchestration-store' }) },
+  );
+  const startupOrchestrationReconcile = await orchestrationStore.reconcileOnStartup(
+    (headlessTaskId) => headlessTasks.get(headlessTaskId)?.status === 'running',
+  );
+  if (startupOrchestrationReconcile.lostTasks.length > 0) {
+    launcherLogger.warn('orchestration.reconciled_lost_workers', {
+      count: startupOrchestrationReconcile.lostTasks.length,
+      dispatchIds: startupOrchestrationReconcile.lostTasks.map((task) => task.dispatchId),
+    });
+  }
+  let orchestration!: OrchestrationManager;
   const dispatchDelivery = new DispatchDelivery(headlessTasks, (message, detail) => launcherLogger.warn(message, detail));
   let reconcilingDelivery = false;
   const reconcileDelivery = async () => {
@@ -980,7 +1061,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   };
 
   const telegramDeskChatHost = {
-    listWorkspaces: () => registry.list().map((workspace) => ({ id: workspace.id, dir: workspace.dir })),
+    listWorkspaces: () => activeSlots.listActiveWorkspacesSync().map((workspace) => ({ id: workspace.id, dir: workspace.dir })),
     getWorkspace: (id: string) => {
       const workspace = registry.get(id);
       return workspace ? { id: workspace.id, dir: workspace.dir } : undefined;
@@ -1104,7 +1185,14 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     bootstrapTimeoutMs: config.bootstrapTimeoutMs,
     registry,
     isWorkspaceIdReserved: (id) => catalog.hasId(id),
-    onWorkspaceCreated: (workspace) => catalog.recordCreated(workspace),
+    onWorkspaceCreated: async (workspace) => {
+      await catalog.recordCreated(workspace);
+      const state = await activeSlots.handleWorkspaceCreated(workspace);
+      if (state === 'active') {
+        invalidateBacklinks(registry);
+        await refreshScheduleScanner?.();
+      }
+    },
     logger: launcherLogger.child({ scope: 'creator' }),
   });
   const chatWorkspaceResolver = new ChatWorkspaceResolver({
@@ -1371,20 +1459,32 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     return 'global-config';
   };
 
-  const resolveOrCreateChatWorkspaceMethod = (
+  const resolveOrCreateChatWorkspaceMethod = async (
     preferredWorkspaceId?: string | null,
-  ): Promise<ChatWorkspaceResolution> =>
-    chatWorkspaceResolver.resolveOrCreate(preferredWorkspaceId);
-  const resolveOrCreateAutoQuantWorkspaceMethod = (
+  ): Promise<ChatWorkspaceResolution> => {
+    const targetId = preferredWorkspaceId
+      ?? (await activeSlots.activeWorkspaceForTemplate(CHAT_WORKSPACE_TEMPLATE))?.id
+      ?? null;
+    return chatWorkspaceResolver.resolveOrCreate(targetId);
+  };
+  const resolveOrCreateAutoQuantWorkspaceMethod = async (
     preferredWorkspaceId?: string | null,
     sourceVersion?: string,
-  ): Promise<TemplateWorkspaceResolution> =>
-    autoQuantWorkspaceResolver.resolveOrCreate(preferredWorkspaceId, sourceVersion);
-  const resolveOrCreateAutoPredictionWorkspaceMethod = (
+  ): Promise<TemplateWorkspaceResolution> => {
+    const targetId = preferredWorkspaceId
+      ?? (await activeSlots.activeWorkspaceForTemplate(AUTO_QUANT_WORKSPACE_TEMPLATE))?.id
+      ?? null;
+    return autoQuantWorkspaceResolver.resolveOrCreate(targetId, sourceVersion);
+  };
+  const resolveOrCreateAutoPredictionWorkspaceMethod = async (
     preferredWorkspaceId?: string | null,
     sourceVersion?: string,
-  ): Promise<TemplateWorkspaceResolution> =>
-    autoPredictionWorkspaceResolver.resolveOrCreate(preferredWorkspaceId, sourceVersion);
+  ): Promise<TemplateWorkspaceResolution> => {
+    const targetId = preferredWorkspaceId
+      ?? (await activeSlots.activeWorkspaceForTemplate(AUTO_PREDICTION_WORKSPACE_TEMPLATE))?.id
+      ?? null;
+    return autoPredictionWorkspaceResolver.resolveOrCreate(targetId, sourceVersion);
+  };
 
   let runtimeReadinessWorkspaceInFlight: Promise<WorkspaceMeta> | null = null;
 
@@ -2140,6 +2240,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     // failures and terminal in-band runtime errors fail the task; retryable
     // errors followed by a later assistant reply remain visible in Activity
     // without turning a recovered run into a false failure.
+    let settledForOrchestration:
+      | { status: 'done' | 'failed' | 'interrupted'; assistantPreview: string | null; error?: string }
+      | null = null;
     const completion = runHeadlessTaskMethod(ws, adapter, prompt, timeoutMs, {
       origin,
       taskId: rec.taskId,
@@ -2189,6 +2292,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             toolFailures: r.structured.metrics.toolFailures,
           },
         });
+        settledForOrchestration = {
+          status,
+          assistantPreview: r.structured.assistantText?.slice(0, 2000) ?? null,
+          ...(failure ? { error: failure } : {}),
+        };
         if (conversation?.source.kind === 'session') {
           await sessionWakeDelivery.notifyTaskCompleted({
             recipientResumeId: conversation.source.resumeId,
@@ -2299,6 +2407,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           finishedAt: Date.now(),
           error: message,
         });
+        settledForOrchestration = {
+          status,
+          assistantPreview: null,
+          error: message,
+        };
         if (conversation?.source.kind === 'session') {
           await sessionWakeDelivery.notifyTaskCompleted({
             recipientResumeId: conversation.source.resumeId,
@@ -2381,10 +2494,29 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             });
           }
         }
+        releaseTakeover();
         void sessionWakeDelivery.onSessionSettled(rec.resumeId).catch((err) =>
           launcherLogger.warn('session_wake.headless_settlement_failed', { resumeId: rec.resumeId, err }),
         );
-        releaseTakeover();
+        const settled = settledForOrchestration;
+        void (async () => {
+          if (settled) {
+            await orchestration.onWorkerHeadlessSettled({
+              headlessTaskId: rec.taskId,
+              workerResumeId: rec.resumeId,
+              status: settled.status,
+              assistantPreview: settled.assistantPreview,
+              ...(settled.error ? { error: settled.error } : {}),
+            });
+          }
+          await orchestration.onSessionSettled(rec.resumeId);
+        })().catch((err) =>
+          launcherLogger.warn('orchestration.headless_settlement_failed', {
+            taskId: rec.taskId,
+            resumeId: rec.resumeId,
+            err,
+          }),
+        );
       });
     headlessDispatchCompletions.add(completion);
     void completion.then(
@@ -2456,6 +2588,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     isIssueRunning: (workspaceId, issueId) => headlessTasks.list({ issue: { workspaceId, issueId } }).some((run) => run.status === 'running'),
     isSessionBlocked: (resumeId, nowMs) => executionManager.admission.blocks(resumeId, nowMs).length > 0,
     registry,
+    listActiveWorkspaces: () => activeSlots.listActiveWorkspaces(),
     resolveResumeWorkspace: (resumeId) => {
       const identity = resumeRegistry.get(resumeId);
       return identity && identity.lifecycle !== 'retired' && sessionPresence(identity) !== 'deleted'
@@ -2534,6 +2667,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       } catch (err) {
         launcherLogger.warn('resume_registry.runtime_binding_reconcile_failed', { err })
       }
+      await orchestration.tick(Date.now()).catch((err) =>
+        launcherLogger.warn('orchestration.watchdog_tick_failed', { err }),
+      )
     },
     markers: scheduleMarkers,
     logger: launcherLogger.child({ scope: 'schedule' }),
@@ -2541,8 +2677,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       ? { intervalMs: opts.scheduleScannerIntervalMs }
       : {}),
   });
+  refreshScheduleScanner = () => scheduleScanner.refresh();
   // Read-only aggregation for the Schedules dashboard (GET /api/schedule).
-  // Walks each workspace's live declaration + the scanner's marker; the route
+  // Walks each active workspace's live declaration + the scanner's marker; the route
   // layer stays a thin adapter and the marker store stays private.
   const scheduleSnapshot = async (): Promise<ScheduleSnapshot> => {
     // Warm path: the scanner rebuilds this every tick (it already reads every
@@ -2552,8 +2689,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     // Cold path: only before the scanner's first tick (delayed to stay
     // test-safe). One live read-only build — no firing.
     const nowMs = Date.now();
+    const activeWorkspaces = await activeSlots.listActiveWorkspaces();
     const workspaces = await Promise.all(
-      registry.list().map(async (ws): Promise<ScheduleSnapshotWorkspace> => {
+      activeWorkspaces.map(async (ws): Promise<ScheduleSnapshotWorkspace> => {
         const res = await readWorkspaceIssues(ws.dir);
         if (!res.ok) {
           return {
@@ -2594,8 +2732,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   const issuesSnapshot = async (): Promise<IssuesSnapshot> => {
     const nowMs = Date.now();
     const availability = detectAgents();
+    const activeWorkspaces = await activeSlots.listActiveWorkspaces();
     const workspaces = await Promise.all(
-      registry.list().map(async (ws): Promise<IssuesSnapshotWorkspace> => {
+      activeWorkspaces.map(async (ws): Promise<IssuesSnapshotWorkspace> => {
         const res = await readWorkspaceIssues(ws.dir);
         if (!res.ok) {
           // 'absent' (no issues dir) is an empty board for that workspace, not an
@@ -2986,8 +3125,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     const token = name.trim().toLowerCase();
     if (!token) return [];
     const out: WikilinkIssueRef[] = [];
+    const activeWorkspaces = await activeSlots.listActiveWorkspaces();
     await Promise.all(
-      registry.list().map(async (ws) => {
+      activeWorkspaces.map(async (ws) => {
         const res = await readWorkspaceIssues(ws.dir);
         if (!res.ok) return;
         for (const issue of res.issues) {
@@ -3111,6 +3251,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       void sessionWakeDelivery.onSessionSettled(productSession.resumeId).catch((err) =>
         launcherLogger.warn('session_wake.pty_settlement_failed', { resumeId: productSession.resumeId, err }),
       );
+      void orchestration.onSessionSettled(productSession.resumeId).catch((err) =>
+        launcherLogger.warn('orchestration.pty_settlement_failed', { resumeId: productSession.resumeId, err }),
+      );
     },
   );
 
@@ -3175,7 +3318,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         meta,
         adapter,
         pointerText,
-        { kind: 'system', entry: 'session-wake-mailbox', workspaceId: identity.wsId, resumeId },
+        { kind: 'system', entry: 'session-wake-mailbox', workspaceId: identity.wsId },
         undefined,
         latestTask.trigger,
         resumeId,
@@ -3309,6 +3452,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
               void sessionWakeDelivery.onSessionSettled(record.resumeId).catch((err) =>
                 launcherLogger.warn('session_wake.web_settlement_failed', { resumeId: record.resumeId, err }),
               );
+              void orchestration.onSessionSettled(record.resumeId).catch((err) =>
+                launcherLogger.warn('orchestration.web_settlement_failed', { resumeId: record.resumeId, err }),
+              );
             }
           },
           recordId: record.id,
@@ -3375,12 +3521,189 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           interruptionReason: execution?.reason ?? 'interrupted', error: 'Session execution was interrupted.' });
         await dispatchDelivery.finish(task, null);
         await completeIssueCommentInquiry({ task, status: 'interrupted', error: task.error });
+        await orchestration.onWorkerHeadlessSettled({
+          headlessTaskId: task.taskId,
+          workerResumeId: resumeId,
+          status: 'interrupted',
+          assistantPreview: null,
+          ...(task.error ? { error: task.error } : {}),
+        }).catch((err) => launcherLogger.warn('orchestration.interrupt_settlement_failed', { taskId: task.taskId, err }));
       }
       return stopped;
     },
     admission: executionManager.admission,
     takeovers: executionManager.takeovers,
   };
+
+  const orchestrationDelivery = new OrchestrationDelivery({
+    store: orchestrationStore,
+    deliverToWeb: async (resumeId, prompt) => {
+      const identity = resumeRegistry.get(resumeId);
+      if (!identity) return 'absent';
+      await sessionRegistry.ensureLoaded(identity.wsId);
+      const record = sessionRegistry.findByResumeId(identity.wsId, resumeId);
+      if (!record || !web.has(record.id)) return 'absent';
+      if (web.get(record.id)?.phase !== 'idle') return 'busy';
+      await web.prompt(record.id, prompt);
+      return 'delivered';
+    },
+    deliverToPty: async (resumeId, pointerText) => {
+      const identity = resumeRegistry.get(resumeId);
+      if (!identity) return 'absent';
+      await sessionRegistry.ensureLoaded(identity.wsId);
+      const record = sessionRegistry.findByResumeId(identity.wsId, resumeId);
+      if (!record) return 'absent';
+      const pty = pool.get(record.id);
+      if (!pty) return 'absent';
+      if (!pty.isTuiSettledForDelivery()) return 'busy';
+      const sent = await pty.sendPointerPrompt(pointerText);
+      return sent.ok ? 'delivered' : 'busy';
+    },
+    deliverToHeadless: async (resumeId, prompt, replyRoute) => {
+      if (activeResumeIds.has(resumeId)) return 'busy';
+      const identity = resumeRegistry.get(resumeId);
+      if (!identity || identity.lifecycle === 'retired' || sessionPresence(identity) === 'deleted') {
+        return 'unavailable';
+      }
+      await sessionRegistry.ensureLoaded(identity.wsId);
+      const record = sessionRegistry.findByResumeId(identity.wsId, resumeId);
+      if (record && (pool.get(record.id) || web.has(record.id))) return 'busy';
+      const meta = registry.get(identity.wsId);
+      const adapter = adapters.get(identity.agent);
+      if (!meta || !adapter || !adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
+        return 'unavailable';
+      }
+      // NEVER set origin.resumeId = resumeId — SessionTakeovers forbids self-takeover.
+      const origin: ExecutionOrigin = {
+        kind: 'system',
+        entry: 'orchestration-wake',
+        workspaceId: replyRoute?.workspaceId ?? identity.wsId,
+        ...(replyRoute?.connectorId ? { connectorId: replyRoute.connectorId } : {}),
+        ...(replyRoute?.issueId ? { issueId: replyRoute.issueId } : {}),
+      };
+      const dispatched = await dispatchHeadlessTaskMethod(
+        meta,
+        adapter,
+        prompt,
+        origin,
+        undefined,
+        replyRoute?.trigger,
+        resumeId,
+        replyRoute?.inquiry,
+      );
+      return { status: 'delivered', headlessTaskId: dispatched.taskId };
+    },
+    stopStalledWorker: async (task) => {
+      await executionManager.stop(task.workerResumeId, 'orchestration:stalled');
+    },
+    warn: (event, detail) => launcherLogger.warn(event, detail),
+  });
+
+  orchestration = new OrchestrationManager({
+    store: orchestrationStore,
+    delivery: orchestrationDelivery,
+    resolveWorkspace: (workspaceId) => registry.get(workspaceId),
+    resolveHarnessWorkspace: async (harness) => {
+      if (harness === 'chat') {
+        const preferences = await readQuickChatPreferences().catch(() => ({ recentChatWorkspaceId: null }));
+        const target = await resolveOrCreateChatWorkspaceMethod(preferences.recentChatWorkspaceId);
+        if (!target.ok) return undefined;
+        await rememberRecentChatWorkspace(target.workspace.id).catch(() => undefined);
+        return target.workspace;
+      }
+      const prediction = harness === 'prediction';
+      const preferences = await (prediction
+        ? readAutoPredictionPreferences()
+        : readAutoQuantPreferences()
+      ).catch(() => ({ defaultWorkspaceId: null }));
+      const workspace = preferences.defaultWorkspaceId
+        ? registry.get(preferences.defaultWorkspaceId)
+        : undefined;
+      const expectedTemplate = prediction
+        ? AUTO_PREDICTION_WORKSPACE_TEMPLATE
+        : AUTO_QUANT_WORKSPACE_TEMPLATE;
+      if (!workspace || workspace.template !== expectedTemplate) return undefined;
+      return workspace;
+    },
+    captureReplyRoute: async (parentResumeId, parentWorkspaceId): Promise<OrchestrationReplyRoute> => {
+      const identity = resumeRegistry.get(parentResumeId);
+      const wsId = identity?.wsId ?? parentWorkspaceId;
+      await sessionRegistry.ensureLoaded(wsId);
+      const record = sessionRegistry.findByResumeId(wsId, parentResumeId);
+      const latestTask = headlessTasks.latestForResumeId(parentResumeId);
+      const trigger = latestTask?.trigger;
+      const inquiry = latestTask?.inquiry;
+      const connectorId =
+        latestTask?.communication?.delivery?.connectorId ??
+        (trigger?.metadata?.kind === 'connector-cron-issue'
+          ? trigger.metadata.connectorId
+          : undefined);
+      const issueId =
+        trigger?.kind === 'issue'
+          ? trigger.issueId
+          : inquiry?.subject.kind === 'issue'
+            ? inquiry.subject.issueId
+            : undefined;
+      let surface: OrchestrationReplySurface = 'headless';
+      if (connectorId) {
+        surface = 'connector';
+      } else if (record && web.has(record.id)) {
+        surface = 'web';
+      } else if (record && pool.get(record.id)) {
+        surface = 'pty';
+      }
+      return {
+        workspaceId: wsId,
+        resumeId: parentResumeId,
+        ...(trigger ? { trigger: structuredClone(trigger) } : {}),
+        ...(inquiry ? { inquiry: structuredClone(inquiry) } : {}),
+        ...(connectorId ? { connectorId } : {}),
+        ...(issueId ? { issueId } : {}),
+        surface,
+      };
+    },
+    dispatchWorker: async (request) => {
+      const agentId = request.agent ?? await resolveHeadlessDefaultAgentId(request.workspace);
+      if (!agentId) {
+        throw new OrchestrationError(
+          'adapter_unavailable',
+          `Workspace "${request.workspace.tag}" has no default agent runtime.`,
+        );
+      }
+      const adapter = adapters.get(agentId);
+      if (!adapter || !isAgentRuntime(adapter)) {
+        throw new OrchestrationError('adapter_unavailable', `Unknown agent runtime: ${agentId}`);
+      }
+      if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
+        throw new OrchestrationError(
+          'adapter_unavailable',
+          `Agent runtime "${agentId}" does not support headless execution.`,
+        );
+      }
+      const dispatched = await dispatchHeadlessTaskMethod(
+        request.workspace,
+        adapter,
+        request.prompt,
+        request.origin,
+        request.timeoutMs,
+        undefined,
+        undefined,
+        undefined,
+        request.selection,
+        undefined,
+        request.createdBy,
+      );
+      return {
+        taskId: dispatched.taskId,
+        resumeId: dispatched.resumeId,
+        agent: adapter.id,
+      };
+    },
+    stopWorkerExecution: (workerResumeId, reason) =>
+      executionManager.stop(workerResumeId, reason),
+    isSessionRunning: (resumeId) =>
+      activeResumeIds.has(resumeId) || Boolean(executionManager.current(resumeId)),
+  });
 
   const workspaceRuntimeActivityMethod = (workspaceId: string): WorkspaceRuntimeActivity => {
     const sessions = sessionRegistry.listFor(workspaceId).flatMap((record) => {
@@ -3420,6 +3743,18 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       if (!existsSync(join(cwd, '.pi', 'openalice-provider.json')) && !existsSync(join(cwd, '.pi-agent'))) return;
       await piAdapter.writeAiConfig?.(cwd, {});
     },
+    onWorkspaceOffboarded: async () => {
+      await activeSlots.converge();
+      invalidateBacklinks(registry);
+      await refreshScheduleScanner?.();
+    },
+    onWorkspaceRestored: async (workspace) => {
+      const state = await activeSlots.handleWorkspaceCreated(workspace);
+      if (state === 'active') {
+        invalidateBacklinks(registry);
+        await refreshScheduleScanner?.();
+      }
+    },
     logger: launcherLogger.child({ scope: 'workspace-lifecycle' }),
   });
   await lifecycle.recover();
@@ -3455,6 +3790,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     logger: launcherLogger.child({ scope: 'workspace-absorb' }),
   });
   await workspaceAbsorbs.recover();
+  // Converge per-template active Workspace slots after recovery and before
+  // starting the scanner so missing/offboarded pointers fall back cleanly.
+  await activeSlots.converge();
   // Recovery owns the active/departed boundary. Scheduled work must not see an
   // interrupted offboarding/upgrade row between registry load and repair.
   scheduleScanner.start();
@@ -3548,8 +3886,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         }
       }
     }
+    const activationState: WorkspaceActivationState = await activeSlots.activationState(w.id);
     return {
       ...w,
+      activationState,
       ...(metadata.ok ? metadata.metadata : {}),
       ...(!metadata.ok && metadata.reason === 'invalid' ? { metadataError: metadata.error } : {}),
       ...(runtimeSettings.ok ? {
@@ -3592,8 +3932,96 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     return disposal;
   };
 
+  const previewWorkspaceActivation = async (
+    workspaceId: string,
+  ): Promise<WorkspaceActivationPreview | null> => {
+    const target = registry.get(workspaceId);
+    if (!target) return null;
+    const catalogEntry = catalog.get(workspaceId);
+    if (catalogEntry && catalogEntry.lifecycle !== 'active') return null;
+
+    const template = workspaceTemplateSlot(target.template);
+    const currentActiveWs = await activeSlots.activeWorkspaceForTemplate(template);
+    const alreadyActive = currentActiveWs?.id === target.id;
+    let currentActive: WorkspaceActivationCurrentActive | null = null;
+    if (currentActiveWs) {
+      const [metadata, issues] = await Promise.all([
+        readWorkspaceMetadata(currentActiveWs.dir).catch(() => null),
+        readWorkspaceIssues(currentActiveWs.dir).catch(() => null),
+      ]);
+      const displayName = metadata?.ok ? metadata.metadata.displayName : undefined;
+      const openIssueCount = issues?.ok
+        ? issues.issues.filter((issue) => !isTerminalStatus(issue.status)).length
+        : 0;
+      const scheduledIssueCount = issues?.ok
+        ? issues.issues.filter((issue) => Boolean(issue.when) && !isTerminalStatus(issue.status)).length
+        : 0;
+      const runningTasks = headlessTasks.list({ status: 'running' }).filter((task) =>
+        task.wsId === currentActiveWs.id
+        || (task.trigger?.kind === 'issue' && task.trigger.workspaceId === currentActiveWs.id),
+      );
+      const inFlightRunCount = Math.max(
+        runningTasks.length,
+        headlessActivity.list(currentActiveWs.id).length,
+      );
+      currentActive = {
+        id: currentActiveWs.id,
+        tag: currentActiveWs.tag,
+        ...(displayName ? { displayName } : {}),
+        openIssueCount,
+        scheduledIssueCount,
+        inFlightRunCount,
+      };
+    }
+    return {
+      workspaceId: target.id,
+      template,
+      alreadyActive,
+      currentActive,
+    };
+  };
+
+  const activateWorkspace = async (workspaceId: string): Promise<WorkspaceActivationResult> => {
+    const catalogEntry = catalog.get(workspaceId);
+    if (catalogEntry && catalogEntry.lifecycle !== 'active') {
+      throw new WorkspaceActivationError('departed', `workspace is ${catalogEntry.lifecycle}: ${workspaceId}`);
+    }
+    const target = registry.get(workspaceId);
+    if (!target) {
+      throw new WorkspaceActivationError('not_found', `workspace not found: ${workspaceId}`);
+    }
+
+    const template = workspaceTemplateSlot(target.template);
+    const previousActive = await activeSlots.activeWorkspaceForTemplate(template);
+    const previousActiveId = previousActive?.id ?? null;
+
+    await activeSlots.setActive(template, target.id);
+
+    // Immediately stop any managed Harness Studio process for the previously
+    // active Workspace, while letting any in-flight headless session/issue runs
+    // finish naturally.
+    if (previousActiveId && previousActiveId !== target.id) {
+      await harnessSurfaces.stopWorkspace(previousActiveId);
+    }
+
+    invalidateBacklinks(registry);
+    await scheduleScanner.refresh();
+
+    launcherLogger.info('workspace.activated', {
+      workspaceId: target.id,
+      template,
+      previousActiveId,
+    });
+
+    return {
+      workspace: await publicMeta(target),
+      previousActiveId,
+    };
+  };
+
   const connectorDeskOp = async (connectorId: string): Promise<ConnectorDesk | null> => {
-    const desks = await findConnectorDesks(registry.list().map((ws) => ({ id: ws.id, dir: ws.dir })), connectorId);
+    const active = await activeSlots.listActiveWorkspaces();
+    const desks = await findConnectorDesks(active.map((ws) => ({ id: ws.id, dir: ws.dir })), connectorId);
     return desks[0] ?? null;
   };
   const createConnectorDeskOp = async (connectorId: string, wsId: string): Promise<ConnectorDesk> => (
@@ -3608,7 +4036,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       if (!workspace) {
         throw new Error(`workspace not found: ${wsId}`);
       }
-      const workspaces = registry.list().map((ws) => ({ id: ws.id, dir: ws.dir }));
+      const active = await activeSlots.listActiveWorkspaces();
+      const workspaces = active.map((ws) => ({ id: ws.id, dir: ws.dir }));
       const created = await createConnectorDeskFile(
         connectorId,
         definition.label,
@@ -3683,6 +4112,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     sessionRegistry,
     sessionMailbox,
     sessionWakeDelivery,
+    orchestration,
     sessionCoordinator,
     scrollbackStore,
     templates,
@@ -3726,6 +4156,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     executions,
     refreshSessionTitles,
     publicMeta,
+    listActiveWorkspaces: () => activeSlots.listActiveWorkspaces(),
+    listActiveWorkspacesSync: () => activeSlots.listActiveWorkspacesSync(),
+    previewWorkspaceActivation,
+    activateWorkspace,
     detectAgents,
     getAgentRuntimeReadiness: getAgentRuntimeReadinessMethod,
     beginAgentRuntimeReadinessProbe: beginAgentRuntimeReadinessProbeMethod,

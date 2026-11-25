@@ -80,6 +80,7 @@ import { workspaceRuntimeToolFactories } from './tool/workspace-runtime-tools.js
 import { provenanceShowFactory } from './tool/provenance-show.js'
 import { conversationToolFactories } from './tool/conversation.js'
 import { artifactConversationToolFactories } from './tool/conversation-artifacts.js'
+import { orchestrationToolFactories } from './tool/orchestration-tools.js'
 import { createToolCallLog } from './core/tool-call-log.js'
 import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
 import { createNewsArchiveTools } from './tool/news.js'
@@ -128,6 +129,7 @@ async function main() {
   for (const f of workspaceRuntimeToolFactories) workspaceToolCenter.register(f)
   for (const f of conversationToolFactories) workspaceToolCenter.register(f)
   for (const f of artifactConversationToolFactories) workspaceToolCenter.register(f)
+  for (const f of orchestrationToolFactories) workspaceToolCenter.register(f)
 
   // ==================== UTA SDK (HTTP boundary) ====================
   //
@@ -319,7 +321,7 @@ async function main() {
     tradingModePolicy: currentTradingModePolicy,
   })
   startTelegramDeskInboundPoll({
-    listWorkspaces: () => workspaceServiceRef.current?.registry.list() ?? [],
+    listWorkspaces: () => workspaceServiceRef.current?.listActiveWorkspacesSync() ?? [],
     getWorkspace: (id) => workspaceServiceRef.current?.registry.get(id),
     provenanceStore: () => workspaceServiceRef.current?.provenanceStore,
     conversation: () => {

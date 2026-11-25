@@ -88,6 +88,24 @@ export async function awaitConversationTask(
   return task
 }
 
+async function ackCompletedTasks(
+  ctx: WorkspaceToolContext,
+  tasks: readonly (WorkspaceConversationTask | null)[],
+): Promise<void> {
+  if (!ctx.conversation?.ackTasks) return
+  const recipientResumeId = sessionOriginFromInboxOrigin(ctx.workspaceId, ctx.origin)?.resumeId
+    ?? ctx.origin?.resumeId
+  if (!recipientResumeId) return
+  const completedTaskIds = tasks
+    .filter((task): task is WorkspaceConversationTask => task !== null && task.status !== 'running')
+    .map((task) => task.taskId)
+  if (completedTaskIds.length === 0) return
+  await ctx.conversation.ackTasks({
+    recipientResumeId,
+    taskIds: completedTaskIds,
+  })
+}
+
 export async function askWorkspaceConversation(
   ctx: WorkspaceToolContext,
   input: {
@@ -153,6 +171,7 @@ export async function askWorkspaceConversation(
         error: `conversation task disappeared while awaiting: ${result.taskId}`,
       }
     }
+    await ackCompletedTasks(ctx, [task])
     return {
       ...dispatched,
       ...taskProjection(task, 'summary'),
@@ -364,6 +383,7 @@ export const conversationAwaitFactory: WorkspaceToolFactory = {
         try {
           const task = await awaitConversationTask(ctx.conversation, taskId, timeoutMs)
           if (!task) return { ok: false as const, error: `conversation task not found: ${taskId}` }
+          await ackCompletedTasks(ctx, [task])
           return {
             ok: true as const,
             ...taskProjection(task, 'summary'),
@@ -408,6 +428,7 @@ export const conversationCollectFactory: WorkspaceToolFactory = {
             id,
             timeoutMs,
           )))
+          await ackCompletedTasks(ctx, tasks)
           const results = tasks.map((task, index) => task
             ? {
                 ok: true as const,
@@ -464,6 +485,7 @@ export const conversationReadFactory: WorkspaceToolFactory = {
         try {
           const task = await ctx.conversation.read(taskId)
           if (!task) return { ok: false as const, error: `conversation task not found: ${taskId}` }
+          await ackCompletedTasks(ctx, [task])
           return {
             ok: true as const,
             ...taskProjection(task, mode),

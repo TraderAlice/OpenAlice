@@ -214,6 +214,20 @@ export default function DownloadPage() {
                       }}
                     />
                   </div>
+                  <p className="mt-4 border-t border-border/45 pt-4 text-xs leading-relaxed text-foreground/56">
+                    Review Windows installer build origin, team roles, and verification
+                    details in our{" "}
+                    <Link
+                      href="/code-signing"
+                      data-evt="download_code_signing_policy"
+                      data-target="code_signing"
+                      data-location="download"
+                      className="text-foreground/80 ink-link hover:text-foreground"
+                    >
+                      Code Signing &amp; Privacy Policy
+                    </Link>
+                    .
+                  </p>
                 </InstallSection>
 
                 <InstallSection

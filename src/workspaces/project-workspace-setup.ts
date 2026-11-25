@@ -56,9 +56,21 @@ async function prepareUnlocked(
           ? await service.resolveOrCreateAutoQuantWorkspace((await readAutoQuantPreferences(preferences)).defaultWorkspaceId)
           : await service.resolveOrCreateAutoPredictionWorkspace((await readAutoPredictionPreferences(preferences)).defaultWorkspaceId)
       if (!result.ok) throw new Error(result.message)
-      if (kind === 'chat') await rememberRecentChatWorkspace(result.workspace.id, preferences)
-      else if (kind === 'auto-quant') await rememberAutoQuantDefaultWorkspace(result.workspace.id, preferences)
-      else await rememberAutoPredictionDefaultWorkspace(result.workspace.id, preferences)
+      const currentActiveId = kind === 'chat'
+        ? (await readQuickChatPreferences(preferences)).recentChatWorkspaceId
+        : kind === 'auto-quant'
+          ? (await readAutoQuantPreferences(preferences)).defaultWorkspaceId
+          : (await readAutoPredictionPreferences(preferences)).defaultWorkspaceId
+      const hasValidActive = Boolean(
+        currentActiveId &&
+        currentActiveId !== result.workspace.id &&
+        service.registry.get(currentActiveId)?.template === templates[kind],
+      )
+      if (!hasValidActive) {
+        if (kind === 'chat') await rememberRecentChatWorkspace(result.workspace.id, preferences)
+        else if (kind === 'auto-quant') await rememberAutoQuantDefaultWorkspace(result.workspace.id, preferences)
+        else await rememberAutoPredictionDefaultWorkspace(result.workspace.id, preferences)
+      }
       request.pending = request.pending.filter(item => item !== kind)
       if (request.errors) delete request.errors[kind]
     } catch (error) {

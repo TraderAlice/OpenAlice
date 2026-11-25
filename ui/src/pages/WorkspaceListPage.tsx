@@ -108,6 +108,8 @@ export function WorkspaceListPage() {
     hasLoaded,
     listError,
     templatesError,
+    activatingWorkspaceId,
+    requestActivateWorkspace,
   } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const [departed, setDeparted] = useState<DepartedWorkspace[]>([])
@@ -244,6 +246,8 @@ export function WorkspaceListPage() {
                       })
                     }
                     onUpgrade={() => openAgentConfig(w.id, undefined, 'template')}
+                    onActivate={requestActivateWorkspace ? () => void requestActivateWorkspace(w.id) : undefined}
+                    activating={activatingWorkspaceId === w.id}
                   />
                 ))}
               </div>
