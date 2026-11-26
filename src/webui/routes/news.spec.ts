@@ -21,6 +21,18 @@ function routes(getNewsV2: INewsProvider['getNewsV2']) {
 }
 
 describe('news routes', () => {
+  it.each(['F', 'A', 'T', 'BRK.B', 'BTC-USD', '^GSPC', '2330.TW', 'EURUSD=X'])('matches the complete symbol %s while preserving keyword substrings', async (symbol) => {
+    const app = routes(vi.fn(async () => [
+      item(1, { title: 'Fed cuts rates', content: 'AAPL and Tesla outlook' }),
+      item(2, { title: `X${symbol}X update`, content: '' }),
+      item(3, { title: `($${symbol.toLowerCase()}) announces earnings.`, content: '' }),
+    ]))
+    const response = await app.request(`/?symbol=${encodeURIComponent(symbol)}`)
+    expect((await response.json()).items.map((entry: { title: string }) => entry.title)).toEqual([`($${symbol.toLowerCase()}) announces earnings.`])
+    const keywords = await app.request('/?keyword=fed')
+    expect((await keywords.json()).items[0].title).toBe('Fed cuts rates')
+  })
+
   it('uses explicit timestamps instead of lookback and returns a nullable lookback', async () => {
     const getNewsV2 = vi.fn(async () => [item(1)])
     const app = routes(getNewsV2)

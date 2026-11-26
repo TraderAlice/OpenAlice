@@ -14,6 +14,24 @@ afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
 describe('demo News handlers', () => {
+  it.each(['F', 'A', 'T', 'BRK.B', 'BTC-USD', '^GSPC', '2330.TW', 'EURUSD=X'])('matches complete Symbol tokens for %s', async (symbol) => {
+    const fixture = { time: new Date().toISOString(), content: '', source: 'test', link: null, categories: null }
+    const original = [...demoNewsArticles]
+    demoNewsArticles.splice(0, demoNewsArticles.length,
+      { ...fixture, title: 'Fed cuts rates and AAPL rises' },
+      { ...fixture, title: `X${symbol}X update` },
+      { ...fixture, title: `($${symbol.toLowerCase()}) announces earnings.` },
+    )
+    try {
+      const response = await fetch(`${baseUrl}/api/news?symbol=${encodeURIComponent(symbol)}`)
+      expect((await response.json()).items.map((article: { title: string }) => article.title)).toEqual([`($${symbol.toLowerCase()}) announces earnings.`])
+      const keyword = await fetch(`${baseUrl}/api/news?keyword=fed`)
+      expect((await keyword.json()).count).toBe(1)
+    } finally {
+      demoNewsArticles.splice(0, demoNewsArticles.length, ...original)
+    }
+  })
+
   it('uses an explicit range as an exclusive-start, inclusive-end interval', async () => {
     const start = demoNewsArticles.find((article) => article.title.startsWith('Hang Seng TECH'))!
     const end = demoNewsArticles.find((article) => article.title.startsWith('NVDA'))!
