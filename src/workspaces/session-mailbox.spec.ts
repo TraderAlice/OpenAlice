@@ -194,4 +194,49 @@ describe('SessionMailbox', () => {
     const files = await readdir(dir)
     expect(files).toEqual(['session-mailbox.json'])
   })
+
+  it('persists optional reportSource and exposes listRecent including acked messages', async () => {
+    const mailbox = await SessionMailbox.load(path)
+    await mailbox.enqueue(input({
+      recipientResumeId: 'resume-commander',
+      recipientWorkspaceId: 'commander',
+      taskId: 'run-sched-1',
+      createdAt: 1000,
+      reportSource: {
+        kind: 'scheduled-issue',
+        workspaceId: 'ws-quant',
+        workspaceTag: 'Auto Quant',
+        issueId: 'morning-scan',
+        issueTitle: 'Morning Market Scan',
+        fire: 'schedule',
+      },
+    }))
+    await mailbox.enqueue(input({
+      recipientResumeId: 'resume-other',
+      recipientWorkspaceId: 'ws-a',
+      taskId: 'run-peer-2',
+      createdAt: 2000,
+    }))
+    await mailbox.checkAndAck('resume-commander', 1500)
+
+    const reloaded = await SessionMailbox.load(path)
+    expect(reloaded.pendingFor('resume-commander')).toEqual([])
+
+    const allRecent = reloaded.listRecent()
+    expect(allRecent.map((m) => m.taskId)).toEqual(['run-sched-1', 'run-peer-2'])
+    expect(allRecent[0]?.reportSource).toEqual({
+      kind: 'scheduled-issue',
+      workspaceId: 'ws-quant',
+      workspaceTag: 'Auto Quant',
+      issueId: 'morning-scan',
+      issueTitle: 'Morning Market Scan',
+      fire: 'schedule',
+    })
+    expect(allRecent[0]?.status).toBe('acked')
+
+    expect(reloaded.listRecent({ recipientResumeId: 'resume-commander' }).map((m) => m.taskId)).toEqual([
+      'run-sched-1',
+    ])
+    expect(reloaded.listRecent({ sinceMs: 1500 }).map((m) => m.taskId)).toEqual(['run-peer-2'])
+  })
 })

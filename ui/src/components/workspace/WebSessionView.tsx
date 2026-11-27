@@ -25,6 +25,8 @@ interface Props {
   readonly agents?: readonly AgentInfo[]
   readonly label?: string
   readonly headerActions?: ReactNode
+  /** Omit the inner PageTopBar when the parent surface owns a single unified header. */
+  readonly hideHeader?: boolean
   readonly onSessionLost: () => void
 }
 
@@ -37,7 +39,7 @@ export function WebSessionView(props: Props) {
   return <WebSession key={JSON.stringify([props.wsId, props.sessionId])} {...props} />
 }
 
-function WebSession({ readOnly = false, record, wsId, sessionId, agent, agents, label, headerActions, onSessionLost }: Props) {
+function WebSession({ readOnly = false, record, wsId, sessionId, agent, agents, label, headerActions, hideHeader = false, onSessionLost }: Props) {
   const [configurationReady, setConfigurationReady] = useState(true)
   const session = useWebConversation(wsId, sessionId, readOnly)
   const { snapshot, busy, requests } = session
@@ -60,18 +62,20 @@ function WebSession({ readOnly = false, record, wsId, sessionId, agent, agents, 
 
   return <>
     <ConversationView
-      header={<PageTopBar title={label ?? 'Conversation'} actions={<>
-        <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground" title={agentLabel} aria-label={agentLabel}>
-          <AgentRuntimeIcon agentId={agentId} className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">{agentLabel}</span>
-        </span>
-        {headerActions}
-      </>}>
-        {(busy || !snapshot || snapshot.phase === 'failed') && <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-          {(busy || !snapshot) && <LoaderCircle size={12} className="animate-spin" aria-hidden />}
-          {phaseLabel}
-        </span>}
-      </PageTopBar>}
+      header={hideHeader ? undefined : (
+        <PageTopBar title={label ?? 'Conversation'} actions={<>
+          <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground" title={agentLabel} aria-label={agentLabel}>
+            <AgentRuntimeIcon agentId={agentId} className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{agentLabel}</span>
+          </span>
+          {headerActions}
+        </>}>
+          {(busy || !snapshot || snapshot.phase === 'failed') && <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+            {(busy || !snapshot) && <LoaderCircle size={12} className="animate-spin" aria-hidden />}
+            {phaseLabel}
+          </span>}
+        </PageTopBar>
+      )}
       fileHrefs={files.fileHrefs}
       onFileReference={files.onFileReference}
       items={session.items}

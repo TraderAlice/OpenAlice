@@ -45,9 +45,9 @@ function context(): WorkspacesContextValue {
     defaultAgent: null,
     issueDefaultAgent: null,
     listError: null,
-    workspaceManager: null,
-    workspaceManagerLoaded: true,
-    workspaceManagerError: null,
+    commander: null,
+    commanderLoaded: true,
+    commanderError: null,
     hasLoaded: true,
     templatesLoaded: true,
     templatesError: null,
@@ -57,8 +57,8 @@ function context(): WorkspacesContextValue {
     refresh: vi.fn(),
     refreshTemplates: vi.fn(async () => undefined),
     refreshAutoQuantPreference: vi.fn(async () => undefined),
-    refreshWorkspaceManager: vi.fn(async () => undefined),
-    quickStartWorkspaceManager: vi.fn(async () => {
+    refreshCommander: vi.fn(async () => undefined),
+    openCommander: vi.fn(async () => {
       throw new Error('not used')
     }),
     spawn: vi.fn(async () => undefined),

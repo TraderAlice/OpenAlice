@@ -22,8 +22,9 @@ import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { basename, delimiter, join } from 'node:path';
 
+import type { ModelReasoningEffort } from '@/ai-providers/model-semantics.js';
 import { cliBinPath } from '@/core/paths.js';
-import { readIssueDefaultAgent, readWorkspaceDefaultAgent } from '@/core/config.js';
+import { readCredentials, readIssueDefaultAgent, readWorkspaceDefaultAgent } from '@/core/config.js';
 import {
   ACTIVITY_UPDATE_COALESCE_MS,
   ArtifactProvenanceStore,
@@ -449,9 +450,16 @@ import { readHarnessSource } from './harness-source.js';
 import { HarnessSourceUpgradeManager } from './harness-source-upgrade.js';
 import { HarnessSurfaceManager } from './harness-surface-manager.js';
 import {
-  createManagerWorkspaceMeta,
-  MANAGER_WORKSPACE_ID,
-} from './manager-workspace.js';
+  COMMANDER_SYSTEM_PROMPT,
+  COMMANDER_WORKSPACE_ID,
+  COMMANDER_WORKSPACE_TAG,
+  CommanderPointerStore,
+  LEGACY_MANAGER_WORKSPACE_ID,
+  commanderSkillPath,
+  commanderTerminalPrompt,
+  createCommanderWorkspaceMeta,
+  type CommanderPointer,
+} from './commander-workspace.js';
 
 /**
  * The fully-resolved spawn plan for a (workspace, adapter, resume-intent)
@@ -472,6 +480,26 @@ export interface SpawnPlan {
   readonly environment: readonly SpawnEnvironmentDisclosure[];
   readonly transcriptDir: string | null;
   readonly projectKey: string | null;
+}
+
+export interface EnsureCommanderIdentityOptions {
+  readonly agent?: string;
+  readonly credentialSource?: 'native';
+  readonly credentialSlug?: string;
+  readonly model?: string;
+  readonly reasoningEffort?: ModelReasoningEffort;
+  readonly createdBy?: SessionCreatedBy;
+  readonly surface?: 'terminal' | 'webpi' | 'headless';
+  readonly fallbackTitle?: string;
+  /** When true (cold-start scheduled report), only select headless-capable runtimes and never throw on missing credentials. */
+  readonly requireHeadless?: boolean;
+}
+
+export interface EnsureCommanderIdentityResult {
+  readonly resumeId: string;
+  readonly sessionRecord: SessionRecord | null;
+  readonly initialized: boolean;
+  readonly created: boolean;
 }
 
 export interface WorkspaceService {
@@ -539,9 +567,15 @@ export interface WorkspaceService {
     takeovers: SessionExecutionManager['takeovers'];
     wait(meta: WorkspaceMeta, adapter: CliAdapter, prompt: string, origin: ExecutionOrigin, timeoutMs?: number): Promise<HeadlessTaskResult>;
   };
-  /** Launcher-owned control plane. Not part of the business Workspace registry. */
-  readonly managerWorkspace: WorkspaceMeta;
-  /** Resolve a runtime target, including the special manager control plane. */
+  /** Launcher-owned global Commander control plane. Not part of the business Workspace registry. */
+  readonly commanderWorkspace: WorkspaceMeta;
+  /** Shared mailbox backing Commander's incoming scheduled/task reports. */
+  readonly commanderMailbox: SessionMailbox;
+  /** Read the canonical Commander pointer (`state/commander.json`), or null if never allocated. */
+  getCommanderPointer(): Promise<CommanderPointer | null>;
+  /** Serialized ensure for the single canonical Commander identity in this AliceProject. */
+  ensureCommanderIdentity(opts?: EnsureCommanderIdentityOptions): Promise<EnsureCommanderIdentityResult | null>;
+  /** Resolve a runtime target, including the global Commander control plane. */
   resolveRuntimeWorkspace(workspaceId: string): WorkspaceMeta | undefined;
   readonly transcriptWatcher: TranscriptWatcher;
   /** Process-backed activity used by Upgrade, Offboarding, and Absorb guards. */
@@ -839,7 +873,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   deliveryTimer.unref();
   void reconcileDelivery();
   const sessionRuntimeStore = new WorkspaceSessionRuntimeStore((wsId) => {
-    if (wsId === MANAGER_WORKSPACE_ID) {
+    if (wsId === COMMANDER_WORKSPACE_ID) {
+      return [join(config.launcherRoot, 'state', 'commander-sessions')];
+    }
+    if (wsId === LEGACY_MANAGER_WORKSPACE_ID) {
       return [join(config.launcherRoot, 'state', 'workspace-manager-sessions')];
     }
     const directories: string[] = [];
@@ -1166,10 +1203,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   });
   const refreshSessionTitles = (meta: WorkspaceMeta): Promise<void> =>
     sessionTitleResolver.refreshWorkspace(meta);
-  const managerWorkspace = createManagerWorkspaceMeta(config.launcherRoot);
-  await mkdir(managerWorkspace.dir, { recursive: true });
+  const commanderPointerStore = CommanderPointerStore.forLauncherRoot(config.launcherRoot);
+  const commanderWorkspace = createCommanderWorkspaceMeta(config.launcherRoot);
+  await mkdir(commanderWorkspace.dir, { recursive: true });
   const resolveRuntimeWorkspace = (workspaceId: string): WorkspaceMeta | undefined =>
-    workspaceId === managerWorkspace.id ? managerWorkspace : registry.get(workspaceId);
+    workspaceId === commanderWorkspace.id ? commanderWorkspace : registry.get(workspaceId);
   const runtimeReadinessCache = new Map<string, AgentRuntimeReadinessRow>();
   const runtimeReadinessProbeInFlight = new Map<string, AgentRuntimeReadinessProbeInFlight>();
   const runtimeReadinessProbeAuthority = new Map<string, AgentRuntimeReadinessProbeAuthority>();
@@ -1271,6 +1309,144 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         : null) ??
       validRegisteredRuntime(await readIssueDefaultAgent().catch(() => null)) ??
       await resolveDefaultAgentId(wsMeta);
+  };
+
+  let commanderEnsureChain: Promise<unknown> = Promise.resolve();
+  const getCommanderPointer = (): Promise<CommanderPointer | null> =>
+    commanderPointerStore.read();
+
+  const ensureCommanderIdentity = (
+    opts: EnsureCommanderIdentityOptions = {},
+  ): Promise<EnsureCommanderIdentityResult | null> => {
+    const run = async (): Promise<EnsureCommanderIdentityResult | null> => {
+      await sessionRegistry.ensureLoaded(COMMANDER_WORKSPACE_ID);
+      const existingPointer = await commanderPointerStore.read();
+      let reservedResumeId: string | undefined;
+      if (existingPointer) {
+        const existingIdentity = resumeRegistry.get(existingPointer.resumeId);
+        const existingRecord = sessionRegistry.findByResumeId(
+          COMMANDER_WORKSPACE_ID,
+          existingPointer.resumeId,
+        );
+        if (
+          existingRecord
+          && existingIdentity
+          && existingIdentity.lifecycle !== 'retired'
+          && sessionPresence(existingIdentity) !== 'deleted'
+        ) {
+          return {
+            resumeId: existingPointer.resumeId,
+            sessionRecord: existingRecord,
+            initialized: true,
+            created: false,
+          };
+        }
+        if (!existingIdentity) {
+          // Reserved pointer created before an AI runtime was configured: bind onto it now.
+          reservedResumeId = existingPointer.resumeId;
+        }
+      }
+
+      const pickAdapter = async (): Promise<CliAdapter | undefined> => {
+        if (opts.agent) {
+          const explicit = adapters.get(opts.agent);
+          if (!explicit || !isAgentRuntime(explicit)) return undefined;
+          if (opts.requireHeadless && (!explicit.capabilities.headless || !explicit.composeHeadlessCommand)) {
+            return undefined;
+          }
+          return explicit;
+        }
+        if (opts.requireHeadless) {
+          const preferredId = await resolveHeadlessDefaultAgentId(commanderWorkspace).catch(() => undefined);
+          const preferred = preferredId ? adapters.get(preferredId) : undefined;
+          if (preferred && isAgentRuntime(preferred) && preferred.capabilities.headless && preferred.composeHeadlessCommand) {
+            return preferred;
+          }
+          return adapters.list().find(
+            (candidate) =>
+              isAgentRuntime(candidate)
+              && candidate.capabilities.headless
+              && Boolean(candidate.composeHeadlessCommand),
+          );
+        }
+        const preferredId = await resolveDefaultAgentId(commanderWorkspace).catch(() => undefined);
+        const preferred = preferredId ? adapters.get(preferredId) : undefined;
+        return preferred && isAgentRuntime(preferred) ? preferred : undefined;
+      };
+
+      const reserveUninitialized = async (): Promise<EnsureCommanderIdentityResult> => {
+        const ensured = await commanderPointerStore.ensure(
+          () => `resume-commander-${randomUUID().slice(0, 8)}`,
+        );
+        return {
+          resumeId: ensured.pointer.resumeId,
+          sessionRecord: null,
+          initialized: false,
+          created: ensured.created,
+        };
+      };
+
+      const adapter = await pickAdapter();
+      if (!adapter) {
+        if (opts.requireHeadless) return reserveUninitialized();
+        return null;
+      }
+
+      const selection: SessionRuntimeSelection = {
+        ...(opts.credentialSource ? { credentialSource: opts.credentialSource } : {}),
+        ...(opts.credentialSlug ? { credentialSlug: opts.credentialSlug } : {}),
+        ...(opts.model ? { model: opts.model } : {}),
+        ...(opts.reasoningEffort ? { reasoningEffort: opts.reasoningEffort } : {}),
+      };
+      let sessionRuntime: ResolvedSessionRuntimeBinding;
+      try {
+        sessionRuntime = await createSessionRuntimeBinding({
+          adapter,
+          cwd: commanderWorkspace.dir,
+          selection,
+          ...(selection.credentialSlug ? { credentials: await readCredentials() } : {}),
+        });
+      } catch (err) {
+        if (opts.requireHeadless) {
+          launcherLogger.warn('commander.cold_start_runtime_unavailable', {
+            agent: adapter.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return reserveUninitialized();
+        }
+        throw err;
+      }
+
+      const productSession = await sessionCoordinator.ensure({
+        ...(reservedResumeId ? { resumeId: reservedResumeId } : {}),
+        wsId: COMMANDER_WORKSPACE_ID,
+        agent: adapter.id,
+        namePrefix: adapter.namePrefix ?? adapter.id[0] ?? 'c',
+        runtimeBinding: sessionRuntime.binding,
+        metadata: sessionMetadata(opts.createdBy ?? { kind: 'commander' }),
+        surface: opts.surface ?? (adapter.capabilities.web && adapter.composeWebCommand ? 'webpi' : 'terminal'),
+        fallbackTitle: opts.fallbackTitle ?? COMMANDER_WORKSPACE_TAG,
+      });
+      await commanderPointerStore.write(productSession.identity.resumeId);
+      if (productSession.created) {
+        await agentRuntimeLog.record('session.born', {
+          workspaceId: COMMANDER_WORKSPACE_ID,
+          resumeId: productSession.identity.resumeId,
+          agent: adapter.id,
+          sessionRecordId: productSession.session.id,
+        });
+      }
+      return {
+        resumeId: productSession.identity.resumeId,
+        sessionRecord: productSession.session,
+        initialized: true,
+        created: productSession.created,
+      };
+    };
+
+    const next = commanderEnsureChain.catch(() => undefined).then(run);
+    commanderEnsureChain = next;
+    return next;
   };
 
   const resolveIssueAssigneeSession = (assignee: string): IssueAssigneeSession | undefined => {
@@ -1850,30 +2026,31 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       operationLease.release();
     };
     try {
-      if (catalog.get(ws.id)?.lifecycle !== 'active') {
+      const isCommander = ws.id === COMMANDER_WORKSPACE_ID;
+      if (!isCommander && catalog.get(ws.id)?.lifecycle !== 'active') {
         throw new Error(`workspace is not active: ${ws.id}`);
       }
       if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
         throw new Error(`adapter "${adapter.id}" has no headless mode`);
       }
       let sessionRuntime = opts.sessionRuntime;
-      let rememberRuntime = opts.rememberRuntime === true;
+      let rememberRuntime = opts.rememberRuntime === true && !isCommander;
       if (!sessionRuntime) {
-        const read = await readWorkspaceRuntimeSettings(ws.dir);
-        if (!read.ok && read.reason === 'invalid') {
+        const read = isCommander ? null : await readWorkspaceRuntimeSettings(ws.dir);
+        if (read && !read.ok && read.reason === 'invalid') {
           throw new Error(`invalid Workspace runtime settings: ${read.error}`);
         }
         sessionRuntime = await createSessionRuntimeBinding({
           adapter,
           cwd: ws.dir,
           selection: resolveWorkspaceRuntimeSelection(
-            read.ok ? read.settings : null,
+            read?.ok ? read.settings : null,
             'headless',
             adapter.id,
             opts.selection,
           ),
         });
-        rememberRuntime = true;
+        rememberRuntime = !isCommander;
       }
       const product = await sessionCoordinator.ensure({
         ...(opts.resumeId ? { resumeId: opts.resumeId } : {}),
@@ -1886,7 +2063,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         cwd: ws.dir,
         launcherRepoRoot: config.launcherRepoRoot,
       });
-      if (catalog.get(ws.id)?.lifecycle !== 'active') {
+      if (!isCommander && catalog.get(ws.id)?.lifecycle !== 'active') {
         throw new Error(`workspace stopped accepting work before spawn: ${ws.id}`);
       }
       // Reuse a fresh interactive spawn's env/cwd (identical MCP injection),
@@ -1909,6 +2086,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         } : undefined,
         sessionRuntime,
       );
+      const nativeHeadlessSystemPromptAdapters = new Set(['pi', 'claude', 'omp', 'grok']);
+      const headlessPrompt =
+        isCommander && !opts.resume && !nativeHeadlessSystemPromptAdapters.has(adapter.id)
+          ? commanderTerminalPrompt(prompt)
+          : prompt;
       const command = adapter.composeHeadlessCommand(
         config.command,
         {
@@ -1916,8 +2098,15 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           env,
           ...(sessionRuntimeProjection ? { sessionRuntime: sessionRuntimeProjection } : {}),
           ...(opts.resume !== undefined ? { resume: opts.resume } : {}),
+          ...(isCommander
+            ? {
+                appendSystemPrompt: COMMANDER_SYSTEM_PROMPT,
+                skills: [commanderSkillPath(config.launcherRepoRoot)],
+                approveProject: true,
+              }
+            : {}),
         },
-        prompt,
+        headlessPrompt,
       );
       const logPaths = opts.taskId ? headlessLogPaths(headlessLogsDir, opts.taskId) : null;
       const activityLease = headlessActivity.begin({
@@ -2015,7 +2204,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     releaseTakeover: () => void = () => {},
   ): Promise<{ taskId: string; resumeId: string }> => {
     origin = validateExecutionOrigin(origin);
-    if (catalog.get(ws.id)?.lifecycle !== 'active') {
+    const isCommander = ws.id === COMMANDER_WORKSPACE_ID;
+    if (!isCommander && catalog.get(ws.id)?.lifecycle !== 'active') {
       throw new ScheduleDispatchError('workspace_not_active', `workspace is not active: ${ws.id}`);
     }
     if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
@@ -2081,15 +2271,15 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         throw error;
       }
     } else {
-      const read = await readWorkspaceRuntimeSettings(ws.dir);
-      if (!read.ok && read.reason === 'invalid') {
+      const read = isCommander ? null : await readWorkspaceRuntimeSettings(ws.dir);
+      if (read && !read.ok && read.reason === 'invalid') {
         throw new ScheduleDispatchError('invalid_runtime_settings', `invalid Workspace runtime settings: ${read.error}`);
       }
       sessionRuntime = await createSessionRuntimeBinding({
         adapter,
         cwd: ws.dir,
         selection: resolveWorkspaceRuntimeSelection(
-          read.ok ? read.settings : null,
+          read?.ok ? read.settings : null,
           'headless',
           adapter.id,
           selection,
@@ -2114,7 +2304,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       });
       const identity = productSession.identity;
       occupancySessionId = productSession.session.id;
-      if (catalog.get(ws.id)?.lifecycle !== 'active') {
+      if (!isCommander && catalog.get(ws.id)?.lifecycle !== 'active') {
         throw new ScheduleDispatchError('workspace_not_active', `workspace stopped accepting work during dispatch: ${ws.id}`);
       }
       let occupancyCauseSeq: number | undefined;
@@ -2243,6 +2433,68 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     let settledForOrchestration:
       | { status: 'done' | 'failed' | 'interrupted'; assistantPreview: string | null; error?: string }
       | null = null;
+    const notifyCommanderScheduledOutcome = async (input: {
+      status: 'done' | 'failed' | 'interrupted';
+      assistantPreview: string | null;
+      error?: string;
+      durationMs?: number;
+    }): Promise<void> => {
+      if (trigger?.kind !== 'issue' || inquiry || ws.id === COMMANDER_WORKSPACE_ID) return;
+      try {
+        const ensured = await ensureCommanderIdentity({
+          requireHeadless: true,
+          createdBy: { kind: 'commander' },
+        });
+        if (!ensured) return;
+        const issueWorkspace = registry.get(trigger.workspaceId);
+        let issueTitle: string | undefined;
+        try {
+          const read = await readWorkspaceIssues(issueWorkspace?.dir ?? ws.dir);
+          if (read.ok) {
+            issueTitle = read.issues.find((item) => item.id === trigger.issueId)?.title;
+          }
+        } catch {
+          // Best-effort metadata lookup; never block wake delivery.
+        }
+        const fire: 'schedule' | 'manual' | 'retry' =
+          origin.entry === 'issue-retry' || trigger.retryOfTaskId
+            ? 'retry'
+            : origin.entry === 'issue-manual'
+              ? 'manual'
+              : 'schedule';
+        await sessionWakeDelivery.notifyTaskCompleted({
+          recipientResumeId: ensured.resumeId,
+          recipientWorkspaceId: COMMANDER_WORKSPACE_ID,
+          taskId: rec.taskId,
+          childResumeId: rec.resumeId,
+          childWorkspaceId: ws.id,
+          childAgent: adapter.id,
+          taskStatus: input.status,
+          assistantPreview: input.assistantPreview,
+          ...(input.error ? { error: input.error } : {}),
+          ...(input.durationMs !== undefined ? { durationMs: input.durationMs } : {}),
+          reportSource: {
+            kind: 'scheduled-issue',
+            workspaceId: trigger.workspaceId,
+            ...(issueWorkspace?.tag
+              ? { workspaceTag: issueWorkspace.tag }
+              : ws.tag
+                ? { workspaceTag: ws.tag }
+                : {}),
+            issueId: trigger.issueId,
+            ...(issueTitle ? { issueTitle } : {}),
+            fire,
+          },
+        });
+      } catch (notifyErr) {
+        launcherLogger.warn('commander.scheduled_report_notify_failed', {
+          taskId: rec.taskId,
+          wsId: trigger.workspaceId,
+          issueId: trigger.issueId,
+          err: notifyErr,
+        });
+      }
+    };
     const completion = runHeadlessTaskMethod(ws, adapter, prompt, timeoutMs, {
       origin,
       taskId: rec.taskId,
@@ -2311,6 +2563,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             ...(r.durationMs !== undefined ? { durationMs: r.durationMs } : {}),
           }).catch((err) => launcherLogger.warn('session_wake.notify_failed', { taskId: rec.taskId, err }));
         }
+        await notifyCommanderScheduledOutcome({
+          status,
+          assistantPreview: r.structured.assistantText?.slice(0, 2000) ?? null,
+          ...(failure ? { error: failure } : {}),
+          ...(r.durationMs !== undefined ? { durationMs: r.durationMs } : {}),
+        });
         await dispatchDelivery.finish(rec, r.structured.assistantText);
         if (conversation) {
           await agentConversationLog.recordCompletion({
@@ -2425,6 +2683,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             error: message,
           }).catch((notifyErr) => launcherLogger.warn('session_wake.notify_failed', { taskId: rec.taskId, err: notifyErr }));
         }
+        await notifyCommanderScheduledOutcome({
+          status,
+          assistantPreview: null,
+          error: message,
+        });
         if (conversation) {
           await agentConversationLog.recordCompletion({
             taskId: rec.taskId,
@@ -3305,24 +3568,29 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     deliverToHeadless: async (resumeId, pointerText) => {
       if (activeResumeIds.has(resumeId)) return 'busy';
       const identity = resumeRegistry.get(resumeId);
-      if (!identity || !identity.agentSessionId || identity.lifecycle === 'retired') return 'unavailable';
+      if (!identity || identity.lifecycle === 'retired' || sessionPresence(identity) === 'deleted') {
+        return 'unavailable';
+      }
+      const isCommander = identity.wsId === COMMANDER_WORKSPACE_ID;
       const latestTask = headlessTasks.latestForResumeId(resumeId);
-      if (!latestTask) return 'unavailable';
+      if (!isCommander && (!identity.agentSessionId || !latestTask)) return 'unavailable';
       await sessionRegistry.ensureLoaded(identity.wsId);
       const record = sessionRegistry.findByResumeId(identity.wsId, resumeId);
       if (record && (pool.get(record.id) || web.has(record.id))) return 'unavailable';
-      const meta = registry.get(identity.wsId);
+      const meta = resolveRuntimeWorkspace(identity.wsId);
       const adapter = adapters.get(identity.agent);
-      if (!meta || !adapter) return 'unavailable';
+      if (!meta || !adapter || !adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
+        return 'unavailable';
+      }
       await dispatchHeadlessTaskMethod(
         meta,
         adapter,
         pointerText,
         { kind: 'system', entry: 'session-wake-mailbox', workspaceId: identity.wsId },
         undefined,
-        latestTask.trigger,
+        latestTask?.trigger,
         resumeId,
-        latestTask.inquiry,
+        latestTask?.inquiry,
       );
       return 'delivered';
     },
@@ -3568,7 +3836,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       await sessionRegistry.ensureLoaded(identity.wsId);
       const record = sessionRegistry.findByResumeId(identity.wsId, resumeId);
       if (record && (pool.get(record.id) || web.has(record.id))) return 'busy';
-      const meta = registry.get(identity.wsId);
+      const meta = resolveRuntimeWorkspace(identity.wsId);
       const adapter = adapters.get(identity.agent);
       if (!meta || !adapter || !adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
         return 'unavailable';
@@ -3602,7 +3870,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   orchestration = new OrchestrationManager({
     store: orchestrationStore,
     delivery: orchestrationDelivery,
-    resolveWorkspace: (workspaceId) => registry.get(workspaceId),
+    resolveWorkspace: (workspaceId) => resolveRuntimeWorkspace(workspaceId),
     resolveHarnessWorkspace: async (harness) => {
       if (harness === 'chat') {
         const preferences = await readQuickChatPreferences().catch(() => ({ recentChatWorkspaceId: null }));
@@ -4143,7 +4411,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         return web.respond(recordId, requestId, optionId, text);
       },
     },
-    managerWorkspace,
+    commanderWorkspace,
+    commanderMailbox: sessionMailbox,
+    getCommanderPointer,
+    ensureCommanderIdentity,
     resolveRuntimeWorkspace,
     transcriptWatcher,
     workspaceRuntimeActivity: workspaceRuntimeActivityMethod,

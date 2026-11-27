@@ -53,6 +53,7 @@ import {
   CONNECTOR_BACKEND_WATCH_INCLUDES,
   buildTsxWatchArgs,
   isBackendHotReloadEnabled,
+  resolveDevWatchEnv,
 } from './dev-hot-reload.js'
 import { parseDevGuardianOptions } from './dev-options.js'
 import { buildGuardianChildEnv } from './system-proxy.js'
@@ -279,13 +280,18 @@ async function main(): Promise<void> {
     console.warn(`[guardian] ${baseEnvResolution.diagnostic}`)
   }
   const baseEnv = baseEnvResolution.env
+  const devWatch = await resolveDevWatchEnv(process.env, { appRoot: process.cwd() })
+  if (devWatch.diagnostic) {
+    console.warn(`[guardian] ${devWatch.diagnostic}`)
+  }
+  const backendBaseEnv = { ...baseEnv, ...devWatch.backendEnv }
 
   // ── UTA spec (re-used by Guardian for restart) ────────────
   const utaSpec: SpawnSpec = {
     name: 'uta',
     command: 'tsx',
     args: buildTsxWatchArgs('services/uta/src/main.ts', UTA_BACKEND_WATCH_INCLUDES, process.env),
-    env: { ...baseEnv, OPENALICE_UTA_PORT: String(ports.utaPort) },
+    env: { ...backendBaseEnv, OPENALICE_UTA_PORT: String(ports.utaPort) },
     prefixLogs: true,
   }
 
@@ -309,7 +315,7 @@ async function main(): Promise<void> {
     command: 'tsx',
     args: buildTsxWatchArgs('services/connector/src/main.ts', CONNECTOR_BACKEND_WATCH_INCLUDES, process.env),
     env: {
-      ...baseEnv,
+      ...backendBaseEnv,
       OPENALICE_CONNECTOR_PORT: String(ports.connectorPort),
       OPENALICE_MCP_PORT: String(ports.mcpPort),
       OPENALICE_TOOL_SOCKET: '',
@@ -341,7 +347,7 @@ async function main(): Promise<void> {
     command: 'tsx',
     args: buildTsxWatchArgs('src/main.ts', ALICE_BACKEND_WATCH_INCLUDES, process.env),
     env: {
-      ...baseEnv,
+      ...backendBaseEnv,
       OPENALICE_WEB_PORT: String(ports.webPort),
       OPENALICE_MCP_PORT: String(ports.mcpPort),
       OPENALICE_TOOL_BASE_URL: `http://127.0.0.1:${ports.mcpPort}/cli`,
@@ -377,6 +383,7 @@ async function main(): Promise<void> {
     backendPort: ports.webPort,
     uiPort: ports.uiPort,
     vitePort,
+    explicitLocalTarget: explicitDataHome || Boolean(process.env['OPENALICE_PROJECT']),
   }) : null
 
   // ── Vite ──────────────────────────────────────────────────
@@ -386,6 +393,7 @@ async function main(): Promise<void> {
     args: ['--filter', 'open-alice-ui', 'dev'],
     env: {
       ...baseEnv,
+      ...devWatch.viteEnv,
       OPENALICE_BACKEND_PORT: String(ports.webPort),
       // Guardian is the port authority: Vite binds exactly this (strictPort).
       OPENALICE_UI_PORT: String(vitePort),

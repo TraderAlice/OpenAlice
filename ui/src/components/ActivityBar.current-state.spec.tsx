@@ -52,10 +52,12 @@ vi.mock('../live/activity-bar-collapse', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => ({
+    t: (key: string, params?: { count?: number }) => ({
       'nav.quickStart': 'Quick Start',
+      'nav.item.commander': 'Commander',
       'nav.item.issue': 'Issues',
       'nav.item.connectors': 'Connectors',
+      'commander.pendingReports': `${params?.count ?? 0} pending reports`,
       'nav.connectorNeedsAttention': '1 connector needs attention',
       'nav.collapseRail': 'Collapse activity bar',
       'nav.expandRail': 'Expand activity bar',
@@ -178,5 +180,16 @@ describe('ActivityBar current destination', () => {
     mocks.railCollapsed = true
     view.rerender(<ActivityBar open onClose={vi.fn()} railMode="full" />)
     expect(screen.getByTestId('activity-bar').getAttribute('data-rail-layout')).toBe('compact')
+  })
+
+  it('marks Commander active and opens /commander when clicked', () => {
+    mocks.selectedSidebar = 'commander'
+    mocks.focusedKind = 'commander'
+    render(<ActivityBar open onClose={vi.fn()} />)
+    const button = screen.getByRole('button', { name: 'Commander' })
+    expect(button.getAttribute('aria-current')).toBe('page')
+    button.click()
+    expect(mocks.setSidebar).toHaveBeenCalledWith('commander')
+    expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'commander', params: {} })
   })
 })

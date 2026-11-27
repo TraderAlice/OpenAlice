@@ -6,6 +6,7 @@ import { inboxHandlers } from './inbox'
 import { entitiesHandlers } from './entities'
 import { scheduleHandlers } from './schedule'
 import { issuesHandlers } from './issues'
+import { dispatchHandlers } from './dispatch'
 import { wikilinkHandlers } from './wikilink'
 import { toolsSimulatorHandlers } from './toolsSimulator'
 import { marketHandlers } from './market'
@@ -37,6 +38,7 @@ export const handlers = [
   ...entitiesHandlers,
   ...scheduleHandlers,
   ...issuesHandlers,
+  ...dispatchHandlers,
   ...wikilinkHandlers,
   ...toolsSimulatorHandlers,
   ...marketHandlers,

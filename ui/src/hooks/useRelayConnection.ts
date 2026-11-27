@@ -86,10 +86,25 @@ export function useRelayConnection(initial: RelayStatus | null = null) {
     setLoading(true)
     setError(null)
     try {
+      const statusPromise = (desktop ? desktop.status() : relayJson<RelayStatus>('status'))
+        .then((nextStatus) => {
+          if (generation === discoveryGeneration.current && preferenceRevision === startupRevision.current) {
+            setStatus(nextStatus)
+          }
+          return nextStatus
+        })
+      const inventoryPromise = desktop ? desktop.fleet() : relayJson<{ machines: RelayMachine[] }>('fleet')
+      const preferencePromise = (desktop ? desktop.startupTarget() : relayJson<RelayStartupPreference>('startup-target'))
+        .then((preference) => {
+          if (generation === discoveryGeneration.current && preferenceRevision === startupRevision.current) {
+            setStartup(preference)
+          }
+          return preference
+        })
       const [nextStatus, inventory, preference] = await Promise.all([
-        desktop ? desktop.status() : relayJson<RelayStatus>('status'),
-        desktop ? desktop.fleet() : relayJson<{ machines: RelayMachine[] }>('fleet'),
-        desktop ? desktop.startupTarget() : relayJson<RelayStartupPreference>('startup-target'),
+        statusPromise,
+        inventoryPromise,
+        preferencePromise,
       ])
       if (generation !== discoveryGeneration.current) return
       if (preferenceRevision === startupRevision.current) setStatus(nextStatus)

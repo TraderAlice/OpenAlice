@@ -236,7 +236,7 @@ alice headless logs --task-id <taskId> --tail-bytes 8192
 alice schedule list
 ```
 
-From the workspace-manager context, `session list` without `--ws-id` spans
+From the commander context, `session list` without `--ws-id` spans
 every Workspace; elsewhere commands default to this Workspace.
 
 ## Coordinate durable work

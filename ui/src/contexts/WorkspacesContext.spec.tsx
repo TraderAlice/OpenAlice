@@ -4,8 +4,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
-  MANAGER_WORKSPACE_ID,
-  type ManagerWorkspaceSnapshot,
+  COMMANDER_WORKSPACE_ID,
+  type CommanderSnapshot,
   type SessionRecord,
   type Workspace,
 } from '../components/workspace/api'
@@ -25,7 +25,8 @@ const mocks = vi.hoisted(() => ({
   getWorkspaceDefaultAgent: vi.fn(),
   getIssueDefaultAgent: vi.fn(),
   openResumeSession: vi.fn(),
-  getWorkspaceManager: vi.fn(),
+  getCommander: vi.fn(),
+  openCommander: vi.fn(),
   getWorkspaceSessionDirectory: vi.fn(),
   pauseSession: vi.fn(),
   resumeSession: vi.fn(),
@@ -57,7 +58,8 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
     getWorkspaceDefaultAgent: mocks.getWorkspaceDefaultAgent,
     getIssueDefaultAgent: mocks.getIssueDefaultAgent,
     openResumeSession: mocks.openResumeSession,
-    getWorkspaceManager: mocks.getWorkspaceManager,
+    getCommander: mocks.getCommander,
+    openCommander: mocks.openCommander,
     getWorkspaceSessionDirectory: mocks.getWorkspaceSessionDirectory,
     pauseSession: mocks.pauseSession,
     resumeSession: mocks.resumeSession,
@@ -108,11 +110,11 @@ function persistentSession(): SessionRecord {
   }
 }
 
-function managerSession(): SessionRecord {
+function commanderSession(): SessionRecord {
   return {
-    id: 'opencode-manager-session',
-    resumeId: 'resume-manager',
-    wsId: MANAGER_WORKSPACE_ID,
+    id: 'opencode-commander-session',
+    resumeId: 'resume-commander',
+    wsId: COMMANDER_WORKSPACE_ID,
     agent: 'opencode',
     name: 'o1',
     createdAt: '2026-07-16T00:00:00.000Z',
@@ -125,12 +127,15 @@ function managerSession(): SessionRecord {
   }
 }
 
-function managerSnapshot(): ManagerWorkspaceSnapshot {
+function commanderSnapshot(): CommanderSnapshot {
   return {
-    id: MANAGER_WORKSPACE_ID,
-    tag: 'Workspace Manager',
+    id: COMMANDER_WORKSPACE_ID,
+    tag: 'Commander',
+    initialized: true,
+    session: commanderSession(),
+    unreadReports: 1,
+    activeWorkers: 2,
     activeWorkspaceCount: 1,
-    sessions: [managerSession()],
   }
 }
 
@@ -143,23 +148,23 @@ function Probe() {
   )
 }
 
-function ManagerProbe() {
+function CommanderProbe() {
   const {
-    workspaceManager,
+    commander,
     pauseSession,
     resumeSession,
     openWebSession,
     requestDeleteSession,
   } = useWorkspaces()
-  const session = workspaceManager?.sessions[0]
-  if (!session) return <span>Loading manager</span>
+  const session = commander?.session
+  if (!session) return <span>Loading commander</span>
   return (
     <div>
       <span>{session.title}</span>
-      <button type="button" onClick={() => void pauseSession(MANAGER_WORKSPACE_ID, session.id)}>Pause manager</button>
-      <button type="button" onClick={() => void resumeSession(MANAGER_WORKSPACE_ID, session.id)}>Resume manager</button>
-      <button type="button" onClick={() => void openWebSession(MANAGER_WORKSPACE_ID, session.id)}>Open manager Web</button>
-      <button type="button" onClick={() => requestDeleteSession(MANAGER_WORKSPACE_ID, session.id)}>Delete manager</button>
+      <button type="button" onClick={() => void pauseSession(COMMANDER_WORKSPACE_ID, session.id)}>Pause commander</button>
+      <button type="button" onClick={() => void resumeSession(COMMANDER_WORKSPACE_ID, session.id)}>Resume commander</button>
+      <button type="button" onClick={() => void openWebSession(COMMANDER_WORKSPACE_ID, session.id)}>Open commander Web</button>
+      <button type="button" onClick={() => requestDeleteSession(COMMANDER_WORKSPACE_ID, session.id)}>Delete commander</button>
     </div>
   )
 }
@@ -198,7 +203,12 @@ beforeEach(async () => {
   mocks.getIssueDefaultAgent.mockResolvedValue(null)
   mocks.openResumeSession.mockResolvedValue({ session: persistentSession() })
   mocks.getWorkspaceSessionDirectory.mockResolvedValue({ sessions: [] })
-  mocks.getWorkspaceManager.mockResolvedValue(managerSnapshot())
+  mocks.getCommander.mockResolvedValue(commanderSnapshot())
+  mocks.openCommander.mockResolvedValue({
+    commander: commanderSnapshot(),
+    session: commanderSession(),
+    snapshot: null,
+  })
   mocks.pauseSession.mockResolvedValue(true)
   mocks.resumeSession.mockResolvedValue(null)
   mocks.openWebSession.mockResolvedValue({ pid: 43, startedAt: 3 })
@@ -292,42 +302,42 @@ describe('WorkspacesProvider conversation routing', () => {
     await waitFor(() => expect(mocks.openResumeSession).toHaveBeenCalledOnce())
   })
 
-  it('routes Manager lifecycle actions through the separate launcher-owned state', async () => {
+  it('routes Commander lifecycle actions through the separate global Commander state', async () => {
     mocks.resumeSession.mockResolvedValue({ pid: 42, startedAt: 2 })
     render(
       <ToastProvider>
         <WorkspacesProvider>
-          <ManagerProbe />
+          <CommanderProbe />
         </WorkspacesProvider>
       </ToastProvider>,
     )
 
     expect(await screen.findByText('Coordinate release owners')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pause manager' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Pause commander' }))
     await waitFor(() => expect(mocks.pauseSession).toHaveBeenCalledWith(
-      MANAGER_WORKSPACE_ID,
-      'opencode-manager-session',
+      COMMANDER_WORKSPACE_ID,
+      'opencode-commander-session',
     ))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Resume manager' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Resume commander' }))
     await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
-      kind: 'workspace-manager',
-      params: { sessionId: 'opencode-manager-session' },
+      kind: 'commander',
+      params: {},
     }))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open manager Web' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open commander Web' }))
     await waitFor(() => expect(mocks.openWebSession).toHaveBeenCalledWith(
-      MANAGER_WORKSPACE_ID,
-      'opencode-manager-session',
+      COMMANDER_WORKSPACE_ID,
+      'opencode-commander-session',
     ))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete manager' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete commander' }))
     expect(screen.getByText(/Delete "Coordinate release owners"/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     await waitFor(() => expect(mocks.deleteSession).toHaveBeenCalledWith(
-      MANAGER_WORKSPACE_ID,
-      'opencode-manager-session',
+      COMMANDER_WORKSPACE_ID,
+      'opencode-commander-session',
     ))
   })
 

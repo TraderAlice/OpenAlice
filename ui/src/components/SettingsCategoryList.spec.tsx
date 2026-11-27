@@ -8,22 +8,31 @@ import { SettingsCategoryList } from './SettingsCategoryList'
 
 const mocks = vi.hoisted(() => ({
   product: 'trader' as 'trader' | 'nano' | undefined,
+  projectError: null as string | null,
   focused: null as null | { kind: 'dev'; params: { tab: 'logs' | 'runs' | 'api' } }
     | { kind: 'automation'; params: { section: 'runs' | 'api' } },
   openOrFocus: vi.fn(),
   navigate: vi.fn(),
   guidance: { availableCount: 0, needsAttentionCount: 0 },
+  machines: undefined as undefined | {
+    error?: string | null
+    operationError?: string | null
+    startup?: { target: { machine: string; project: string } | null; error: string | null } | null
+    fleet?: Array<{ key: string; connection: string; issue: { message: string } | null }>
+  },
 }))
 
 vi.mock('react-router-dom', () => ({ useNavigate: () => mocks.navigate }))
 
-vi.mock('../hooks/useUpdateLifecycle', () => ({ useUpdateLifecycle: () => ({ guidance: mocks.guidance }) }))
+vi.mock('../hooks/useUpdateLifecycle', () => ({
+  useUpdateLifecycle: () => ({ guidance: mocks.guidance, machines: mocks.machines }),
+}))
 
 vi.mock('../hooks/useAliceProject', () => ({
   useAliceProject: () => ({
     project: mocks.product ? { product: mocks.product } : null,
     loading: false,
-    error: null,
+    error: mocks.projectError,
     refresh: async () => undefined,
   }),
 }))
@@ -68,6 +77,8 @@ beforeEach(() => {
   mocks.openOrFocus.mockClear()
   mocks.navigate.mockClear()
   mocks.guidance = { availableCount: 0, needsAttentionCount: 0 }
+  mocks.projectError = null
+  mocks.machines = undefined
 })
 
 afterEach(() => {
@@ -150,4 +161,25 @@ it('places Machines directly after Overview and opens its dedicated tab', () => 
   expect(names.indexOf('settings.machines.title')).toBe(names.indexOf('settings.category.general') + 1)
   fireEvent.click(screen.getByRole('button', { name: 'settings.machines.title' }))
   expect(mocks.navigate).toHaveBeenCalledWith('/settings/machines')
+})
+
+it('shows an attention indicator on Machines when a machine has issues or is offline/incompatible and hides it when healthy', () => {
+  mocks.machines = {
+    fleet: [
+      { key: 'local', connection: 'local', issue: null },
+      { key: 'studio', connection: 'online', issue: null },
+    ],
+  }
+  const { rerender } = render(<SettingsCategoryList />)
+  const machinesButton = screen.getByRole('button', { name: /settings\.machines\.title/ })
+  expect(within(machinesButton).queryByRole('status', { name: 'settings.machines.attentionLabel' })).toBeNull()
+
+  mocks.machines = {
+    fleet: [
+      { key: 'local', connection: 'local', issue: null },
+      { key: 'studio', connection: 'incompatible', issue: { message: 'CLI too old' } },
+    ],
+  }
+  rerender(<SettingsCategoryList />)
+  expect(within(screen.getByRole('button', { name: /settings\.machines\.title/ })).getByRole('status', { name: 'settings.machines.attentionLabel' })).toBeTruthy()
 })

@@ -63,7 +63,7 @@ export type ViewSpec =
   | { kind: 'auto-quant-landing';  params: { targetWsId?: string; initialPrompt?: string } }
   | { kind: 'auto-prediction-landing'; params: { targetWsId?: string; initialPrompt?: string } }
   | { kind: 'harness-surface'; params: { wsId: string; capability: 'studio'; source: 'auto-quant' | 'prediction' } }
-  | { kind: 'workspace-manager';   params: { sessionId?: string } }
+  | { kind: 'commander';           params: Record<string, never> }
   | {
       kind: 'file-viewer'
       params: {
@@ -87,6 +87,7 @@ export type ViewKind = ViewSpec['kind']
  */
 export type ActivitySection =
   | 'quick-start'
+  | 'commander'
   | 'chat'
   | 'auto-quant'
   | 'prediction'

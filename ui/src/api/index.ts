@@ -5,6 +5,7 @@
 import { configApi } from './config'
 import { scheduleApi } from './schedule'
 import { issuesApi } from './issues'
+import { dispatchApi } from './dispatch'
 import { tradingApi } from './trading'
 import { marketDataApi } from './openbb'
 import { toolsApi } from './tools'
@@ -27,6 +28,7 @@ export const api = {
   config: configApi,
   schedule: scheduleApi,
   issues: issuesApi,
+  dispatch: dispatchApi,
   trading: tradingApi,
   marketData: marketDataApi,
   tools: toolsApi,
@@ -113,3 +115,17 @@ export type {
   AgentConversationSource,
   AgentConversationTarget,
 } from './agentConversations'
+export type {
+  DispatchArtifact,
+  DispatchBoardSnapshot,
+  DispatchBoardSummary,
+  DispatchDeliverable,
+  DispatchEdge,
+  DispatchEdgeKind,
+  DispatchLane,
+  DispatchScheduleMarker,
+  DispatchSpan,
+  DispatchSpanDelivery,
+  DispatchSpanTrigger,
+  DispatchTemplateKind,
+} from './dispatch'

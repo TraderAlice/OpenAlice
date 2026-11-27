@@ -11,6 +11,7 @@ describe('ActivityBar navigation hierarchy', () => {
 
     expect(primary?.items.map((item) => item.page)).toEqual([
       'chat',
+      'commander',
       'inbox',
       'issue',
       'auto-quant',
@@ -28,6 +29,7 @@ describe('ActivityBar navigation hierarchy', () => {
     const pages = navSectionsForProduct('nano').flatMap((section) => section.items.map((item) => item.page))
     expect(pages).toEqual([
       'chat',
+      'commander',
       'inbox',
       'issue',
       'auto-quant',

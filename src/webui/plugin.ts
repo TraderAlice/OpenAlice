@@ -15,6 +15,7 @@ import { createConfigRoutes, createMarketDataRoutes } from './routes/config.js'
 import { createConnectorRoutes } from './routes/connectors.js'
 import { createScheduleRoutes } from './routes/schedule.js'
 import { createIssuesRoutes } from './routes/issues.js'
+import { createDispatchRoutes } from './routes/dispatch.js'
 import { createInquiryRoutes } from './routes/inquiries.js'
 import { createTradingProxyRoutes } from './routes/trading-proxy.js'
 import { createTradingConfigRoutes } from './routes/trading-config.js'
@@ -277,7 +278,7 @@ export class WebPlugin implements Plugin {
     app.route('/api/market', createMarketRoutes(ctx))
     app.route('/api/bars', createBarsRoutes(ctx))
     app.route('/api/reference', createReferenceRoutes(ctx))
-    app.route('/api/inbox', createInboxRoutes({ inboxStore: ctx.inboxStore, resolveWorkspace: id => this.workspaceService?.registry.get(id) }))
+    app.route('/api/inbox', createInboxRoutes({ inboxStore: ctx.inboxStore, resolveWorkspace: id => this.workspaceService?.resolveRuntimeWorkspace(id) ?? this.workspaceService?.registry.get(id) }))
     app.route('/api/version', createVersionRoutes())
     app.route('/api/alice-project', createAliceProjectRoutes())
 
@@ -325,6 +326,7 @@ export class WebPlugin implements Plugin {
     app.route('/api/office', createOfficeRoutes(this.workspaceService))
     app.route('/api/schedule', createScheduleRoutes(this.workspaceService))
     app.route('/api/issues', createIssuesRoutes(this.workspaceService))
+    app.route('/api/dispatch', createDispatchRoutes(this.workspaceService))
     app.route('/api/inquiries', createInquiryRoutes({
       service: this.workspaceService,
       inboxStore: ctx.inboxStore,

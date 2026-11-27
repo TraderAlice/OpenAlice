@@ -128,8 +128,18 @@ const CATEGORY_GROUPS = [
 export function SettingsCategoryList({ onSelect }: { onSelect?: () => void }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { project } = useAliceProject()
-  const guidance = useUpdateLifecycle({ optional: true })?.guidance
+  const { project, error: projectError } = useAliceProject()
+  const lifecycle = useUpdateLifecycle({ optional: true })
+  const guidance = lifecycle?.guidance
+  const machinesAttention = Boolean(
+    projectError
+    || lifecycle?.machines?.error
+    || lifecycle?.machines?.operationError
+    || lifecycle?.machines?.startup?.error
+    || lifecycle?.machines?.fleet?.some(
+      (m) => Boolean(m.issue) || m.connection === 'incompatible' || m.connection === 'offline',
+    ),
+  )
   const focused = useWorkspace((state) => getFocusedTab(state)?.spec)
   const developerTab = focused?.kind === 'dev' ? focused.params.tab
     : focused?.kind === 'automation' ? focused.params.section : null
@@ -169,7 +179,20 @@ export function SettingsCategoryList({ onSelect }: { onSelect?: () => void }) {
                 label={t(item.labelKey)}
                 active={active}
                 icon={<item.Icon size={14} strokeWidth={1.75} className="text-muted-foreground/70" aria-hidden />}
-                trail={item.category === 'general' ? <><UpdateGuidanceBadge count={guidance?.availableCount ?? 0} setupCount={guidance?.setupCount ?? 0} /><UpdateGuidanceBadge count={guidance?.needsAttentionCount ?? 0} tone="attention" /></> : undefined}
+                trail={
+                  item.category === 'general' ? (
+                    <>
+                      <UpdateGuidanceBadge count={guidance?.availableCount ?? 0} setupCount={guidance?.setupCount ?? 0} />
+                      <UpdateGuidanceBadge count={guidance?.needsAttentionCount ?? 0} tone="attention" />
+                    </>
+                  ) : item.category === 'machines' && machinesAttention ? (
+                    <span
+                      role="status"
+                      aria-label={t('settings.machines.attentionLabel')}
+                      className="size-2 shrink-0 rounded-full bg-warning"
+                    />
+                  ) : undefined
+                }
                 onClick={() => {
                   navigate(item.category === 'general' ? '/settings' : `/settings/${item.category}`)
                   onSelect?.()

@@ -273,6 +273,7 @@ export const claudeAdapter: CliAdapter = {
       ...base,
       '--settings', AUTOTRUST_SETTINGS, '--dangerously-skip-permissions',
       ...(ctx.sessionRuntime?.headlessArgs ?? []),
+      ...(ctx.appendSystemPrompt ? ['--append-system-prompt', ctx.appendSystemPrompt] : []),
       ...(ctx.resume ? ['--resume', ctx.resume.sessionId] : []),
       '-p', '--output-format', 'stream-json', '--verbose',
       '--', prompt,

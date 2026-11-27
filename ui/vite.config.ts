@@ -62,6 +62,7 @@ function readUiPort(): { port: number; strictPort: boolean } {
 }
 
 const { port: uiPort, strictPort } = readUiPort()
+const disableFsEvents = process.env['OPENALICE_VITE_USE_FSEVENTS'] === '0'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -85,6 +86,7 @@ export default defineConfig({
     host: '127.0.0.1',
     port: uiPort,
     strictPort,
+    ...(disableFsEvents ? { watch: { useFsEvents: false } } : {}),
     proxy: {
       '/api': {
         target: `http://localhost:${backendPort}`,

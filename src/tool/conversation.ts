@@ -342,7 +342,7 @@ export const conversationCheckFactory: WorkspaceToolFactory = {
   name: 'conversation_check',
   build(ctx) {
     return tool({
-      description: 'Check and acknowledge completed peer conversation replies in this Session mailbox. Run this when woken by an OpenAlice peer-task notification.',
+      description: 'Check and acknowledge completed peer conversation replies and scheduled-issue reports in this Session mailbox. Run this when woken by an OpenAlice peer-task or scheduled-report notification.',
       inputSchema: z.object({
         resumeId: z.string().min(1).optional().describe('Optional Session resumeId; defaults to the calling Session.'),
       }),
