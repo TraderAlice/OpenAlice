@@ -4,7 +4,8 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { DispatchBoardSnapshot, DispatchSpan } from '../../api/dispatch'
+import type { DispatchSpan } from '../../api/dispatch'
+import type { DispatchBoardSnapshot } from './useDispatchBoard'
 import type { IssueSnapshot } from '../../api/issues'
 import { i18n } from '../../i18n'
 import { IssuesBoard } from '../IssuesBoard'
@@ -986,5 +987,204 @@ describe('Issues -> Dispatch integration & Inspector', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(clusterPill.className).not.toContain('ring-primary/50')
     expect(waveEp.className).not.toContain('ring-1')
+  })
+
+  it('renders pinned Commander control-plane swimlane, Scheduled Thread -> Commander report wake, Commander -> Worker dispatch, and safe Inspector actions', async () => {
+    const user = userEvent.setup()
+    const commanderSnapshot: DispatchBoardSnapshot = {
+      fromMs: FROM,
+      toMs: BASE,
+      generatedAt: BASE,
+      lanes: [
+        {
+          workspaceId: 'commander',
+          tag: 'Commander',
+          label: 'Commander',
+          template: 'commander',
+          templateKind: 'commander',
+        },
+        {
+          workspaceId: 'ws-chat',
+          tag: 'chat-main',
+          label: 'Chat',
+          template: 'chat',
+          templateKind: 'chat',
+        },
+        {
+          workspaceId: 'ws-quant',
+          tag: 'quant-main',
+          label: 'Auto Quant',
+          template: 'auto-quant-v2',
+          templateKind: 'auto-quant',
+        },
+      ],
+      spans: [
+        {
+          id: 'span-sched-report',
+          kind: 'headless',
+          workspaceId: 'ws-quant',
+          resumeId: 'res-sched-report',
+          sessionLabel: 'Morning Scan',
+          agent: 'claude',
+          status: 'done',
+          startedAt: FROM + 500_000,
+          finishedAt: FROM + 620_000,
+          durationMs: 120_000,
+          trigger: {
+            kind: 'scheduled-issue',
+            workspaceId: 'ws-quant',
+            issueId: 'morning-scan',
+            issueTitle: 'Morning Market Scan',
+          },
+          assistantPreview: 'Detected 2.1 sigma spread widening in QQQ.',
+          toolCalls: 3,
+          toolFailures: 0,
+        },
+        {
+          id: 'span-cmd-wake',
+          kind: 'headless',
+          workspaceId: 'commander',
+          resumeId: 'res-commander',
+          sessionLabel: 'Commander',
+          agent: 'claude',
+          status: 'done',
+          startedAt: FROM + 630_000,
+          finishedAt: FROM + 720_000,
+          durationMs: 90_000,
+          trigger: { kind: 'manual' },
+          prompt: 'You have 1 pending schedule report. Run alice conversation check.',
+          assistantPreview: 'Dispatched follow-up quant worker and pushed alert to Inbox.',
+          toolCalls: 2,
+          toolFailures: 0,
+        },
+        {
+          id: 'span-cmd-worker',
+          kind: 'headless',
+          workspaceId: 'ws-quant',
+          resumeId: 'res-cmd-worker',
+          sessionLabel: 'Spread Deep Dive',
+          agent: 'codex',
+          status: 'done',
+          startedAt: FROM + 660_000,
+          finishedAt: FROM + 840_000,
+          durationMs: 180_000,
+          trigger: {
+            kind: 'orchestration',
+            dispatchId: 'dsp-cmd-1',
+            parentWorkspaceId: 'commander',
+            parentResumeId: 'res-commander',
+          },
+          prompt: 'Verify whether QQQ spread widening is ETF rebalance noise.',
+          assistantPreview: 'Confirmed ETF rebalance flow.',
+          toolCalls: 4,
+          toolFailures: 0,
+        },
+      ],
+      edges: [
+        {
+          id: 'report-mail-1',
+          kind: 'conversation',
+          messageKind: 'scheduled_report',
+          fromWorkspaceId: 'ws-quant',
+          fromResumeId: 'res-sched-report',
+          toWorkspaceId: 'commander',
+          toResumeId: 'res-commander',
+          at: FROM + 625_000,
+          taskId: 'span-sched-report',
+          deliveryStatus: 'acked',
+          ackedAt: FROM + 635_000,
+          subject: 'Morning Market Scan',
+          body: 'Detected 2.1 sigma spread widening in QQQ.',
+          outcome: 'completed',
+          summary: 'Morning Market Scan (done)',
+        },
+        {
+          id: 'dsp-dsp-cmd-1',
+          kind: 'dispatch',
+          fromWorkspaceId: 'commander',
+          fromResumeId: 'res-commander',
+          toWorkspaceId: 'ws-quant',
+          toResumeId: 'res-cmd-worker',
+          at: FROM + 660_000,
+          taskId: 'span-cmd-worker',
+          dispatchId: 'dsp-cmd-1',
+          taskStatus: 'done',
+          spec: 'Verify whether QQQ spread widening is ETF rebalance noise.',
+        },
+      ],
+      artifacts: [
+        {
+          id: 'art-cmd-inbox',
+          kind: 'inbox',
+          entryId: 'inbox-cmd-1',
+          workspaceId: 'commander',
+          at: FROM + 715_000,
+          title: 'QQQ Spread Alert',
+          body: '# QQQ Spread Alert\nCommander escalated verified spread anomaly.',
+          files: ['ws-quant/reports/spread.md'],
+          unread: true,
+          runId: 'span-cmd-wake',
+          resumeId: 'res-commander',
+        },
+      ],
+      scheduleMarkers: [],
+      summary: {
+        activeWorkspaceCount: 2,
+        runningSpanCount: 0,
+        totalSpanCount: 3,
+        edgeCount: 2,
+        artifactCount: 1,
+        errorSpanCount: 0,
+      },
+    }
+
+    mocks.getDispatch.mockResolvedValue(commanderSnapshot)
+
+    render(<IssuesBoard />)
+    await user.click(screen.getByRole('button', { name: 'Dispatch' }))
+    await waitFor(() => expect(screen.getByTestId('dispatch-board')).toBeTruthy())
+
+    // Commander lane is pinned first at index 0 with control-plane styling & badge
+    const lanes = screen.getAllByTestId(/^dispatch-lane-/)
+    expect(lanes.map((el) => el.getAttribute('data-testid'))).toEqual([
+      'dispatch-lane-commander',
+      'dispatch-lane-ws-chat',
+      'dispatch-lane-ws-quant',
+    ])
+    const commanderLane = lanes[0]!
+    expect(commanderLane.getAttribute('data-lane-kind')).toBe('commander')
+    const commanderBadge = within(commanderLane).getByTestId('dispatch-commander-badge')
+    expect(commanderBadge.textContent).toBe('Commander')
+    expect(commanderBadge.className).toContain('text-primary')
+    expect(commanderBadge.className).toContain('border-primary/30')
+    expect(commanderBadge.className).toContain('bg-primary/10')
+
+    // Causal episode feed includes both the Scheduled Thread -> Commander report chip and Commander -> Worker dispatch chip
+    expect(screen.getByTestId('dispatch-edge-chip-report-mail-1').textContent).toContain('Report')
+    expect(screen.getByTestId('dispatch-edge-chip-dsp-dsp-cmd-1')).toBeTruthy()
+    expect(screen.getByTestId('dispatch-artifact-art-cmd-inbox')).toBeTruthy()
+
+    // Inspecting a Commander span displays Commander badge cleanly without invalid business-workspace Open Session button
+    await user.click(screen.getByTestId('dispatch-span-span-cmd-wake'))
+    const cmdSpanDialog = await screen.findByRole('dialog')
+    expect(within(cmdSpanDialog).queryByRole('button', { name: 'Open Session' })).toBeNull()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    // Inspecting the scheduled-report edge displays full label, summary, and keeps Commander resume non-business-clickable
+    await user.click(screen.getByTestId('dispatch-edge-chip-report-mail-1'))
+    const reportDialog = await screen.findByRole('dialog')
+    expect(within(reportDialog).getByText('Scheduled report')).toBeTruthy()
+    expect(within(reportDialog).getByText('Morning Market Scan (done)')).toBeTruthy()
+    expect(within(reportDialog).queryByRole('button', { name: 'res-commander' })).toBeNull()
+    expect(within(reportDialog).getByText('res-commander')).toBeTruthy()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    // Inspecting Commander -> Inbox artifact preserves Open in Inbox without invalid business Open Session
+    await user.click(screen.getByTestId('dispatch-artifact-art-cmd-inbox'))
+    const inboxDialog = await screen.findByRole('dialog')
+    expect(within(inboxDialog).getByRole('button', { name: 'Open in Inbox' })).toBeTruthy()
+    expect(within(inboxDialog).queryByRole('button', { name: 'Open Session' })).toBeNull()
   })
 })

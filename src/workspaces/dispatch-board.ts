@@ -1,13 +1,16 @@
 /**
- * Read-only active-Workspace Agent Dispatch observability projection.
+ * Read-only active-Workspace + global Commander Agent Dispatch observability projection.
  *
  * Joins HeadlessTaskRegistry, OrchestrationManager, AgentConversationLog,
- * ProductActivityJournal (interactive turns), ScheduleScanner, InboxStore,
- * and ArtifactProvenanceStore inside a bounded `[fromMs, toMs]` time window.
+ * SessionMailbox (scheduled-issue reports to Commander), ProductActivityJournal
+ * (interactive turns), ScheduleScanner, InboxStore, and ArtifactProvenanceStore
+ * inside a bounded `[fromMs, toMs]` time window.
  *
- * Hard boundary: ONLY currently active Workspaces (`listActiveWorkspaces`)
- * appear in lanes, spans, edges, schedules, and artifacts. Standby Workspaces
- * are excluded as inactive. Native runtime session ids never cross this boundary.
+ * Hard boundary: ONLY currently active business Workspaces (`listActiveWorkspaces`)
+ * plus the global control-plane Commander (`commander`, when initialized or active
+ * in the window) appear in lanes, spans, edges, schedules, and artifacts. Standby
+ * business Workspaces are excluded as inactive. Native runtime session ids never
+ * cross this boundary.
  */
 import { inboxFiles } from '@traderalice/connector-protocol'
 
@@ -41,7 +44,58 @@ const MAX_SPANS = 300
 const MAX_INBOX_PAGES = 3
 const JOURNAL_FAST_LIMIT = 500
 
-export type DispatchTemplateKind = 'chat' | 'auto-quant' | 'prediction' | 'custom'
+export const COMMANDER_LANE_ID = 'commander'
+const COMMANDER_LANE_TAG = 'Commander'
+const COMMANDER_LANE_LABEL = 'Commander'
+
+export type DispatchTemplateKind = 'commander' | 'chat' | 'auto-quant' | 'prediction' | 'custom'
+
+interface DispatchMailboxReportSource {
+  readonly kind: 'scheduled-issue'
+  readonly workspaceId: string
+  readonly workspaceTag?: string
+  readonly issueId: string
+  readonly issueTitle?: string
+  readonly fire?: 'schedule' | 'manual' | 'retry'
+}
+
+interface DispatchMailboxMessageLike {
+  readonly id: string
+  readonly recipientResumeId: string
+  readonly recipientWorkspaceId: string
+  readonly taskId: string
+  readonly childResumeId: string
+  readonly childWorkspaceId: string
+  readonly childAgent: string
+  readonly taskStatus: 'done' | 'failed' | 'interrupted'
+  readonly assistantPreview: string | null
+  readonly error?: string
+  readonly durationMs?: number
+  readonly createdAt: number
+  readonly status: 'unread' | 'notified' | 'acked'
+  readonly notifiedAt?: number
+  readonly ackedAt?: number
+  readonly reportSource?: DispatchMailboxReportSource
+}
+
+interface DispatchSessionMailboxLike {
+  listRecent?(opts?: { sinceMs?: number; recipientResumeId?: string }): readonly DispatchMailboxMessageLike[]
+  pendingFor?(recipientResumeId: string): readonly DispatchMailboxMessageLike[]
+}
+
+interface DispatchCommanderPointerLike {
+  readonly version?: number
+  readonly resumeId: string
+  readonly createdAt?: number
+  readonly updatedAt?: number
+}
+
+interface DispatchCommanderHost {
+  readonly commanderWorkspace?: WorkspaceMeta
+  readonly commanderMailbox?: DispatchSessionMailboxLike
+  readonly sessionMailbox?: DispatchSessionMailboxLike
+  readonly getCommanderPointer?: () => Promise<DispatchCommanderPointerLike | null>
+}
 
 export interface DispatchLane {
   readonly workspaceId: string
@@ -126,6 +180,7 @@ export type DispatchEdgeKind =
 export interface DispatchEdge {
   readonly id: string
   readonly kind: DispatchEdgeKind
+  readonly messageKind?: 'scheduled_report'
   readonly fromWorkspaceId: string
   readonly fromResumeId?: string
   readonly toWorkspaceId: string
@@ -245,10 +300,11 @@ function classifyTemplateKind(template?: string): DispatchTemplateKind {
 }
 
 const TEMPLATE_SORT_ORDER: Record<DispatchTemplateKind, number> = {
-  chat: 0,
-  'auto-quant': 1,
-  prediction: 2,
-  custom: 3,
+  commander: 0,
+  chat: 1,
+  'auto-quant': 2,
+  prediction: 3,
+  custom: 4,
 }
 
 function firstHeadingOrLine(markdown: string): string {
@@ -359,7 +415,7 @@ async function readInteractiveRuntimeEvents(
 function buildInteractiveSpans(
   svc: WorkspaceService,
   events: readonly AgentRuntimeEvent[],
-  activeById: ReadonlyMap<string, WorkspaceMeta>,
+  visibleIds: ReadonlySet<string>,
   issueTitleByKey: ReadonlyMap<string, string>,
   fromMs: number,
   toMs: number,
@@ -416,7 +472,7 @@ function buildInteractiveSpans(
       metrics?: { toolCalls?: number; toolFailures?: number }
     }
     if (!payload?.workspaceId || !payload?.resumeId) continue
-    if (!activeById.has(payload.workspaceId)) continue
+    if (!visibleIds.has(payload.workspaceId)) continue
 
     const key = `${payload.workspaceId}\0${payload.resumeId}\0${payload.sessionRecordId ?? ''}`
     if (event.type === 'runtime.started') {
@@ -483,8 +539,15 @@ export async function buildDispatchBoardSnapshot(
   const activeById = new Map<string, WorkspaceMeta>(
     activeWorkspaces.map((ws) => [ws.id, ws]),
   )
+  const visibleIds = new Set<string>(activeById.keys())
+  visibleIds.add(COMMANDER_LANE_ID)
 
-  const [lanes, issuesSnap, scheduleSnap, conversationRecords, runtimeEvents] = await Promise.all([
+  const commanderHost = svc as unknown as DispatchCommanderHost
+  const commanderPointerPromise = typeof commanderHost.getCommanderPointer === 'function'
+    ? commanderHost.getCommanderPointer().catch(() => null)
+    : Promise.resolve(null)
+
+  const [lanes, issuesSnap, scheduleSnap, conversationRecords, runtimeEvents, commanderPointer] = await Promise.all([
     Promise.all(
       activeWorkspaces.map(async (ws): Promise<DispatchLane> => {
         const meta = ws.dir ? await readWorkspaceMetadata(ws.dir).catch(() => null) : null
@@ -508,7 +571,16 @@ export async function buildDispatchBoardSnapshot(
       ? svc.agentConversationLog.queryWindow({ fromMs, toMs, limit: MAX_SPANS }).catch(() => [])
       : Promise.resolve([]),
     readInteractiveRuntimeEvents(svc, fromMs).catch(() => []),
+    commanderPointerPromise,
   ])
+
+  const commanderSessions = typeof svc.sessionRegistry?.listFor === 'function'
+    ? svc.sessionRegistry.listFor(COMMANDER_LANE_ID)
+    : []
+  const commanderInitialized = Boolean(
+    commanderPointer?.resumeId
+    || commanderSessions.length > 0,
+  )
 
   lanes.sort((a, b) => {
     const orderDiff = TEMPLATE_SORT_ORDER[a.templateKind] - TEMPLATE_SORT_ORDER[b.templateKind]
@@ -589,7 +661,7 @@ export async function buildDispatchBoardSnapshot(
 
   const headlessSpans: DispatchSpan[] = []
   for (const task of headlessRaw) {
-    if (!activeById.has(task.wsId)) continue
+    if (!visibleIds.has(task.wsId)) continue
     const endMs = task.finishedAt ?? nowMs
     if (task.startedAt > toMs || endMs < fromMs) continue
     if (headlessSpans.length >= MAX_SPANS) break
@@ -618,7 +690,7 @@ export async function buildDispatchBoardSnapshot(
         ...(subj.kind === 'inbox' ? { inboxEntryId: subj.entryId } : {}),
         question: task.inquiry.question,
       }
-    } else if (orchTask && activeById.has(orchTask.parentWorkspaceId)) {
+    } else if (orchTask && visibleIds.has(orchTask.parentWorkspaceId)) {
       trigger = {
         kind: 'orchestration',
         dispatchId: orchTask.dispatchId,
@@ -689,7 +761,7 @@ export async function buildDispatchBoardSnapshot(
   const interactiveSpans = buildInteractiveSpans(
     svc,
     runtimeEvents,
-    activeById,
+    visibleIds,
     issueTitleByKey,
     fromMs,
     toMs,
@@ -700,12 +772,13 @@ export async function buildDispatchBoardSnapshot(
     .sort((a, b) => a.startedAt - b.startedAt)
     .slice(0, MAX_SPANS)
 
-  // Edges: orchestration dispatches, orchestration messages, cross-agent conversations.
+  // Edges: orchestration dispatches, orchestration messages, cross-agent conversations,
+  // and scheduled-issue completion reports targeting the global Commander.
   const edges: DispatchEdge[] = []
   const orchestrationWorkerHeadlessIds = new Set<string>()
   for (const task of allOrchestrationTasks) {
     if (task.headlessTaskId) orchestrationWorkerHeadlessIds.add(task.headlessTaskId)
-    if (!activeById.has(task.parentWorkspaceId) || !activeById.has(task.workerWorkspaceId)) {
+    if (!visibleIds.has(task.parentWorkspaceId) || !visibleIds.has(task.workerWorkspaceId)) {
       continue
     }
     const endAt = task.settledAt ?? task.updatedAt
@@ -750,7 +823,7 @@ export async function buildDispatchBoardSnapshot(
           : resolveWorkspaceForResume(svc, msg.toResumeId, orchestrationByAnyResumeId)
 
     if (!fromWorkspaceId || !toWorkspaceId) continue
-    if (!activeById.has(fromWorkspaceId) || !activeById.has(toWorkspaceId)) continue
+    if (!visibleIds.has(fromWorkspaceId) || !visibleIds.has(toWorkspaceId)) continue
 
     edges.push({
       id: msg.id,
@@ -775,7 +848,7 @@ export async function buildDispatchBoardSnapshot(
     if (orchestrationWorkerHeadlessIds.has(rec.taskId)) continue
     if (rec.dispatchedAt < fromMs || rec.dispatchedAt > toMs) continue
     if (rec.source.kind !== 'session' && rec.source.kind !== 'workspace') continue
-    if (!activeById.has(rec.source.workspaceId) || !activeById.has(rec.target.workspaceId)) continue
+    if (!visibleIds.has(rec.source.workspaceId) || !visibleIds.has(rec.target.workspaceId)) continue
     edges.push({
       id: `conv-${rec.taskId}`,
       kind: 'conversation',
@@ -792,6 +865,87 @@ export async function buildDispatchBoardSnapshot(
       assistantText: rec.assistantText,
       ...(rec.durationMs !== undefined ? { durationMs: rec.durationMs } : {}),
     })
+  }
+
+  // Scheduled-issue completion reports delivered to Commander via SessionMailbox.
+  const commanderMailbox = commanderHost.commanderMailbox ?? commanderHost.sessionMailbox
+  if (commanderMailbox) {
+    let mailboxMessages: readonly DispatchMailboxMessageLike[] = []
+    if (typeof commanderMailbox.listRecent === 'function') {
+      mailboxMessages = commanderMailbox.listRecent({ sinceMs: fromMs })
+    } else if (typeof commanderMailbox.pendingFor === 'function') {
+      const candidateResumeIds = new Set<string>()
+      if (commanderPointer?.resumeId) candidateResumeIds.add(commanderPointer.resumeId)
+      for (const rec of commanderSessions) {
+        if (rec.resumeId) candidateResumeIds.add(rec.resumeId)
+      }
+      for (const span of spans) {
+        if (span.workspaceId === COMMANDER_LANE_ID && span.resumeId) {
+          candidateResumeIds.add(span.resumeId)
+        }
+      }
+      const collected: DispatchMailboxMessageLike[] = []
+      for (const resumeId of candidateResumeIds) {
+        collected.push(...commanderMailbox.pendingFor(resumeId))
+      }
+      mailboxMessages = collected
+    }
+
+    const seenMailboxIds = new Set<string>()
+    for (const msg of mailboxMessages) {
+      if (seenMailboxIds.has(msg.id)) continue
+      seenMailboxIds.add(msg.id)
+      if (msg.recipientWorkspaceId !== COMMANDER_LANE_ID) continue
+      if (!activeById.has(msg.childWorkspaceId)) continue
+      if (msg.createdAt < fromMs || msg.createdAt > toMs) continue
+
+      const childTask = headlessByTaskId.get(msg.taskId)
+      const isScheduledReport =
+        msg.reportSource?.kind === 'scheduled-issue'
+        || (!msg.reportSource && childTask?.trigger?.kind === 'issue')
+      if (!isScheduledReport) continue
+
+      const issueId =
+        msg.reportSource?.issueId
+        ?? (childTask?.trigger?.kind === 'issue' ? childTask.trigger.issueId : undefined)
+      const issueTitle =
+        msg.reportSource?.issueTitle
+        ?? (issueId ? issueTitleByKey.get(`${msg.childWorkspaceId}\0${issueId}`) : undefined)
+      const issueLabel = issueTitle || (issueId ? `#${issueId}` : 'Scheduled run')
+      const deliveryStatus: OrchestrationMessageStatus =
+        msg.status === 'acked'
+          ? 'acked'
+          : msg.status === 'notified'
+            ? 'leased'
+            : 'unread'
+      const body = msg.error ?? msg.assistantPreview ?? undefined
+      const outcome: OrchestrationTaskOutcome =
+        msg.taskStatus === 'done'
+          ? 'completed'
+          : msg.taskStatus === 'failed'
+            ? 'failed'
+            : 'inconclusive'
+
+      edges.push({
+        id: `report-${msg.id}`,
+        kind: 'conversation',
+        messageKind: 'scheduled_report',
+        fromWorkspaceId: msg.childWorkspaceId,
+        fromResumeId: msg.childResumeId,
+        toWorkspaceId: COMMANDER_LANE_ID,
+        toResumeId: msg.recipientResumeId,
+        at: msg.createdAt,
+        taskId: msg.taskId,
+        deliveryStatus,
+        ...(msg.notifiedAt !== undefined ? { leasedAt: msg.notifiedAt } : {}),
+        ...(msg.ackedAt !== undefined ? { ackedAt: msg.ackedAt } : {}),
+        subject: issueLabel,
+        ...(body ? { body } : {}),
+        outcome,
+        summary: `${issueLabel} (${msg.taskStatus})`,
+        ...(msg.durationMs !== undefined ? { durationMs: msg.durationMs } : {}),
+      })
+    }
   }
 
   edges.sort((a, b) => a.at - b.at)
@@ -812,9 +966,9 @@ export async function buildDispatchBoardSnapshot(
       for (const entry of batch.entries) {
         if (entry.ts > toMs) continue
         if (entry.ts < fromMs) continue
-        const laneWsId = activeById.has(entry.workspaceId)
+        const laneWsId = visibleIds.has(entry.workspaceId)
           ? entry.workspaceId
-          : entry.origin?.issueWorkspaceId && activeById.has(entry.origin.issueWorkspaceId)
+          : entry.origin?.issueWorkspaceId && visibleIds.has(entry.origin.issueWorkspaceId)
             ? entry.origin.issueWorkspaceId
             : null
         if (!laneWsId) continue
@@ -845,7 +999,7 @@ export async function buildDispatchBoardSnapshot(
   for (const record of provenanceRecords) {
     if (record.artifact.kind !== 'report') continue
     if (record.at < fromMs || record.at > toMs) continue
-    if (!activeById.has(record.artifact.workspaceId)) continue
+    if (!visibleIds.has(record.artifact.workspaceId)) continue
     seenReportKeys.add(`${record.artifact.workspaceId}\0${record.artifact.path}`)
     artifacts.push({
       id: `prov-${record.id}`,
@@ -867,7 +1021,7 @@ export async function buildDispatchBoardSnapshot(
     if (settledAt < fromMs || settledAt > toMs) continue
     for (const del of task.deliverables) {
       const wsId = del.workspaceId ?? task.workerWorkspaceId
-      if (!activeById.has(wsId)) continue
+      if (!visibleIds.has(wsId)) continue
       const key = `${wsId}\0${del.path}`
       if (seenReportKeys.has(key)) continue
       seenReportKeys.add(key)
@@ -887,8 +1041,32 @@ export async function buildDispatchBoardSnapshot(
 
   artifacts.sort((a, b) => a.at - b.at)
 
+  const hasCommanderActivity =
+    spans.some((span) => span.workspaceId === COMMANDER_LANE_ID)
+    || edges.some(
+      (edge) =>
+        edge.fromWorkspaceId === COMMANDER_LANE_ID
+        || edge.toWorkspaceId === COMMANDER_LANE_ID,
+    )
+    || artifacts.some((art) => art.workspaceId === COMMANDER_LANE_ID)
+
+  const finalLanes: DispatchLane[] =
+    (commanderInitialized || hasCommanderActivity)
+    && !lanes.some((lane) => lane.workspaceId === COMMANDER_LANE_ID)
+      ? [
+          {
+            workspaceId: COMMANDER_LANE_ID,
+            tag: commanderHost.commanderWorkspace?.tag || COMMANDER_LANE_TAG,
+            label: COMMANDER_LANE_LABEL,
+            template: COMMANDER_LANE_ID,
+            templateKind: 'commander',
+          },
+          ...lanes,
+        ]
+      : lanes
+
   const summary: DispatchBoardSummary = {
-    activeWorkspaceCount: lanes.length,
+    activeWorkspaceCount: activeWorkspaces.length,
     runningSpanCount: spans.filter((span) => span.status === 'running').length,
     totalSpanCount: spans.length,
     edgeCount: edges.length,
@@ -902,7 +1080,7 @@ export async function buildDispatchBoardSnapshot(
     fromMs,
     toMs,
     generatedAt: nowMs,
-    lanes,
+    lanes: finalLanes,
     spans,
     edges,
     artifacts,

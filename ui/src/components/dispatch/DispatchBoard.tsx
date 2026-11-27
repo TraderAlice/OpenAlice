@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ChevronUp,
   Clock,
+  Compass,
   FileText,
   GitFork,
   Inbox,
@@ -22,8 +23,6 @@ import {
 
 import type {
   DispatchArtifact,
-  DispatchEdge,
-  DispatchEdgeKind,
   DispatchSpan,
 } from '../../api/dispatch'
 import { ScheduleSkipPill } from '../ScheduleSkipState'
@@ -31,7 +30,7 @@ import { CenteredLoading } from '../StateViews'
 import { Button } from '../ui/button'
 import {
   DispatchInspectorSheet,
-  edgeKindLabel,
+  edgeDisplayLabel,
   type DispatchSelectedItem,
 } from './DispatchInspectorSheet'
 import {
@@ -56,7 +55,12 @@ import {
   type PackedDispatchSpan,
   type RawDispatchEdgeEndpoint,
 } from './layout'
-import type { DispatchWindowPreset, UseDispatchBoardResult } from './useDispatchBoard'
+import {
+  COMMANDER_LANE_ID,
+  type DispatchEdge,
+  type DispatchWindowPreset,
+  type UseDispatchBoardResult,
+} from './useDispatchBoard'
 
 export type DispatchFilterKind = 'all' | 'orchestration' | 'scheduled' | 'outputs' | 'attention'
 
@@ -175,24 +179,35 @@ function clusterPillClasses(
   return `${base} ${tone} ${focusRing} ${opacity}`
 }
 
-function edgeStrokeClass(kind: DispatchEdgeKind): string {
-  if (kind === 'escalation') return 'stroke-destructive'
-  if (kind === 'question') return 'stroke-warning'
-  if (kind === 'worker_done' || kind === 'reply') return 'stroke-success'
+function isScheduledReportEdge(edge: DispatchEdge): boolean {
+  return edge.messageKind === 'scheduled_report'
+}
+
+function edgeStrokeClass(edge: DispatchEdge): string {
+  if (edge.kind === 'escalation') return 'stroke-destructive'
+  if (isScheduledReportEdge(edge)) {
+    return edge.outcome === 'failed' ? 'stroke-destructive' : 'stroke-primary'
+  }
+  if (edge.kind === 'question') return 'stroke-warning'
+  if (edge.kind === 'worker_done' || edge.kind === 'reply') return 'stroke-success'
   return 'stroke-primary'
 }
 
 function edgePillClasses(edge: DispatchEdge, emphasized: boolean, dimmed: boolean): string {
   const base =
-    'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium shadow-xs transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+    'inline-flex min-h-6 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium shadow-xs transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
   const tone =
     edge.kind === 'escalation'
       ? 'border-destructive/50 bg-destructive/15 text-destructive'
-      : edge.kind === 'question'
-        ? 'border-warning/50 bg-warning/15 text-warning'
-        : edge.kind === 'worker_done' || edge.kind === 'reply'
-          ? 'border-success/50 bg-success/15 text-success'
-          : 'border-primary/40 bg-background text-primary'
+      : isScheduledReportEdge(edge)
+        ? edge.outcome === 'failed'
+          ? 'border-destructive/50 bg-destructive/15 text-destructive'
+          : 'border-primary/40 bg-primary/10 text-primary'
+        : edge.kind === 'question'
+          ? 'border-warning/50 bg-warning/15 text-warning'
+          : edge.kind === 'worker_done' || edge.kind === 'reply'
+            ? 'border-success/50 bg-success/15 text-success'
+            : 'border-primary/40 bg-background text-primary'
   const ring = emphasized ? 'ring-2 ring-primary/50 z-30' : 'z-20'
   const opacity = dimmed ? 'opacity-25' : 'opacity-100'
   return `${base} ${tone} ${ring} ${opacity}`
@@ -396,6 +411,8 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [selected, focusedClusterId, focusedEpisodeId, clearFocus])
 
+  const commanderBadgeLabel = t('dispatch.commanderBadge', { defaultValue: 'Commander' })
+
   const laneLabelMap = useMemo(() => {
     const map = new Map<string, string>()
     for (const lane of snapshot?.lanes ?? []) {
@@ -403,7 +420,10 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
     }
     return map
   }, [snapshot?.lanes])
-  const laneLabel = useCallback((wsId: string) => laneLabelMap.get(wsId) ?? wsId, [laneLabelMap])
+  const laneLabel = useCallback(
+    (wsId: string) => laneLabelMap.get(wsId) ?? (wsId === COMMANDER_LANE_ID ? commanderBadgeLabel : wsId),
+    [laneLabelMap, commanderBadgeLabel],
+  )
 
   const connectedArtifactRunIds = useMemo(() => {
     const set = new Set<string>()
@@ -424,9 +444,15 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
   const visibleEdges = useMemo(() => {
     const edges = snapshot?.edges ?? []
     if (filter === 'all' || filter === 'orchestration') return edges
+    if (filter === 'scheduled') return edges.filter(isScheduledReportEdge)
     if (filter === 'attention') return edges.filter(isAttentionEdge)
     return []
   }, [snapshot?.edges, filter])
+
+  const visibleEdgeById = useMemo(
+    () => new Map(visibleEdges.map((edge) => [edge.id, edge])),
+    [visibleEdges],
+  )
 
   const visibleSpans = useMemo(() => {
     const spans = snapshot?.spans ?? []
@@ -440,7 +466,11 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
       )
     }
     if (filter === 'scheduled') {
-      return spans.filter((span) => span.trigger.kind === 'scheduled-issue')
+      return spans.filter(
+        (span) =>
+          span.trigger.kind === 'scheduled-issue'
+          || visibleEdges.some((edge) => edgeConnectsSpan(edge, span)),
+      )
     }
     if (filter === 'outputs') {
       return spans.filter(
@@ -607,12 +637,19 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
       if (fromRect.width <= 0 || toRect.width <= 0) continue
 
       const pct = Math.max(1, Math.min(99, clampTimePct(edge.at, fromMs, toMs))) / 100
-      const fromTrackIdx = findSpanTrackForEdge(edge.fromWorkspaceId, edge.fromResumeId, edge.at)
+      const fromTrackIdx = findSpanTrackForEdge(
+        edge.fromWorkspaceId,
+        edge.fromResumeId,
+        edge.at,
+        isScheduledReportEdge(edge) ? edge.taskId : undefined,
+      )
       const toTrackIdx = findSpanTrackForEdge(
         edge.toWorkspaceId,
         edge.toResumeId,
         edge.at,
-        edge.kind === 'dispatch' || edge.kind === 'conversation' ? edge.taskId : undefined,
+        edge.kind === 'dispatch' || (edge.kind === 'conversation' && !isScheduledReportEdge(edge))
+          ? edge.taskId
+          : undefined,
       )
 
       const x1 = fromRect.left - canvasRect.left + pct * fromRect.width
@@ -930,23 +967,58 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                 .filter((s) => s.nextDueAtMs !== null)
                 .sort((a, b) => (a.nextDueAtMs ?? Infinity) - (b.nextDueAtMs ?? Infinity))[0]
               const skippedSchedule = schedules.find((s) => s.skipState)
-              const showDistinctTag = Boolean(lane.tag && lane.tag !== lane.label)
+              const isCommanderLane =
+                lane.templateKind === 'commander' || lane.workspaceId === COMMANDER_LANE_ID
+              const showDistinctTag = !isCommanderLane && Boolean(lane.tag && lane.tag !== lane.label)
 
               return (
                 <section
                   key={lane.workspaceId}
                   data-testid={`dispatch-lane-${lane.workspaceId}`}
+                  data-lane-kind={lane.templateKind}
                   className="flex flex-col @[42rem]/dispatch:flex-row"
                 >
                   {/* Compact lane header */}
-                  <div className="flex shrink-0 flex-col justify-center gap-1.5 border-b border-border/50 bg-muted/15 px-3 py-2 @[42rem]/dispatch:w-48 @[42rem]/dispatch:border-b-0 @[42rem]/dispatch:border-r">
+                  <div
+                    className={`flex shrink-0 flex-col justify-center gap-1.5 border-b border-border/50 px-3 py-2 @[42rem]/dispatch:w-48 @[42rem]/dispatch:border-b-0 @[42rem]/dispatch:border-r ${
+                      isCommanderLane ? 'bg-primary/[0.03]' : 'bg-muted/15'
+                    }`}
+                  >
                     <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="size-1.5 shrink-0 rounded-full bg-success" aria-hidden />
-                        <h3 className="truncate text-xs font-semibold text-foreground" title={lane.label}>
-                          {lane.label}
-                        </h3>
-                      </div>
+                      {isCommanderLane ? (
+                        <div className="flex items-center gap-1.5">
+                          <Compass size={12} className="shrink-0 text-primary" aria-hidden="true" />
+                          {lane.label && lane.label !== commanderBadgeLabel ? (
+                            <>
+                              <h3 className="truncate text-xs font-semibold text-foreground" title={lane.label}>
+                                {lane.label}
+                              </h3>
+                              <span
+                                data-testid="dispatch-commander-badge"
+                                className="inline-flex shrink-0 items-center rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary"
+                              >
+                                {commanderBadgeLabel}
+                              </span>
+                            </>
+                          ) : (
+                            <h3 className="min-w-0 truncate" title={lane.label}>
+                              <span
+                                data-testid="dispatch-commander-badge"
+                                className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary"
+                              >
+                                {commanderBadgeLabel}
+                              </span>
+                            </h3>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <span className="size-1.5 shrink-0 rounded-full bg-success" aria-hidden="true" />
+                          <h3 className="truncate text-xs font-semibold text-foreground" title={lane.label}>
+                            {lane.label}
+                          </h3>
+                        </div>
+                      )}
                       {showDistinctTag && (
                         <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
                           {lane.tag}
@@ -1172,54 +1244,57 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                     </marker>
                   </defs>
                   {edgeGeometries.map(({ edge, x1, y1, x2, y2, ctrlX1, ctrlX2 }) => {
+                    const fullEdge = visibleEdgeById.get(edge.id) ?? edge
                     const d = `M ${x1} ${y1} C ${ctrlX1} ${y1}, ${ctrlX2} ${y2}, ${x2} ${y2}`
-                    const isDimmed = hasFocus && !trace.edgeIds.has(edge.id)
+                    const isDimmed = hasFocus && !trace.edgeIds.has(fullEdge.id)
                     const markerId =
-                      edge.kind === 'escalation'
+                      fullEdge.kind === 'escalation'
+                      || (isScheduledReportEdge(fullEdge) && fullEdge.outcome === 'failed')
                         ? 'url(#dispatch-arrow-destructive)'
-                        : edge.kind === 'question'
+                        : fullEdge.kind === 'question'
                           ? 'url(#dispatch-arrow-warning)'
-                          : edge.kind === 'worker_done' || edge.kind === 'reply'
+                          : fullEdge.kind === 'worker_done' || fullEdge.kind === 'reply'
                             ? 'url(#dispatch-arrow-success)'
                             : 'url(#dispatch-arrow-primary)'
 
                     return (
                       <path
-                        key={edge.id}
+                        key={fullEdge.id}
                         d={d}
                         fill="none"
-                        strokeWidth={hasFocus && trace.edgeIds.has(edge.id) ? 2.2 : 1.5}
-                        strokeDasharray={edge.kind === 'conversation' ? '4 3' : undefined}
+                        strokeWidth={hasFocus && trace.edgeIds.has(fullEdge.id) ? 2.2 : 1.5}
+                        strokeDasharray={fullEdge.kind === 'conversation' ? '4 3' : undefined}
                         markerEnd={markerId}
-                        className={`${edgeStrokeClass(edge.kind)} transition-opacity ${isDimmed ? 'opacity-20' : 'opacity-80'}`}
+                        className={`${edgeStrokeClass(fullEdge)} transition-opacity ${isDimmed ? 'opacity-20' : 'opacity-80'}`}
                       />
                     )
                   })}
                 </svg>
 
                 {edgeGeometries.map(({ edge, mx, my }) => {
+                  const fullEdge = visibleEdgeById.get(edge.id) ?? edge
                   const isEmphasized =
-                    selected?.kind === 'edge' && selected.item.id === edge.id
+                    selected?.kind === 'edge' && selected.item.id === fullEdge.id
                       ? true
-                      : hasFocus && trace.edgeIds.has(edge.id)
-                  const isDimmed = hasFocus && !trace.edgeIds.has(edge.id)
-                  const pendingMailbox = edge.deliveryStatus === 'unread' || edge.deliveryStatus === 'leased'
+                      : hasFocus && trace.edgeIds.has(fullEdge.id)
+                  const isDimmed = hasFocus && !trace.edgeIds.has(fullEdge.id)
+                  const pendingMailbox = fullEdge.deliveryStatus === 'unread' || fullEdge.deliveryStatus === 'leased'
                   return (
                     <button
-                      key={`pill-${edge.id}`}
+                      key={`pill-${fullEdge.id}`}
                       type="button"
-                      data-testid={`dispatch-edge-${edge.id}`}
-                      onClick={() => openInspector({ kind: 'edge', item: edge })}
-                      onMouseEnter={() => setHovered({ kind: 'edge', id: edge.id })}
+                      data-testid={`dispatch-edge-${fullEdge.id}`}
+                      onClick={() => openInspector({ kind: 'edge', item: fullEdge })}
+                      onMouseEnter={() => setHovered({ kind: 'edge', id: fullEdge.id })}
                       onMouseLeave={() => setHovered(null)}
                       style={{ left: mx, top: my }}
-                      className={`absolute -translate-x-1/2 -translate-y-1/2 ${edgePillClasses(edge, isEmphasized, isDimmed)}`}
-                      title={edge.subject || edge.body || edge.spec}
+                      className={`absolute -translate-x-1/2 -translate-y-1/2 ${edgePillClasses(fullEdge, isEmphasized, isDimmed)}`}
+                      title={fullEdge.summary || fullEdge.subject || fullEdge.body || fullEdge.spec}
                     >
                       {pendingMailbox && (
-                        <span className="size-1.5 rounded-full bg-warning animate-pulse motion-reduce:animate-none" aria-hidden />
+                        <span className="size-1.5 rounded-full bg-warning animate-pulse motion-reduce:animate-none" aria-hidden="true" />
                       )}
-                      {edgeKindLabel(edge.kind, t)}
+                      {edgeDisplayLabel(fullEdge, t)}
                     </button>
                   )
                 })}
@@ -1250,6 +1325,23 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
               const dimClass = hasFocus && !emphasized ? 'opacity-65' : 'opacity-100'
 
               if (ep.kind === 'orchestration') {
+                const epEdges = ep.edges.map((edge) => visibleEdgeById.get(edge.id) ?? edge)
+                const promotedCommander = !ep.coordinator
+                  ? ep.workers.find((w) => w.span.workspaceId === COMMANDER_LANE_ID)
+                  : undefined
+                const displayCoordinator = ep.coordinator ?? promotedCommander
+                const displayWorkers = promotedCommander
+                  ? ep.workers.filter((w) => w.span.id !== promotedCommander.span.id)
+                  : ep.workers
+                const reportEdge = epEdges.find(isScheduledReportEdge)
+                const involvesCommander =
+                  displayCoordinator?.span.workspaceId === COMMANDER_LANE_ID
+                  || epEdges.some(
+                    (edge) =>
+                      edge.fromWorkspaceId === COMMANDER_LANE_ID
+                      || edge.toWorkspaceId === COMMANDER_LANE_ID,
+                  )
+
                 return (
                   <article
                     key={ep.id}
@@ -1268,48 +1360,71 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                   >
                     {/* Episode Header / Coordinator */}
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-3 py-2">
-                      {ep.coordinator ? (
+                      {displayCoordinator ? (
                         <button
                           type="button"
-                          data-testid={`dispatch-feed-span-${ep.coordinator.span.id}`}
-                          onClick={() => openInspector({ kind: 'span', item: ep.coordinator!.span })}
-                          className="flex min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                          data-testid={`dispatch-feed-span-${displayCoordinator.span.id}`}
+                          onClick={() => openInspector({ kind: 'span', item: displayCoordinator.span })}
+                          className="flex min-h-6 min-w-0 flex-1 items-center gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
-                          <GitFork size={13} className="shrink-0 text-primary" aria-hidden />
-                          <SpanStatusIcon status={ep.coordinator.span.status} />
+                          {displayCoordinator.span.workspaceId === COMMANDER_LANE_ID ? (
+                            <Compass size={13} className="shrink-0 text-primary" aria-hidden="true" />
+                          ) : (
+                            <GitFork size={13} className="shrink-0 text-primary" aria-hidden="true" />
+                          )}
+                          <SpanStatusIcon status={displayCoordinator.span.status} />
                           <span className="truncate text-xs font-semibold text-foreground">
-                            {spanTitle(ep.coordinator.span, t)}
+                            {spanTitle(displayCoordinator.span, t)}
                           </span>
                           <span className="shrink-0 rounded border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                            {t('issues.dispatch.episodeOrchestration')}
+                            {reportEdge && !epEdges.some((e) => e.kind === 'dispatch')
+                              ? t('dispatch.edgeScheduledReportFull', { defaultValue: 'Scheduled report' })
+                              : t('issues.dispatch.episodeOrchestration')}
                           </span>
-                          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                            {laneLabel(ep.coordinator.span.workspaceId)}
+                          <span
+                            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${
+                              displayCoordinator.span.workspaceId === COMMANDER_LANE_ID
+                                ? 'border border-primary/30 bg-primary/10 font-medium text-primary'
+                                : 'bg-muted text-muted-foreground'
+                            }`}
+                          >
+                            {laneLabel(displayCoordinator.span.workspaceId)}
                           </span>
                           <span className="hidden shrink-0 text-[11px] text-muted-foreground sm:inline">
-                            {ep.coordinator.span.agent}
-                            {ep.coordinator.span.model ? ` · ${ep.coordinator.span.model}` : ''}
+                            {displayCoordinator.span.agent}
+                            {displayCoordinator.span.model ? ` · ${displayCoordinator.span.model}` : ''}
                           </span>
                         </button>
                       ) : (
                         <button
                           type="button"
                           onClick={clearFocus}
-                          className="flex min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                          className="flex min-h-6 min-w-0 flex-1 items-center gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
-                          <GitFork size={13} className="shrink-0 text-primary" aria-hidden />
+                          {involvesCommander ? (
+                            <Compass size={13} className="shrink-0 text-primary" aria-hidden="true" />
+                          ) : (
+                            <GitFork size={13} className="shrink-0 text-primary" aria-hidden="true" />
+                          )}
                           <span className="truncate text-xs font-semibold text-foreground">
-                            {t('issues.dispatch.coordinatorFallback')}
+                            {reportEdge?.subject || (involvesCommander ? commanderBadgeLabel : t('issues.dispatch.coordinatorFallback'))}
                           </span>
                           <span className="shrink-0 rounded border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                            {t('issues.dispatch.episodeOrchestration')}
+                            {reportEdge
+                              ? t('dispatch.edgeScheduledReportFull', { defaultValue: 'Scheduled report' })
+                              : t('issues.dispatch.episodeOrchestration')}
                           </span>
+                          {involvesCommander && (
+                            <span className="shrink-0 rounded border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                              {commanderBadgeLabel}
+                            </span>
+                          )}
                         </button>
                       )}
 
                       <div className="flex shrink-0 items-center gap-2 text-[11px] tabular-nums text-muted-foreground">
-                        {ep.coordinator && (
-                          <span>{formatDurationMs(ep.coordinator.span.durationMs)}</span>
+                        {displayCoordinator && (
+                          <span>{formatDurationMs(displayCoordinator.span.durationMs)}</span>
                         )}
                         <span className="font-mono">
                           {formatClockPoint(ep.latestAt, {
@@ -1322,9 +1437,9 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                     </div>
 
                     {/* Worker runs */}
-                    {ep.workers.length > 0 && (
+                    {displayWorkers.length > 0 && (
                       <div className="divide-y divide-border/40">
-                        {ep.workers.map(({ span }) => {
+                        {displayWorkers.map(({ span }) => {
                           const snippet = snippetText(span)
                           return (
                             <button
@@ -1340,7 +1455,13 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                                   <span className="truncate text-xs font-medium text-foreground">
                                     {spanTitle(span, t)}
                                   </span>
-                                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                  <span
+                                    className={`rounded px-1.5 py-0.5 text-[10px] ${
+                                      span.workspaceId === COMMANDER_LANE_ID
+                                        ? 'border border-primary/30 bg-primary/10 font-medium text-primary'
+                                        : 'bg-muted text-muted-foreground'
+                                    }`}
+                                  >
                                     {laneLabel(span.workspaceId)}
                                   </span>
                                   <span className="text-[11px] text-muted-foreground">
@@ -1371,9 +1492,9 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                     )}
 
                     {/* Inline message chips + attached outputs */}
-                    {(ep.edges.length > 0 || ep.artifacts.length > 0) && (
+                    {(epEdges.length > 0 || ep.artifacts.length > 0) && (
                       <div className="flex flex-wrap items-center gap-1.5 border-t border-border/50 bg-muted/15 px-3 py-2">
-                        {ep.edges.map((edge, idx) => {
+                        {epEdges.map((edge, idx) => {
                           const edgeEmphasized =
                             selected?.kind === 'edge' && selected.item.id === edge.id
                               ? true
@@ -1382,7 +1503,7 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                           return (
                             <span key={edge.id} className="inline-flex items-center gap-1">
                               {idx > 0 && (
-                                <span className="text-[10px] text-muted-foreground/60" aria-hidden>
+                                <span className="text-[10px] text-muted-foreground/60" aria-hidden="true">
                                   →
                                 </span>
                               )}
@@ -1393,9 +1514,9 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                                 onMouseEnter={() => setHovered({ kind: 'edge', id: edge.id })}
                                 onMouseLeave={() => setHovered(null)}
                                 className={edgePillClasses(edge, edgeEmphasized, edgeDimmed)}
-                                title={edge.subject || edge.body || edge.spec}
+                                title={edge.summary || edge.subject || edge.body || edge.spec}
                               >
-                                <span>{edgeKindLabel(edge.kind, t)}</span>
+                                <span>{edgeDisplayLabel(edge, t)}</span>
                                 <span className="font-mono text-[10px] opacity-75">
                                   {formatClockPoint(edge.at, {
                                     includeDate: isDifferentCalendarDay(edge.at, toMs),
@@ -1406,8 +1527,8 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                             </span>
                           )
                         })}
-                        {ep.edges.length > 0 && ep.artifacts.length > 0 && (
-                          <span className="mx-1 h-3.5 w-px bg-border" aria-hidden />
+                        {epEdges.length > 0 && ep.artifacts.length > 0 && (
+                          <span className="mx-1 h-3.5 w-px bg-border" aria-hidden="true" />
                         )}
                         {ep.artifacts.map(renderArtifactChip)}
                       </div>
@@ -1591,7 +1712,13 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                             <SpanTriggerIcon trigger={span.trigger} />
                             {triggerKindLabel(span.trigger.kind, t)}
                           </span>
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[10px] ${
+                              span.workspaceId === COMMANDER_LANE_ID
+                                ? 'border border-primary/30 bg-primary/10 font-medium text-primary'
+                                : 'bg-muted text-muted-foreground'
+                            }`}
+                          >
                             {laneLabel(span.workspaceId)}
                           </span>
                           <span className="text-[11px] text-muted-foreground">
@@ -1671,7 +1798,13 @@ export function DispatchBoard({ board }: { board: UseDispatchBoardResult }) {
                             {t('issues.dispatch.inboxUnread')}
                           </span>
                         )}
-                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[10px] ${
+                            art.workspaceId === COMMANDER_LANE_ID
+                              ? 'border border-primary/30 bg-primary/10 font-medium text-primary'
+                              : 'bg-muted text-muted-foreground'
+                          }`}
+                        >
                           {laneLabel(art.workspaceId)}
                         </span>
                       </div>

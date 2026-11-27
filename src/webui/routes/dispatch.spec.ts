@@ -493,6 +493,370 @@ describe('GET /api/dispatch', () => {
     expect(body.edges.some((e: { id: string }) => e.id === 'conv-run-stale-orphan')).toBe(false)
   })
 
+  it('pins Commander at lanes[0] with scheduled-report wakes, Commander->Worker dispatches, and Commander->Inbox pushes while excluding standby workspaces', async () => {
+    const baseSvc = buildServiceFixture()
+    const standbyQuantId = 'ws-quant-standby'
+
+    const svcWithCommander = {
+      ...baseSvc,
+      commanderWorkspace: {
+        id: 'commander',
+        tag: 'Commander',
+        dir: '',
+        createdAt: '2026-10-01T00:00:00.000Z',
+      },
+      getCommanderPointer: vi.fn(async () => ({
+        version: 1 as const,
+        resumeId: 'res-commander',
+        createdAt: BASE - 7_200_000,
+        updatedAt: BASE - 1_200_000,
+      })),
+      sessionRegistry: {
+        listFor: vi.fn((wsId: string) =>
+          wsId === 'commander'
+            ? [{ id: 'sess-cmd', resumeId: 'res-commander', label: 'Global Commander' }]
+            : [],
+        ),
+        findByResumeId: vi.fn(() => undefined),
+      },
+      headlessTasks: {
+        list: vi.fn(() => [
+          ...baseSvc.headlessTasks.list(),
+          {
+            taskId: 'run-cmd-wake-1',
+            resumeId: 'res-commander',
+            wsId: 'commander',
+            agent: 'claude',
+            model: 'claude-sonnet-4-6',
+            prompt: 'You have 1 pending schedule report. Run alice conversation check.',
+            status: 'done',
+            startedAt: BASE - 1_690_000,
+            finishedAt: BASE - 1_640_000,
+            durationMs: 50_000,
+            agentSessionId: 'native-secret-cmd-1',
+            output: {
+              hasAssistantReply: true,
+              assistantPreview: 'Dispatched follow-up worker and notified Inbox.',
+              blockCount: 2,
+              toolCalls: 3,
+              toolFailures: 0,
+            },
+          },
+          {
+            taskId: 'run-cmd-worker-1',
+            resumeId: 'res-cmd-worker-1',
+            wsId: 'ws-quant',
+            agent: 'codex',
+            prompt: 'Investigate morning scan spread widening',
+            status: 'done',
+            startedAt: BASE - 1_630_000,
+            finishedAt: BASE - 1_550_000,
+            durationMs: 80_000,
+            agentSessionId: 'native-secret-cmd-worker',
+            output: {
+              hasAssistantReply: true,
+              assistantPreview: 'Spread widening traced to ETF rebalance.',
+              blockCount: 2,
+              toolCalls: 4,
+              toolFailures: 0,
+            },
+          },
+        ]),
+      },
+      orchestration: {
+        listTasks: vi.fn(() => [
+          ...baseSvc.orchestration.listTasks(),
+          {
+            taskId: 'task-cmd-1',
+            dispatchId: 'dsp-cmd-1',
+            parentResumeId: 'res-commander',
+            parentWorkspaceId: 'commander',
+            workerResumeId: 'res-cmd-worker-1',
+            workerWorkspaceId: 'ws-quant',
+            workerAgent: 'codex',
+            headlessTaskId: 'run-cmd-worker-1',
+            spec: 'Investigate spread widening from Morning Market Scan',
+            status: 'done',
+            createdAt: BASE - 1_635_000,
+            updatedAt: BASE - 1_550_000,
+            settledAt: BASE - 1_550_000,
+            outcome: 'completed',
+            summary: 'ETF rebalance explained spread move',
+            replyRoute: { workspaceId: 'commander', resumeId: 'res-commander' },
+            turnCount: 1,
+          },
+          // Commander -> standby workspace MUST be excluded
+          {
+            taskId: 'task-cmd-standby',
+            dispatchId: 'dsp-cmd-standby',
+            parentResumeId: 'res-commander',
+            parentWorkspaceId: 'commander',
+            workerResumeId: 'res-dead-1',
+            workerWorkspaceId: standbyQuantId,
+            workerAgent: 'claude',
+            spec: 'Should be excluded',
+            status: 'done',
+            createdAt: BASE - 1_620_000,
+            updatedAt: BASE - 1_600_000,
+            settledAt: BASE - 1_600_000,
+            replyRoute: { workspaceId: 'commander', resumeId: 'res-commander' },
+            turnCount: 1,
+          },
+        ]),
+        listMessages: vi.fn(() => [
+          ...baseSvc.orchestration.listMessages({}),
+          {
+            id: 'msg-cmd-done-1',
+            kind: 'worker_done',
+            taskId: 'task-cmd-1',
+            dispatchId: 'dsp-cmd-1',
+            fromResumeId: 'res-cmd-worker-1',
+            toResumeId: 'res-commander',
+            body: 'Investigation complete.',
+            status: 'acked',
+            createdAt: BASE - 1_550_000,
+            ackedAt: BASE - 1_540_000,
+          },
+        ]),
+      },
+      commanderMailbox: {
+        listRecent: vi.fn(() => [
+          {
+            id: 'mail-run-sched-1',
+            recipientResumeId: 'res-commander',
+            recipientWorkspaceId: 'commander',
+            taskId: 'run-sched-1',
+            childResumeId: 'res-sched-1',
+            childWorkspaceId: 'ws-quant',
+            childAgent: 'claude',
+            taskStatus: 'done',
+            assistantPreview: 'Morning scan detected 2.1 sigma spread widening.',
+            durationMs: 100_000,
+            createdAt: BASE - 1_695_000,
+            status: 'acked',
+            notifiedAt: BASE - 1_694_000,
+            ackedAt: BASE - 1_685_000,
+            reportSource: {
+              kind: 'scheduled-issue',
+              workspaceId: 'ws-quant',
+              workspaceTag: 'quant-desk',
+              issueId: 'morning-scan',
+              issueTitle: 'Morning Market Scan',
+              fire: 'schedule',
+            },
+          },
+          // Standby workspace report MUST be excluded
+          {
+            id: 'mail-run-dead-1',
+            recipientResumeId: 'res-commander',
+            recipientWorkspaceId: 'commander',
+            taskId: 'run-dead-1',
+            childResumeId: 'res-dead-1',
+            childWorkspaceId: standbyQuantId,
+            childAgent: 'claude',
+            taskStatus: 'done',
+            assistantPreview: 'Standby noise',
+            createdAt: BASE - 950_000,
+            status: 'unread',
+            reportSource: {
+              kind: 'scheduled-issue',
+              workspaceId: standbyQuantId,
+              issueId: 'dead-issue',
+              issueTitle: 'Dead Issue',
+            },
+          },
+        ]),
+      },
+      inboxStore: {
+        read: vi.fn(async () => ({
+          entries: [
+            {
+              id: 'inbox-cmd-1',
+              ts: BASE - 1_530_000,
+              workspaceId: 'commander',
+              body: '# Spread Alert Escalation\nMorning scan & quant worker confirmed ETF rebalance.',
+              origin: {
+                kind: 'headless',
+                runId: 'run-cmd-wake-1',
+                resumeId: 'res-commander',
+                agent: 'claude',
+              },
+            },
+          ],
+          hasMore: false,
+          unreadCount: 1,
+        })),
+      },
+      resumeRegistry: {
+        get: vi.fn((resumeId: string) => {
+          if (resumeId === 'res-commander') return { wsId: 'commander', displayName: 'Commander' }
+          return baseSvc.resumeRegistry.get(resumeId)
+        }),
+      },
+    } as unknown as WorkspaceService
+
+    const app = createDispatchRoutes(svcWithCommander)
+    const res = await app.request(`/?from=${FROM}&to=${TO}`)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    const serialized = JSON.stringify(body)
+
+    expect(serialized).not.toContain('native-secret')
+    expect(serialized).not.toContain(standbyQuantId)
+    expect(serialized).not.toContain('dsp-cmd-standby')
+    expect(serialized).not.toContain('mail-run-dead-1')
+
+    // Commander control-plane lane pinned at index 0
+    expect(body.lanes[0]).toEqual({
+      workspaceId: 'commander',
+      tag: 'Commander',
+      label: 'Commander',
+      template: 'commander',
+      templateKind: 'commander',
+    })
+    expect(body.lanes.map((lane: { workspaceId: string }) => lane.workspaceId)).toEqual([
+      'commander',
+      'ws-chat',
+      'ws-quant',
+    ])
+
+    // Commander headless wake span + worker span triggered by Commander orchestration
+    expect(body.spans).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'run-cmd-wake-1',
+          workspaceId: 'commander',
+          resumeId: 'res-commander',
+        }),
+        expect.objectContaining({
+          id: 'run-cmd-worker-1',
+          workspaceId: 'ws-quant',
+          trigger: expect.objectContaining({
+            kind: 'orchestration',
+            dispatchId: 'dsp-cmd-1',
+            parentWorkspaceId: 'commander',
+            parentResumeId: 'res-commander',
+          }),
+        }),
+      ]),
+    )
+
+    // Scheduled Thread -> Commander report edge + Commander -> Worker dispatch + Worker -> Commander done
+    expect(body.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'report-mail-run-sched-1',
+          kind: 'conversation',
+          messageKind: 'scheduled_report',
+          fromWorkspaceId: 'ws-quant',
+          toWorkspaceId: 'commander',
+          toResumeId: 'res-commander',
+          taskId: 'run-sched-1',
+          summary: 'Morning Market Scan (done)',
+          deliveryStatus: 'acked',
+        }),
+        expect.objectContaining({
+          id: 'dsp-dsp-cmd-1',
+          kind: 'dispatch',
+          fromWorkspaceId: 'commander',
+          toWorkspaceId: 'ws-quant',
+        }),
+        expect.objectContaining({
+          id: 'msg-cmd-done-1',
+          kind: 'worker_done',
+          fromWorkspaceId: 'ws-quant',
+          toWorkspaceId: 'commander',
+        }),
+      ]),
+    )
+
+    // Commander -> Inbox artifact included
+    expect(body.artifacts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'inbox-inbox-cmd-1',
+          kind: 'inbox',
+          workspaceId: 'commander',
+          title: 'Spread Alert Escalation',
+          runId: 'run-cmd-wake-1',
+        }),
+      ]),
+    )
+  })
+
+  it('pins initialized Commander at lanes[0] even during a quiet window and supports pendingFor fallback', async () => {
+    const baseSvc = buildServiceFixture()
+    const quietSvc = {
+      ...baseSvc,
+      getCommanderPointer: vi.fn(async () => ({
+        version: 1 as const,
+        resumeId: 'res-commander-quiet',
+        createdAt: BASE - 86_400_000,
+        updatedAt: BASE - 86_400_000,
+      })),
+      headlessTasks: { list: vi.fn(() => []) },
+      orchestration: { listTasks: vi.fn(() => []), listMessages: vi.fn(() => []) },
+      agentConversationLog: { queryWindow: vi.fn(async () => []) },
+      activityJournal: {
+        query: vi.fn(async () => ({ entries: [], total: 0, page: 1, pageSize: 500, totalPages: 1 })),
+      },
+      inboxStore: { read: vi.fn(async () => ({ entries: [], hasMore: false, unreadCount: 0 })) },
+      provenanceStore: { list: vi.fn(() => []) },
+      commanderMailbox: {
+        pendingFor: vi.fn((resumeId: string) =>
+          resumeId === 'res-commander-quiet'
+            ? [
+                {
+                  id: 'mail-pending-1',
+                  recipientResumeId: 'res-commander-quiet',
+                  recipientWorkspaceId: 'commander',
+                  taskId: 'run-pending-1',
+                  childResumeId: 'res-sched-pending',
+                  childWorkspaceId: 'ws-quant',
+                  childAgent: 'claude',
+                  taskStatus: 'failed',
+                  assistantPreview: null,
+                  error: 'Data feed timeout',
+                  createdAt: BASE - 120_000,
+                  status: 'unread',
+                  reportSource: {
+                    kind: 'scheduled-issue',
+                    workspaceId: 'ws-quant',
+                    issueId: 'morning-scan',
+                    issueTitle: 'Morning Market Scan',
+                  },
+                },
+              ]
+            : [],
+        ),
+      },
+    } as unknown as WorkspaceService
+
+    const app = createDispatchRoutes(quietSvc)
+    const res = await app.request(`/?from=${FROM}&to=${TO}`)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+
+    expect(body.lanes[0]).toEqual(
+      expect.objectContaining({
+        workspaceId: 'commander',
+        templateKind: 'commander',
+      }),
+    )
+    expect(body.edges).toEqual([
+      expect.objectContaining({
+        id: 'report-mail-pending-1',
+        kind: 'conversation',
+        messageKind: 'scheduled_report',
+        fromWorkspaceId: 'ws-quant',
+        toWorkspaceId: 'commander',
+        outcome: 'failed',
+        deliveryStatus: 'unread',
+        summary: 'Morning Market Scan (failed)',
+      }),
+    ])
+  })
+
   it('rejects invalid from/to query timestamps with 400', async () => {
     const app = createDispatchRoutes(buildServiceFixture())
     const res = await app.request('/?from=abc')
