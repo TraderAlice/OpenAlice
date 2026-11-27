@@ -380,7 +380,7 @@ export function CommanderPage({ visible = true }: CommanderPageProps) {
               </p>
             </div>
 
-            <section className="rounded-lg border border-border/80 bg-secondary/55 p-3 md:p-4">
+            <section className="rounded-lg border border-border/80 bg-secondary/55 p-3 transition-colors focus-within:border-primary/70 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring md:p-4">
               <label htmlFor={promptId} className="sr-only">
                 {t('commander.promptLabel')}
               </label>
