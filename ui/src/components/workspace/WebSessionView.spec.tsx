@@ -40,7 +40,7 @@ const agents: readonly AgentInfo[] = [
 function snapshot(phase: WebSessionSnapshot['phase'], overrides: Partial<WebSessionSnapshot> = {}): WebSessionSnapshot {
   return {
     recordId: 'p1',
-    wsId: 'workspace-manager',
+    wsId: 'commander',
     resumeId: 'resume-pi',
     agent: 'pi',
     wire: 'pi-rpc',
@@ -81,7 +81,7 @@ describe('Web transcript scrolling', () => {
   it('does not force history readers back to the bottom and offers an explicit jump', async () => {
     mocks.getWebSession.mockResolvedValue(snapshot('idle'))
     const { container } = render(
-      <WebSessionView wsId="workspace-manager" sessionId="p1" onSessionLost={vi.fn()} />,
+      <WebSessionView wsId="commander" sessionId="p1" onSessionLost={vi.fn()} />,
     )
     await waitFor(() => expect(mocks.getWebSession).toHaveBeenCalled())
 
@@ -105,7 +105,7 @@ describe('Web transcript scrolling', () => {
     let current = snapshot('idle')
     mocks.getWebSession.mockImplementation(async () => current)
     const { container } = render(
-      <WebSessionView wsId="workspace-manager" sessionId="p1" onSessionLost={vi.fn()} />,
+      <WebSessionView wsId="commander" sessionId="p1" onSessionLost={vi.fn()} />,
     )
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0)
@@ -137,8 +137,8 @@ describe('Web composer keyboard submission', () => {
     mocks.getWebSession.mockImplementation((_workspace: string, id: string) => id === 'old'
       ? new Promise<WebSessionSnapshot>((resolve) => { resolvePrevious = resolve })
       : Promise.resolve(snapshot('idle', { recordId: 'new', messages: [{ role: 'user', content: 'New conversation' }] })))
-    const { rerender } = render(<WebSessionView wsId="workspace-manager" sessionId="old" onSessionLost={vi.fn()} />)
-    rerender(<WebSessionView wsId="workspace-manager" sessionId="new" onSessionLost={vi.fn()} />)
+    const { rerender } = render(<WebSessionView wsId="commander" sessionId="old" onSessionLost={vi.fn()} />)
+    rerender(<WebSessionView wsId="commander" sessionId="new" onSessionLost={vi.fn()} />)
     expect(await screen.findByText('New conversation')).toBeTruthy()
     await act(async () => { resolvePrevious(snapshot('idle', { messages: [{ role: 'user', content: 'Old conversation' }] })) })
     expect(screen.queryByText('Old conversation')).toBeNull()
@@ -147,7 +147,7 @@ describe('Web composer keyboard submission', () => {
   it('uses the shared content-sized textarea so multiline prompts grow until the CSS cap', async () => {
     mocks.getWebSession.mockResolvedValue(snapshot('idle'))
     render(
-      <WebSessionView wsId="workspace-manager" sessionId="p1" agents={agents} onSessionLost={vi.fn()} />,
+      <WebSessionView wsId="commander" sessionId="p1" agents={agents} onSessionLost={vi.fn()} />,
     )
 
     const composer = await screen.findByPlaceholderText('Message Pi…')
@@ -159,7 +159,7 @@ describe('Web composer keyboard submission', () => {
   it('does not submit when Enter confirms an IME composition candidate', async () => {
     mocks.getWebSession.mockResolvedValue(snapshot('idle'))
     render(
-      <WebSessionView wsId="workspace-manager" sessionId="p1" onSessionLost={vi.fn()} />,
+      <WebSessionView wsId="commander" sessionId="p1" onSessionLost={vi.fn()} />,
     )
 
     const composer = await screen.findByPlaceholderText('Message Pi…')
@@ -170,7 +170,7 @@ describe('Web composer keyboard submission', () => {
 
     fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter', isComposing: false })
     await waitFor(() => expect(mocks.promptWebSession).toHaveBeenCalledWith(
-      'workspace-manager',
+      'commander',
       'p1',
       '继续检查',
     ))
@@ -208,9 +208,9 @@ describe('WebSessionView compaction state', () => {
   it('explains the pause and keeps the stop action available while the runtime compacts', async () => {
     render(
       <WebSessionView
-        wsId="workspace-manager"
+        wsId="commander"
         sessionId="p1"
-        label="Workspace Manager"
+        label="Commander"
         onSessionLost={vi.fn()}
       />,
     )
@@ -223,7 +223,7 @@ describe('WebSessionView compaction state', () => {
     expect(screen.queryByRole('button', { name: 'Send message' })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Stop Pi' }))
-    await waitFor(() => expect(mocks.abortWebSession).toHaveBeenCalledWith('workspace-manager', 'p1'))
+    await waitFor(() => expect(mocks.abortWebSession).toHaveBeenCalledWith('commander', 'p1'))
     expect(screen.queryByRole('status')).toBeNull()
     expect(screen.getByRole('button', { name: 'Send message' })).toBeTruthy()
   })
@@ -307,9 +307,9 @@ it('submits a free-text question answer through the conversation hook', async ()
     agent: 'codex', wire: 'codex-app-server',
     requests: [{ id: 'q1', kind: 'question', title: 'Project name', options: [], allowText: true, createdAt: 1 }],
   }))
-  render(<WebSessionView wsId="workspace-manager" sessionId="p1" onSessionLost={() => {}} />)
+  render(<WebSessionView wsId="commander" sessionId="p1" onSessionLost={() => {}} />)
   const field = await screen.findByLabelText('Your answer')
   fireEvent.change(field, { target: { value: 'Alice research' } })
   fireEvent.click(screen.getByRole('button', { name: 'Send answer' }))
-  await waitFor(() => expect(mocks.respondWebSession).toHaveBeenCalledWith('workspace-manager', 'p1', 'q1', '', 'Alice research'))
+  await waitFor(() => expect(mocks.respondWebSession).toHaveBeenCalledWith('commander', 'p1', 'q1', '', 'Alice research'))
 })

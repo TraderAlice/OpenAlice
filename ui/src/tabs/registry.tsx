@@ -40,7 +40,7 @@ import { InboxPage } from '../pages/InboxPage'
 import { InboxPageShell } from '../pages/InboxPageShell'
 import { TrackedPage } from '../pages/TrackedPage'
 import { AutoPredictionLandingPage, AutoQuantLandingPage, ChatLandingPage } from '../pages/ChatLandingPage'
-import { WorkspaceManagerPage } from '../pages/WorkspaceManagerPage'
+import { CommanderPage } from '../pages/CommanderPage'
 import { PageSidebarShell } from '../pages/PageSidebarShell'
 import { WorkspacePage } from '../pages/WorkspacePage'
 import { WorkspaceHarnessRedirect } from './WorkspaceHarnessRedirect'
@@ -460,14 +460,11 @@ const harnessSurfaceModule: ViewModule<'harness-surface'> = {
   Component: ({ spec }) => <HarnessSurfacePage workspaceId={spec.params.wsId} source={spec.params.source} />,
 }
 
-const workspaceManagerModule: ViewModule<'workspace-manager'> = {
-  kind: 'workspace-manager',
-  shell: 'chat',
-  title: () => 'Workspace Manager',
-  toUrl: (spec) => spec.params.sessionId
-    ? `/chat/manager/s/${encodeURIComponent(spec.params.sessionId)}`
-    : '/chat/manager',
-  Component: ({ spec, visible }) => <WorkspaceManagerPage spec={spec} visible={visible} />,
+const commanderModule: ViewModule<'commander'> = {
+  kind: 'commander',
+  title: () => 'Commander',
+  toUrl: () => '/commander',
+  Component: ({ visible }) => <CommanderPage visible={visible} />,
 }
 
 const workspaceDetailsModule: ViewModule<'workspace-details'> = {
@@ -614,7 +611,7 @@ const VIEWS = {
   'auto-quant-landing': autoQuantLandingModule,
   'auto-prediction-landing': autoPredictionLandingModule,
   'harness-surface': harnessSurfaceModule,
-  'workspace-manager': workspaceManagerModule,
+  commander: commanderModule,
   'workspace-list': workspaceListModule,
   'workspace-details': workspaceDetailsModule,
   workspace: workspaceModule,

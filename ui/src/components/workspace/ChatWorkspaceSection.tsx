@@ -20,7 +20,6 @@ import {
   MessageSquare,
   MessageSquarePlus,
   MoreHorizontal,
-  Network,
   PanelsTopLeft,
   Plus,
   Settings as SettingsIcon,
@@ -34,8 +33,6 @@ import { useWorkspace } from '../../tabs/store'
 import { getFocusedTab } from '../../tabs/types'
 import {
   isStandbyWorkspace,
-  MANAGER_WORKSPACE_ID,
-  type ManagerWorkspaceSnapshot,
   type SessionRecord,
   type Workspace,
 } from './api'
@@ -125,7 +122,6 @@ export function ChatWorkspaceSection({
     : mode === 'prediction' ? 'auto-prediction-landing' : 'chat-landing'
   const starterTag = mode === 'auto-quant' ? 'auto-quant' : mode === 'prediction' ? 'prediction' : 'chat'
   const isWsFocus = focused?.kind === 'workspace' && focused.params.source === source
-  const isManagerFocus = mode === 'chat' && focused?.kind === 'workspace-manager'
   const selection = isWsFocus
     ? { wsId: focused.params.wsId, sessionId: focused.params.sessionId ?? null }
     : null
@@ -551,30 +547,6 @@ export function ChatWorkspaceSection({
         />
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto">
-      {mode === 'chat' && (
-        <ManagerWorkspaceRow
-          manager={ctx.workspaceManager}
-          loaded={ctx.workspaceManagerLoaded}
-          isFocused={isManagerFocus}
-          activeSessionId={isManagerFocus && focused?.kind === 'workspace-manager' ? focused.params.sessionId ?? null : null}
-          onOpen={() => navigate({ kind: 'workspace-manager', params: {} })}
-          onOpenSession={(sessionId) => navigate({
-            kind: 'workspace-manager',
-            params: { sessionId },
-          })}
-          onPauseSession={(sessionId) => void ctx.pauseSession(MANAGER_WORKSPACE_ID, sessionId)}
-          onResumeSession={(sessionId, surface) => {
-            if (surface === 'webpi') {
-              void ctx.openWebSession(MANAGER_WORKSPACE_ID, sessionId)
-            } else {
-              void ctx.resumeSession(MANAGER_WORKSPACE_ID, sessionId)
-            }
-            onNavigate()
-          }}
-          onDeleteSession={(sessionId) => ctx.requestDeleteSession(MANAGER_WORKSPACE_ID, sessionId)}
-        />
-      )}
-
       <div className="px-3 pb-1 pt-1.5">
         <h3 className="text-caption min-w-0 truncate font-medium text-muted-foreground/70">
           {t('nav.item.workspaces')}
@@ -1222,94 +1194,6 @@ function FocusedChatWorkspace(props: FocusedChatWorkspaceProps): ReactElement {
         onSettingsSession={props.onSettingsSession}
         onBrowseSessions={props.onBrowseSessions}
       />
-    </div>
-  )
-}
-
-interface ManagerWorkspaceRowProps {
-  manager: ManagerWorkspaceSnapshot | null
-  loaded: boolean
-  isFocused: boolean
-  activeSessionId: string | null
-  onOpen: () => void
-  onOpenSession: (sessionId: string) => void
-  onPauseSession: (sessionId: string) => void
-  onResumeSession: (sessionId: string, surface: SessionRecord['surface']) => void
-  onDeleteSession: (sessionId: string) => void
-}
-
-/** Launcher-owned Manager conversations belong beside ordinary Chat history,
- * but remain outside the business Workspace tree and registry. */
-function ManagerWorkspaceRow(props: ManagerWorkspaceRowProps): ReactElement {
-  const { t } = useTranslation()
-  const [expanded, setExpanded] = useState(false)
-  const sessions = useMemo(
-    () => orderSessionsForSidebar(props.manager?.sessions ?? []),
-    [props.manager?.sessions],
-  )
-  const sessionListRef = useReorderMotion<HTMLDivElement>(
-    sessions.map((session) => session.id),
-  )
-  const hasRunning = sessions.some((session) => session.state === 'running')
-
-  return (
-    <div className="pb-1 pt-1">
-      <div
-        className={`group relative flex w-full items-center transition-colors ${
-          props.isFocused
-            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-            : 'text-foreground hover:bg-sidebar-accent/65'
-        }`}
-      >
-        {props.isFocused && <SelectionIndicator />}
-        <button
-          type="button"
-          onClick={() => setExpanded((current) => !current)}
-          disabled={sessions.length === 0}
-          className="oa-icon-action oa-workspace-row-action relative ml-1 flex h-8 w-6 shrink-0 items-center justify-center rounded text-muted-foreground/55 hover:text-foreground disabled:cursor-default disabled:opacity-30"
-          aria-label={expanded ? t('chat.collapseSessions') : t('chat.expandSessions')}
-          title={expanded ? t('chat.collapseSessions') : t('chat.expandSessions')}
-        >
-          {expanded
-            ? <ChevronDown size={13} strokeWidth={2.25} />
-            : <ChevronRight size={13} strokeWidth={2.25} />}
-        </button>
-        <button
-          type="button"
-          onClick={props.onOpen}
-          aria-label={t('workspaceManager.title')}
-          aria-current={props.isFocused && props.activeSessionId === null ? 'page' : undefined}
-          className="oa-pressable relative flex min-w-0 flex-1 items-center gap-2 py-2 pl-1 pr-3 text-left"
-        >
-          <Network size={14} strokeWidth={2.1} className="shrink-0 text-muted-foreground" />
-          <span className="text-caption min-w-0 flex-1 truncate font-medium">{t('workspaceManager.title')}</span>
-          {!props.loaded ? (
-            <span aria-hidden className="h-2.5 w-4 animate-pulse rounded bg-muted-foreground/15" />
-          ) : sessions.length > 0 ? (
-            <span className="text-micro inline-flex shrink-0 items-center gap-1.5 tabular-nums text-muted-foreground/55">
-              <span className={`h-1.5 w-1.5 rounded-full ${hasRunning ? 'bg-success' : 'bg-muted-foreground/35'}`} />
-              {sessions.length}
-            </span>
-          ) : null}
-        </button>
-      </div>
-
-      {expanded && sessions.length > 0 && (
-        <div ref={sessionListRef} className="ml-[18px] border-l border-border/50">
-          {sessions.map((session) => (
-            <SessionRow
-              key={session.id}
-              reorderId={session.id}
-              session={session}
-              isActive={props.activeSessionId === session.id}
-              onSelect={() => props.onOpenSession(session.id)}
-              onPause={() => props.onPauseSession(session.id)}
-              onResume={() => props.onResumeSession(session.id, session.surface)}
-              onDelete={() => props.onDeleteSession(session.id)}
-            />
-          ))}
-        </div>
-      )}
     </div>
   )
 }

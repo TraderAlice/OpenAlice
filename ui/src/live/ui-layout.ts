@@ -2,6 +2,7 @@ import type { Page } from '../App'
 
 export const ACTIVITY_PAGE_IDS = [
   'chat',
+  'commander',
   'auto-quant',
   'prediction',
   'inbox',
@@ -44,7 +45,7 @@ export function defaultUiLayout(): UiLayout {
   return {
     version: 1,
     groups: [
-      { id: 'primary', items: ['chat', 'inbox', 'issue', 'auto-quant', 'tracked', 'market', 'prediction', 'office', 'portfolio', 'connectors'] },
+      { id: 'primary', items: ['chat', 'commander', 'inbox', 'issue', 'auto-quant', 'tracked', 'market', 'prediction', 'office', 'portfolio', 'connectors'] },
       { id: 'system', items: ['workspaces', 'automation'] },
     ],
     hidden: [],
@@ -126,7 +127,16 @@ export function normalizeUiLayout(input: unknown): UiLayout {
     if (seen.has(page)) continue
     const targetId = defaultGroupIdForPage(page)
     const target = groups.find((group) => group.id === targetId) ?? groups[0]
-    target.items.push(page)
+    if (page === 'commander' && target.id === 'primary') {
+      const chatIndex = target.items.indexOf('chat')
+      if (chatIndex >= 0) {
+        target.items.splice(chatIndex + 1, 0, 'commander')
+      } else {
+        target.items.push('commander')
+      }
+    } else {
+      target.items.push(page)
+    }
     seen.add(page)
   }
 

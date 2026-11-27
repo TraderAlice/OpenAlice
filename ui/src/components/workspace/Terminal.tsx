@@ -183,6 +183,8 @@ export interface TerminalViewProps {
   readonly sessionLabel?: string;
   /** Product actions that share the titlebar when the terminal is the primary canvas. */
   readonly headerActions?: ReactNode;
+  /** Omit the inner PageTopBar when the parent surface owns a single unified header. */
+  readonly hideHeader?: boolean;
   /** WebSocket URL base. Defaults to `${ws/wss}://${location.host}/pty`. */
   readonly wsUrl?: string;
   /** OpenTUI currently corrupts to an all-black canvas in xterm's WebGL addon. */
@@ -701,45 +703,47 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
 
   return (
     <div className="terminal-shell">
-      <PageTopBar title={props.sessionLabel ?? props.label ?? wsId}
-        leading={<StatusDot status={status} />} actions={<>
-        {status === 'locked' && (
-          <Button variant="ghost" size="sm"
-            type="button"
-            onClick={() => {
-              takeoverNextAttachRef.current = true;
-              setStatus('connecting');
-              connectRef.current?.();
-            }}
-            title="take over this session"
-          >
-            take over
-          </Button>
-        )}
-        {status === 'closed' && closedRecoverable && (
-          <Button variant="ghost" size="sm"
-            type="button"
-            onClick={() => retryRecoverableRef.current?.()}
-            aria-label="retry this terminal connection"
-            title="retry this terminal connection"
-          >
-            retry
-          </Button>
-        )}
-        {props.headerActions}
-      </>}>
-        <span className="truncate text-xs text-muted-foreground" title={[
-          props.label ?? wsId,
-          pid !== null ? `pid ${pid}` : '',
-          childExited ? 'child exited' : '',
-          scrollbackTruncated ? 'scrollback truncated' : '',
-          exitInfo ? `session ended code=${exitInfo.code} signal=${exitInfo.signal ?? 'none'}` : '',
-        ].filter(Boolean).join(' · ')}>
-          {childExited ? 'child exited' : status}
-          {scrollbackTruncated ? ' · scrollback truncated' : ''}
-          {exitInfo ? ` · session ended code=${exitInfo.code}` : ''}
-        </span>
-      </PageTopBar>
+      {(!props.hideHeader || status === 'locked' || (status === 'closed' && closedRecoverable)) && (
+        <PageTopBar title={props.sessionLabel ?? props.label ?? wsId}
+          leading={<StatusDot status={status} />} actions={<>
+          {status === 'locked' && (
+            <Button variant="ghost" size="sm"
+              type="button"
+              onClick={() => {
+                takeoverNextAttachRef.current = true;
+                setStatus('connecting');
+                connectRef.current?.();
+              }}
+              title="take over this session"
+            >
+              take over
+            </Button>
+          )}
+          {status === 'closed' && closedRecoverable && (
+            <Button variant="ghost" size="sm"
+              type="button"
+              onClick={() => retryRecoverableRef.current?.()}
+              aria-label="retry this terminal connection"
+              title="retry this terminal connection"
+            >
+              retry
+            </Button>
+          )}
+          {props.headerActions}
+        </>}>
+          <span className="truncate text-xs text-muted-foreground" title={[
+            props.label ?? wsId,
+            pid !== null ? `pid ${pid}` : '',
+            childExited ? 'child exited' : '',
+            scrollbackTruncated ? 'scrollback truncated' : '',
+            exitInfo ? `session ended code=${exitInfo.code} signal=${exitInfo.signal ?? 'none'}` : '',
+          ].filter(Boolean).join(' · ')}>
+            {childExited ? 'child exited' : status}
+            {scrollbackTruncated ? ' · scrollback truncated' : ''}
+            {exitInfo ? ` · session ended code=${exitInfo.code}` : ''}
+          </span>
+        </PageTopBar>
+      )}
       {/* FitAddon reads the computed size of xterm's direct parent. Keep that
           parent padding-free: putting the visual inset on `.terminal-host`
           makes FitAddon count the padding as usable columns, so the xterm
