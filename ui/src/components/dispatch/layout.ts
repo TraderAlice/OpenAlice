@@ -1219,24 +1219,39 @@ export function layoutEdgeGeometries(
       }
 
       const cluster = sorted.slice(clusterStart, clusterEnd)
+      const pillSafePad = 38
       if (cluster.length === 1) {
         const item = cluster[0]!
+        const avgX = (item.x1 + item.x2) / 2
         const dx = Math.max(24, Math.abs(item.y2 - item.y1) * 0.25)
-        const dir = item.edge.kind === 'question' || item.edge.kind === 'worker_done' ? -1 : 1
+        const nearRight = canvasWidth > 160 && avgX > canvasWidth - 96
+        const nearLeft = canvasWidth > 160 && avgX < 96
+        const dir = nearRight
+          ? -1
+          : nearLeft
+            ? 1
+            : item.edge.kind === 'question' || item.edge.kind === 'worker_done'
+              ? -1
+              : 1
         const ctrlX1 = item.x1 + dir * dx
         const ctrlX2 = item.x2 + dir * dx
         const rawMx = 0.125 * item.x1 + 0.375 * ctrlX1 + 0.375 * ctrlX2 + 0.125 * item.x2
-        const mx = canvasWidth > 64 ? Math.max(28, Math.min(canvasWidth - 28, rawMx)) : rawMx
+        const mx = canvasWidth > pillSafePad * 2
+          ? Math.max(pillSafePad, Math.min(canvasWidth - pillSafePad, rawMx))
+          : rawMx
         const my = (item.y1 + item.y2) / 2
         resultById.set(item.edge.id, { ...item, ctrlX1, ctrlX2, mx, my })
       } else {
-        // Fan parallel curves left/right and stagger pill positions along t in [0.34..0.66]
-        const tCycle = [0.35, 0.65, 0.65, 0.35] as const
+        // Fan parallel curves; near canvas edges bow inward so pills never pile onto the clamp rail
+        const tCycle = [0.28, 0.52, 0.74, 0.4] as const
         for (let i = 0; i < cluster.length; i += 1) {
           const item = cluster[i]!
-          const band = Math.floor(i / 2) + 1
-          const side = i % 2 === 0 ? -1 : 1
-          const baseBow = Math.max(38, Math.abs(item.y2 - item.y1) * 0.38)
+          const avgX = (item.x1 + item.x2) / 2
+          const nearRight = canvasWidth > 220 && avgX > canvasWidth - 120
+          const nearLeft = canvasWidth > 220 && avgX < 120
+          const side = nearRight ? -1 : nearLeft ? 1 : i % 2 === 0 ? -1 : 1
+          const band = nearRight || nearLeft ? i + 1 : Math.floor(i / 2) + 1
+          const baseBow = Math.max(36, Math.abs(item.y2 - item.y1) * 0.34)
           const offset = side * band * baseBow
           const ctrlX1 = item.x1 + offset
           const ctrlX2 = item.x2 + offset
@@ -1252,7 +1267,9 @@ export function layoutEdgeGeometries(
             + 3 * mt * mt * t * item.y1
             + 3 * mt * t * t * item.y2
             + t * t * t * item.y2
-          const mx = canvasWidth > 64 ? Math.max(28, Math.min(canvasWidth - 28, rawMx)) : rawMx
+          const mx = canvasWidth > pillSafePad * 2
+            ? Math.max(pillSafePad, Math.min(canvasWidth - pillSafePad, rawMx))
+            : rawMx
           resultById.set(item.edge.id, { ...item, ctrlX1, ctrlX2, mx, my })
         }
       }
