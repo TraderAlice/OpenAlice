@@ -14,6 +14,8 @@
  * is a one-place edit here — it appears everywhere at once.
  */
 
+import { Select } from '@/components/ui/select'
+
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -44,9 +46,9 @@ export interface CreateWorkspaceFormProps {
   readonly submitLabel?: string
 }
 
-const FIELD = `${inputClass} text-[13px]`
-const LABEL = 'block text-[12px] font-medium text-muted-foreground'
-const HINT = 'text-[11px] text-muted-foreground/70'
+const FIELD = `${inputClass} text-sm`
+const LABEL = 'block text-sm font-medium text-muted-foreground'
+const HINT = 'text-sm text-muted-foreground/70'
 
 export function CreateWorkspaceForm(props: CreateWorkspaceFormProps): ReactElement {
   const { t } = useTranslation()
@@ -123,20 +125,13 @@ export function CreateWorkspaceForm(props: CreateWorkspaceFormProps): ReactEleme
           <label htmlFor="cw-template" className={LABEL}>
             {t('createWorkspace.templateLabel')}
           </label>
-          <select
+          <Select
             id="cw-template"
             value={effectiveTemplate}
-            onChange={(e) => setSelected(e.target.value)}
+            onValueChange={(selectedValue) => setSelected(selectedValue)}
             disabled={create.creating}
-            className={FIELD}
-          >
-            {templates.map((tpl) => (
-              <option key={tpl.name} value={tpl.name}>
-                {tpl.displayName ?? tpl.name}
-                {tpl.community ? t('createWorkspace.communitySuffix') : ''}
-              </option>
-            ))}
-          </select>
+            options={templates.map((tpl) => ({ value: tpl.name, label: [tpl.displayName ?? tpl.name, tpl.community ? t('createWorkspace.communitySuffix') : ''].join('') }))}
+          />
           {selectedMeta?.description && <p className={HINT}>{selectedMeta.description}</p>}
         </div>
       )}
@@ -169,19 +164,13 @@ export function CreateWorkspaceForm(props: CreateWorkspaceFormProps): ReactEleme
           <label htmlFor="cw-source-version" className={LABEL}>
             {t('createWorkspace.sourceVersionLabel')}
           </label>
-          <select
+          <Select
             id="cw-source-version"
-            value={effectiveSourceVersion}
-            onChange={(e) => setSourceVersion(e.target.value)}
+            value={effectiveSourceVersion ?? ''}
+            onValueChange={(selectedValue) => setSourceVersion(selectedValue)}
             disabled={create.creating}
-            className={FIELD}
-          >
-            {selectedMeta.source.versions.map((entry) => (
-              <option key={entry.version} value={entry.version}>
-                {entry.version}
-              </option>
-            ))}
-          </select>
+            options={selectedMeta.source.versions.map((entry) => ({ value: entry.version, label: entry.version }))}
+          />
           <p className={HINT}>
             {t('createWorkspace.sourceVersionHint', {
               commit: selectedMeta.source.versions
@@ -192,7 +181,7 @@ export function CreateWorkspaceForm(props: CreateWorkspaceFormProps): ReactEleme
         </div>
       )}
 
-      {create.error && <div role="alert" className="text-[12px] text-destructive">{create.error}</div>}
+      {create.error && <div role="alert" className="text-sm text-destructive">{create.error}</div>}
 
       <div className="flex items-center justify-end gap-2 pt-1">
         {onCancel && (

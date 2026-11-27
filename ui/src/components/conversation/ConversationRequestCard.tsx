@@ -103,7 +103,7 @@ export function ConversationRequestCard({ request, queued, respond }: Conversati
           {request.options.length ? 'Or write your own answer' : 'Your answer'}
         </label>
         {request.secret
-          ? <input className="oa-field-control w-full rounded-md border border-input px-2.5 py-2 text-sm" id={`request-answer-${request.id}`} type="password" autoComplete="off" value={answer} disabled={pendingOption !== null} onChange={(event) => setAnswer(event.target.value)} />
+          ? <input className="oa-field-control w-full rounded-md border border-input px-2.5 py-2 text-base" id={`request-answer-${request.id}`} type="password" autoComplete="off" value={answer} disabled={pendingOption !== null} onChange={(event) => setAnswer(event.target.value)} />
           : <Textarea id={`request-answer-${request.id}`} value={answer} disabled={pendingOption !== null} onChange={(event) => setAnswer(event.target.value)} />}
         <Button type="submit" className="self-end" disabled={pendingOption !== null || !answer.trim()}>
           {pendingOption === '' && <LoaderCircle size={13} className="animate-spin" aria-hidden />}

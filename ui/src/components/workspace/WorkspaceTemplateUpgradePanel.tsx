@@ -115,7 +115,7 @@ export function WorkspaceTemplateUpgradePanel({
             <section className="oa-status-surface overflow-hidden rounded-lg border border-border bg-secondary/35">
               <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-[12px] font-semibold text-muted-foreground">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
                     <FileDiff size={14} />
                     {projection ? projection.skill : layer === 'alice-harness' ? 'Alice Harness' : t('workspace.upgradeManagedAssets')}
                   </div>
@@ -125,7 +125,7 @@ export function WorkspaceTemplateUpgradePanel({
                     <ArrowRight size={17} className="text-muted-foreground" />
                     <span className={`break-all ${current ? '' : 'text-primary'}`}>v{plan.toVersion}</span></>}
                   </div>
-                  <p className="mt-1 max-w-xl text-[12px] leading-relaxed text-muted-foreground">
+                  <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
                     {projection ? t('skillManager.scopeHint') : current
                       ? t('workspace.upgradeCurrentDescription')
                       : t('workspace.upgradeDescription')}
@@ -152,13 +152,13 @@ export function WorkspaceTemplateUpgradePanel({
             </section>
 
             {plan.source === 'legacy-root-commit' && !current && (
-              <div className="rounded-lg border border-border/70 bg-secondary/25 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
+              <div className="rounded-lg border border-border/70 bg-secondary/25 px-3 py-2.5 text-sm leading-relaxed text-muted-foreground">
                 {t('workspace.upgradeLegacyBaseline')}
               </div>
             )}
 
             {plan.blockers.length > 0 && (
-              <div className="rounded-lg border border-warning/35 bg-warning/8 px-3 py-3 text-[12px] text-foreground">
+              <div className="rounded-lg border border-warning/35 bg-warning/8 px-3 py-3 text-sm text-foreground">
                 <div className="flex items-center gap-2 font-semibold text-warning">
                   <AlertTriangle size={15} />
                   {t('workspace.upgradeBlockedTitle')}
@@ -212,14 +212,14 @@ export function WorkspaceTemplateUpgradePanel({
             {!current && conflicts.length > 0 && (
               <section className="rounded-lg border border-warning/35 bg-secondary/20">
                 <div className="border-b border-border px-4 py-3">
-                  <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                     <AlertTriangle size={15} className="text-warning" />
                     {t('workspace.upgradeConflictTitle')}
-                    <span className="rounded-full bg-warning/12 px-2 py-0.5 text-[10px] text-warning">
+                    <span className="rounded-full bg-warning/12 px-2 py-0.5 text-sm text-warning">
                       {conflicts.length}
                     </span>
                   </div>
-                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                     {t('workspace.upgradeConflictDescription')}
                   </p>
                   <Button type="button" variant="outline" className="mt-3" onClick={() => {
@@ -248,11 +248,11 @@ export function WorkspaceTemplateUpgradePanel({
 
             {result && current && (
               <div className="rounded-lg border border-success/35 bg-success/8 px-4 py-3">
-                <div className="flex items-center gap-2 text-[13px] font-semibold text-success">
+                <div className="flex items-center gap-2 text-sm font-semibold text-success">
                   <Check size={16} />
                   {t('workspace.upgradeCompleteTitle')}
                 </div>
-                <p className="mt-1 text-[11px] text-muted-foreground">
+                <p className="mt-1 text-sm text-muted-foreground">
                   {t('workspace.upgradeCompleteDescription', {
                     count: result.changedPaths.length,
                     commit: result.commit.slice(0, 8),
@@ -265,14 +265,14 @@ export function WorkspaceTemplateUpgradePanel({
 
         {!plan && error && <Button variant="outline" disabled={loading} onClick={() => void load()}><RefreshCw size={13}/>{t('workspace.upgradeRefresh')}</Button>}
         {error && !unsupported && (
-          <div className="rounded-lg border border-destructive/35 bg-destructive/8 px-3 py-2.5 text-[12px] text-destructive" role="alert">
+          <div className="rounded-lg border border-destructive/35 bg-destructive/8 px-3 py-2.5 text-sm text-destructive" role="alert">
             {error}
           </div>
         )}
       </div>
 
       <div className="flex flex-col gap-2 border-t border-border bg-secondary/30 p-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-h-5 text-[11px] text-muted-foreground">
+        <div className="min-h-5 text-sm text-muted-foreground">
           {plan && !current && conflicts.length > 0 && (
             unresolved > 0
               ? t('workspace.upgradeUnresolved', { count: unresolved })
@@ -312,7 +312,7 @@ function Metric({ value, label, tone }: {
   return (
     <div className="border-r border-border px-3 py-2.5 text-center last:border-r-0">
       <div className={`text-[16px] font-semibold tabular-nums ${valueClass}`}>{value}</div>
-      <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{label}</div>
+      <div className="mt-0.5 truncate text-sm text-muted-foreground">{label}</div>
     </div>
   )
 }
@@ -336,9 +336,9 @@ function FileGroup({ title, files, defaultOpen = false, tone }: {
       >
         {open ? <ChevronDown size={15} className="mt-0.5 text-muted-foreground" /> : <ChevronRight size={15} className="mt-0.5 text-muted-foreground" />}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
             {title}
-            <span className={`rounded-full px-2 py-0.5 text-[10px] ${tone === 'accent' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+            <span className={`rounded-full px-2 py-0.5 text-sm ${tone === 'accent' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
               {files.length}
             </span>
           </div>
@@ -351,8 +351,8 @@ function FileGroup({ title, files, defaultOpen = false, tone }: {
               {file.status === 'ready'
                 ? <Check size={13} className="shrink-0 text-primary" />
                 : <ShieldCheck size={13} className="shrink-0 text-muted-foreground" />}
-              <code className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground" title={file.path}>{file.path}</code>
-              <span className="shrink-0 text-[10px] capitalize text-muted-foreground">{file.mergedPreview !== undefined ? t('workspace.upgradeMerged') : file.operation}</span>
+              <code className="min-w-0 flex-1 truncate font-mono text-sm text-foreground" title={file.path}>{file.path}</code>
+              <span className="shrink-0 text-sm capitalize text-muted-foreground">{file.mergedPreview !== undefined ? t('workspace.upgradeMerged') : file.operation}</span>
             </div>
           ))}
         </div>
@@ -372,8 +372,8 @@ function ConflictFile({ file, value, onChange }: {
     <div className="px-4 py-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <code className="block truncate font-mono text-[11px] font-semibold text-foreground" title={file.path}>{file.path}</code>
-          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{file.note}</p>
+          <code className="block truncate font-mono text-sm font-semibold text-foreground" title={file.path}>{file.path}</code>
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{file.note}</p>
         </div>
         <div className="flex shrink-0 rounded-lg border border-border bg-background p-0.5" role="radiogroup" aria-label={file.path}>
           <Choice active={value === 'workspace'} onClick={() => onChange('workspace')}>
@@ -393,7 +393,7 @@ function ConflictFile({ file, value, onChange }: {
         onClick={() => setPreviewOpen((open) => !open)}
         variant="ghost"
         size="sm"
-        className="mt-2 px-1 text-[11px] text-muted-foreground"
+        className="mt-2 px-1 text-sm text-muted-foreground"
         aria-expanded={previewOpen}
       >
         {previewOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -441,11 +441,11 @@ function Preview({ title, value, truncated }: {
   const { t } = useTranslation()
   return (
     <div className="min-w-0 overflow-hidden rounded-lg border border-border bg-background">
-      <div className="flex items-center justify-between border-b border-border px-2.5 py-1.5 text-[10px] font-semibold text-muted-foreground">
+      <div className="flex items-center justify-between border-b border-border px-2.5 py-1.5 text-sm font-semibold text-muted-foreground">
         <span>{title}</span>
         {truncated && <span>{t('workspace.upgradePreviewTruncated')}</span>}
       </div>
-      <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-words px-2.5 py-2 font-mono text-[10px] leading-relaxed text-foreground">
+      <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-words px-2.5 py-2 font-mono text-sm leading-relaxed text-foreground">
         {value ?? t('workspace.upgradeFileMissing')}
       </pre>
     </div>

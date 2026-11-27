@@ -24,13 +24,11 @@ export function UnverifiedHarnessReleaseSetting() {
     }
   }
 
-  return <div className="flex min-h-12 items-start justify-between gap-4 py-3">
-    <div className="min-w-0">
-      <label htmlFor={id} className="block text-sm font-medium text-foreground">{t('settings.harness.showUnverifiedReleases')}</label>
-      <p id={descriptionId} className="mt-1 text-xs leading-relaxed text-muted-foreground">{t('settings.harness.showUnverifiedReleasesDescription')}</p>
-    </div>
-    <div className="flex shrink-0 items-center gap-2">
-      <Toggle id={id} ariaLabel={t('settings.harness.showUnverifiedReleases')} checked={preferences.showUnverifiedHarnessReleases} disabled={status === 'saving'} onChange={(next) => void update(next)} />
+  return <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-2 py-3">
+    <label htmlFor={id} className="min-w-0 text-sm font-medium leading-5 text-foreground">{t('settings.harness.showUnverifiedReleases')}</label>
+    <Toggle id={id} ariaLabel={t('settings.harness.showUnverifiedReleases')} checked={preferences.showUnverifiedHarnessReleases} pending={status === 'saving'} onChange={(next) => void update(next)} />
+    <p id={descriptionId} className="col-span-2 text-sm leading-5 text-muted-foreground">{t('settings.harness.showUnverifiedReleasesDescription')}</p>
+    <div className="col-span-2 justify-self-end">
       <SaveIndicator status={status === 'idle' && error ? 'error' : status} />
     </div>
   </div>

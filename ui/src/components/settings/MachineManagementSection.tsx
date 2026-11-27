@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertCircle, ChevronDown, LoaderCircle, Monitor, Plus, RefreshCw, Server, ShieldCheck } from 'lucide-react'
+import { AlertCircle, ChevronDown, LoaderCircle, Monitor, Plus, RefreshCw, Server, CircleCheck, CircleMinus, CircleAlert } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type { RelayProject } from '../../hooks/useRelayConnection'
 import { useUpdateLifecycle } from '../../hooks/useUpdateLifecycle'
 import { Button } from '../ui/button'
-import { inputClass } from '../form'
+import { Select } from '../ui/select'
+import { ContextHelp } from '../ContextHelp'
 import { AddMachineDialog } from './AddMachineDialog'
 import { MachineUpgradeDialog } from './MachineUpgradeDialog'
 import { claimUpgradeDialog, shouldRestoreUpgradeDialog } from './upgrade-dialog-owner'
@@ -53,13 +54,13 @@ export function MachineManagementSection() {
 
   return (
     <section aria-label={t('settings.machines.title')} className="@container min-w-0">
-      <p className="mb-5 text-[13px] leading-5 text-muted-foreground">{t('settings.machines.description')}</p>
       {added && <p role="status" className="mb-3 text-xs text-success">{t('settings.machines.added')}</p>}
       <div className="min-w-0 overflow-hidden rounded-xl border border-border/70 bg-card">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 px-3 py-3 sm:px-4">
           <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
             <Server className="size-4" aria-hidden />
             {t('settings.machines.saved', 'Saved Machines')}
+            <ContextHelp label={t('settings.machines.title')}>{`${t('settings.machines.description')} ${t('settings.machines.localControl')}`}</ContextHelp>
           </div>
           <div className="flex items-center gap-1.5">
             <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => void manager.refresh()} className="min-h-9 gap-1.5">
@@ -104,11 +105,7 @@ export function MachineManagementSection() {
               : machine.connection === 'incompatible'
                 ? 'text-warning'
                 : 'text-muted-foreground'
-            const statusDotColor = online
-              ? 'bg-success'
-              : machine.connection === 'incompatible'
-                ? 'bg-warning'
-                : 'bg-muted-foreground/60'
+            const ConnectionIcon = online ? CircleCheck : machine.connection === 'incompatible' ? CircleAlert : CircleMinus
 
             const projectTarget = manager.status?.target?.project
             const sortedProjects = [...machine.projects].sort((a, b) => {
@@ -147,8 +144,8 @@ export function MachineManagementSection() {
                         <span className="block truncate text-[11px] text-muted-foreground">{subtitle}</span>
                       )}
                     </span>
-                    <span className={`shrink-0 text-[11px] ${statusColor}`}>
-                      <span className={`mr-1.5 inline-block size-1.5 rounded-full ${statusDotColor}`} aria-hidden />
+                    <span className={`inline-flex shrink-0 items-center gap-2 text-sm ${statusColor}`}>
+                      <ConnectionIcon className="size-4" aria-hidden />
                       {machine.connection}
                     </span>
                   </button>
@@ -273,18 +270,16 @@ export function MachineManagementSection() {
                             {selectableProjects.length > 0 && (
                               <label className="mt-2 block text-[12px] text-muted-foreground">
                                 AliceProject
-                                <select
-                                  className={`${inputClass} mt-1`}
+                                <Select
+                                  aria-label="AliceProject"
+                                  className="mt-1"
                                   value={selectedProject?.key ?? ''}
-                                  onChange={(event) => {
-                                    setUpgradeProjects((value) => ({ ...value, [machine.key]: event.target.value }))
+                                  onValueChange={(projectKey) => {
+                                    setUpgradeProjects((value) => ({ ...value, [machine.key]: projectKey }))
                                     manager.clearPlan()
                                   }}
-                                >
-                                  {selectableProjects.map((project) => (
-                                    <option key={project.key} value={project.key}>{project.displayName}</option>
-                                  ))}
-                                </select>
+                                  options={selectableProjects.map((project) => ({ value: project.key, label: project.displayName }))}
+                                />
                               </label>
                             )}
                           </div>
@@ -359,10 +354,6 @@ export function MachineManagementSection() {
           }
         }}
       />
-      <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
-        <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-        {t('settings.machines.localControl', 'Machine profiles and SSH actions belong to this computer; AliceProject data stays on its Runtime.')}
-      </p>
     </section>
   )
 }

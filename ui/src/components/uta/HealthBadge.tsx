@@ -6,13 +6,12 @@ import type { BrokerHealthInfo } from '../../api/types'
  *  AND what the account is for (a keyless data source reads "Data source", a
  *  read-only account says so), so a data UTA never looks like a broken trader. */
 export function HealthBadge({ health, size = 'sm' }: { health?: BrokerHealthInfo; size?: 'sm' | 'md' }) {
-  const textSize = size === 'md' ? 'text-[12px]' : 'text-[11px]'
-  const iconSize = size === 'md' ? 'size-3.5' : 'size-3'
+  const iconSize = size === 'md' ? 'size-4' : 'size-3.5'
 
   if (!health) return <span className="text-muted-foreground/40">—</span>
 
   const status = (color: string, Icon: LucideIcon, label: string, title?: string, spin = false) => (
-    <span className={`inline-flex items-center gap-1.5 ${textSize} ${color}`} title={title}>
+    <span className={`inline-flex items-center gap-2 text-sm ${color}`} title={title}>
       <Icon aria-hidden className={`${iconSize} shrink-0 ${spin ? 'animate-spin motion-reduce:animate-none' : ''}`} />
       {label}
     </span>

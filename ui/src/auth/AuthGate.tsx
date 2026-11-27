@@ -74,7 +74,7 @@ export function BackendUnavailableScreen({
           {phase === 'relay-unavailable' ? <CloudOff aria-hidden className="h-7 w-7" /> : <ServerOff aria-hidden className="h-7 w-7" />}
         </div>
 
-        <p className="mb-2 text-[12px] font-medium text-destructive">
+        <p className="mb-2 text-sm font-medium text-destructive">
           {t(eyebrowKey)}
         </p>
         <h1 id="backend-unavailable-title" className="max-w-[560px] break-words text-2xl font-semibold leading-tight text-foreground sm:text-3xl">
@@ -84,7 +84,7 @@ export function BackendUnavailableScreen({
           {t(descriptionKey, { target: targetName, machine: machineName })}
         </p>
 
-        {target && <div className="mt-5 flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-muted-foreground">
+        {target && <div className="mt-5 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
           <span>{t('auth.activeMachine')}: <strong className="font-medium text-foreground">{machineName}</strong></span>
           <span>{t('auth.activeProject')}: <strong className="font-medium text-foreground">{targetName}</strong></span>
         </div>}
@@ -93,10 +93,10 @@ export function BackendUnavailableScreen({
           <div role="status" aria-live="polite" className="flex items-start gap-3">
             <Spinner size="sm" />
             <div className="min-w-0">
-              <p className="break-words text-[13px] font-medium text-foreground">
+              <p className="break-words text-sm font-medium text-foreground">
                 {t(phase === 'relay-unavailable' ? 'auth.reconnectingRelay' : remote ? 'auth.reconnectingRemote' : 'auth.reconnecting', { target: machineName })}
               </p>
-              <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">
                 {t('auth.backendUnavailableImpact')}
               </p>
             </div>
@@ -114,7 +114,7 @@ export function BackendUnavailableScreen({
             {t('auth.retryNow')}
           </Button>
           {relayStatus && <Button type="button" variant="outline" onClick={() => setChooserOpen(true)}>{t('settings.backendConnection.change')}</Button>}
-          <p className="max-w-[390px] break-words text-[11px] leading-5 text-muted-foreground">
+          <p className="max-w-[390px] break-words text-sm leading-5 text-muted-foreground">
             {t(phase === 'relay-unavailable' ? 'auth.relayUnavailableHelp' : remote ? 'auth.targetUnavailableHelp' : 'auth.backendUnavailableHelp')}
           </p>
         </div>

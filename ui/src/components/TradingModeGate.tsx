@@ -20,11 +20,11 @@ export function TradingModeGate({ title, description }: TradingModeGateProps) {
             <Gauge size={18} strokeWidth={1.8} aria-hidden />
           </span>
           <div className="min-w-0">
-            <div className="text-[11px] font-medium leading-4 text-muted-foreground">
+            <div className="text-sm font-medium leading-5 text-muted-foreground">
               {t('tradingModeGate.liteMode')}
             </div>
             <h2 className="mt-1 text-[17px] font-semibold text-foreground">{title}</h2>
-            <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">{description}</p>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{description}</p>
           </div>
         </div>
 

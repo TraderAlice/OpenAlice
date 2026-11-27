@@ -219,7 +219,7 @@ describe('OverviewStatusCards', () => {
   it('switches appearance theme mode and UI language inline and links to Appearance', () => {
     render(<OverviewStatusCards />)
 
-    expect(screen.getByText('Codex')).toBeTruthy()
+    expect(screen.getByText('Alice')).toBeTruthy()
     const autoButton = screen.getByRole('button', { name: 'Auto' })
     const nightButton = screen.getByRole('button', { name: 'Night' })
     expect(autoButton.getAttribute('aria-pressed')).toBe('true')

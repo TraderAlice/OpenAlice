@@ -1,11 +1,13 @@
 import { useEffect, useId, useState } from 'react'
-import { ChevronDown, ChevronRight, Monitor, RefreshCw, Server } from 'lucide-react'
+import { ChevronRight, Monitor, RefreshCw, Server } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { getBackendConnection } from '../../auth/backendConnection'
 import { useAliceProject } from '../../hooks/useAliceProject'
 import { useRelayConnection } from '../../hooks/useRelayConnection'
 import { useUpdateLifecycle } from '../../hooks/useUpdateLifecycle'
+import { Collapsible, CollapsibleContent, CollapsibleDetailsTrigger } from '../ui/collapsible'
+import { StatusIndicator } from '../motion/StatusIndicator'
 import { Button } from '../ui/button'
 import { DataHomeSection, WorkspaceShellSection } from './LocalEnvironmentSections'
 
@@ -13,13 +15,11 @@ import { DataHomeSection, WorkspaceShellSection } from './LocalEnvironmentSectio
 export function AliceLocationSection() {
   const { t } = useTranslation()
   const headingId = useId()
-  const detailsId = useId()
   const connection = getBackendConnection()
   const { project, loading, error, refresh } = useAliceProject()
   const sharedMachines = useUpdateLifecycle({ optional: true })?.machines
   const localRelay = useRelayConnection()
   const relay = sharedMachines ?? localRelay
-  const [showDetails, setShowDetails] = useState(false)
   const [returningIntegrated, setReturningIntegrated] = useState(false)
   const [switchError, setSwitchError] = useState<string | null>(null)
   const desktopConnection = window.openAlice?.desktopConnection
@@ -98,11 +98,11 @@ export function AliceLocationSection() {
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[14px] font-semibold text-foreground">
               <span className="min-w-0 truncate" title={machine}>{machine}</span>
-              <span className="text-muted-foreground" aria-hidden>/</span>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
               <span className="min-w-0 truncate" title={projectName}>{projectName}</span>
             </div>
             <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-muted-foreground" role="status">
-              <span className={`size-2 shrink-0 rounded-full ${project && !error && !loading ? 'bg-success' : 'bg-muted-foreground/60'}`} aria-hidden />
+              <StatusIndicator size={16} state={loading ? 'loading' : project && !error ? 'done' : 'error'} />
               {status} · {mode}
             </p>
           </div>
@@ -167,21 +167,9 @@ export function AliceLocationSection() {
 
       {switchError && <p role="alert" className="py-2 text-[12px] text-destructive">{switchError}</p>}
 
-      <button
-        type="button"
-        className="flex min-h-10 w-full items-center gap-2 pt-3 text-left text-[12px] text-muted-foreground hover:text-foreground focus-visible:rounded-sm focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
-        onClick={() => setShowDetails((value) => !value)}
-        aria-expanded={showDetails}
-        aria-controls={detailsId}
-      >
-        {showDetails
-          ? <ChevronDown className="size-4 shrink-0" aria-hidden />
-          : <ChevronRight className="size-4 shrink-0" aria-hidden />}
-        {t('settings.machines.environmentDetails')}
-      </button>
-
-      {showDetails && (
-        <div id={detailsId} className="mt-3 min-w-0 space-y-4 border-t border-border/60 pt-4">
+      <Collapsible>
+        <CollapsibleDetailsTrigger>{t('settings.machines.environmentDetails')}</CollapsibleDetailsTrigger>
+        <CollapsibleContent className="mt-3 min-w-0 space-y-4 border-t border-border/60 pt-4">
           <dl className="grid min-w-0 gap-x-6 gap-y-3 text-[12px] @[30rem]:grid-cols-2">
             <Detail label={t('settings.backendConnection.machine')} value={machine} />
             <Detail label="AliceProject" value={projectName} />
@@ -207,8 +195,8 @@ export function AliceLocationSection() {
           </p>
           <DataHomeSection embedded />
           <WorkspaceShellSection embedded />
-        </div>
-      )}
+        </CollapsibleContent>
+      </Collapsible>
     </section>
   )
 }

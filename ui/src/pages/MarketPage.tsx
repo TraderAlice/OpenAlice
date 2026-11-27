@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Activity, ArrowUpRight, CalendarDays, Globe2, Landmark, TrendingUp } from 'lucide-react'
 import { BoardMeta } from '../components/market/BoardMeta'
+import { ContextHelp } from '../components/ContextHelp'
 import { PageHeader } from '../components/PageHeader'
 import { SearchBox } from '../components/market/SearchBox'
 import { SeriesCard } from '../components/market/SeriesCard'
@@ -25,19 +26,17 @@ export function MarketPage() {
   }, [])
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title={t('market.pageTitle')} description={t('market.pageDescription')} />
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-4 md:px-8">
+    <div className="@container/market-overview flex flex-col flex-1 min-h-0">
+      <PageHeader title={t('market.pageTitle')} help={t('market.pageDescription')} />
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-[var(--page-inset)] pb-8 pt-2">
         <SearchBox />
 
-        <section className="border-y border-border/60 py-4">
+        <section className="py-2">
           <div className="flex flex-col gap-3.5">
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between lg:gap-8">
-              <div>
-                <h2 className="text-[14px] leading-[19px] font-semibold text-foreground">{t('market.fxTitle')}</h2>
-                <p className="mt-0.5 max-w-2xl text-[12px] leading-5 text-muted-foreground">
-                  {t('market.fxDescription')}
-                </p>
+            <div className="flex flex-col gap-2 @min-[40rem]/market-overview:flex-row @min-[40rem]/market-overview:items-end @min-[40rem]/market-overview:justify-between @min-[40rem]/market-overview:gap-8">
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-semibold text-foreground">{t('market.fxTitle')}</h2>
+                <ContextHelp label={t('market.fxTitle')}>{t('market.fxDescription')}</ContextHelp>
               </div>
               <div className="flex flex-wrap gap-1.5" aria-label={t('market.fxTitle')}>
                 {FX_MAJORS.map((pair) => (
@@ -47,25 +46,25 @@ export function MarketPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => openOrFocus({ kind: 'market-detail', params: { assetClass: 'currency', symbol: pair } })}
-                    className="font-mono text-[11px] leading-[15px]"
+                    className="tabular-nums text-sm leading-5"
                   >
                     {pair.slice(0, 3)}/{pair.slice(3)}
                   </Button>
                 ))}
               </div>
             </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <FxDeskEntry
+            <div className="grid grid-cols-1 gap-3 @min-[32rem]/market-overview:grid-cols-2 @min-[48rem]/market-overview:grid-cols-3">
+              <MarketLaunchCard
                 icon={<Globe2 size={15} />}
                 title={t('market.fxGlobalTitle')}
                 onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'global-macro' } })}
               />
-              <FxDeskEntry
+              <MarketLaunchCard
                 icon={<Activity size={15} />}
                 title={t('market.fxUsTitle')}
                 onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'macro' } })}
               />
-              <FxDeskEntry
+              <MarketLaunchCard
                 icon={<Landmark size={15} />}
                 title={t('market.fxFedTitle')}
                 onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'fed' } })}
@@ -76,15 +75,15 @@ export function MarketPage() {
 
         {/* S&P 500 valuation strip — the market-level regime read. */}
         <div className="flex flex-col gap-2">
-          <h3 className="text-caption font-semibold text-foreground">
+          <h3 className="text-base font-semibold text-foreground">
             {t('market.valuationTitle')}
             {strip && <span className="ml-2 normal-case font-normal tracking-normal"><BoardMeta meta={strip.meta} /></span>}
           </h3>
           {stripError && (
-            <div className="rounded-lg border border-border bg-card px-3 py-2 text-[12px] text-muted-foreground">{stripError}</div>
+            <div className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">{stripError}</div>
           )}
           {!strip && !stripError && (
-            <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(210px,1fr))]" aria-hidden="true">
+            <div className="grid grid-cols-1 gap-3 @min-[28rem]/market-overview:grid-cols-2 @min-[60rem]/market-overview:grid-cols-4" aria-hidden="true">
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="flex flex-col gap-1.5 rounded-lg border border-border bg-card px-3 py-2.5">
                   <Skeleton className="h-3 w-20 rounded" />
@@ -94,7 +93,7 @@ export function MarketPage() {
             </div>
           )}
           {strip && (
-            <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(210px,1fr))]">
+            <div className="grid grid-cols-1 gap-3 @min-[28rem]/market-overview:grid-cols-2 @min-[60rem]/market-overview:grid-cols-4">
               {strip.cards.map((c) => {
                 const labelKey = valuationLabelKey(c.id)
                 return (
@@ -105,13 +104,13 @@ export function MarketPage() {
           )}
         </div>
 
-        <section className="border-y border-border/60 py-4">
+        <section className="py-2">
           <div>
             <div className="flex items-end justify-between gap-6">
-              <h2 className="text-[14px] leading-[19px] font-semibold text-foreground">{t('market.overviewTitle')}</h2>
+              <h2 className="text-base leading-6 font-semibold text-foreground">{t('market.overviewTitle')}</h2>
             </div>
 
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-3 grid grid-cols-1 gap-3 @min-[28rem]/market-overview:grid-cols-2 @min-[64rem]/market-overview:grid-cols-4">
               <MarketLaunchCard
                 icon={<TrendingUp size={17} strokeWidth={1.75} />}
                 title={t('market.boardMovers')}
@@ -142,25 +141,6 @@ export function MarketPage() {
 
 const FX_MAJORS = ['EURUSD', 'USDJPY', 'GBPUSD', 'USDCNH'] as const
 
-function FxDeskEntry({ icon, title, onClick }: {
-  icon: ReactNode
-  title: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="oa-data-surface oa-pressable group flex min-h-11 items-center gap-2.5 rounded-lg border px-3 py-2 text-left hover:border-success/30 hover:bg-success/5"
-    >
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center text-success">
-        {icon}
-      </span>
-      <span className="min-w-0 truncate text-[13px] font-medium text-foreground">{title}</span>
-    </button>
-  )
-}
-
 function MarketLaunchCard({
   icon,
   title,
@@ -174,12 +154,12 @@ function MarketLaunchCard({
     <button
       type="button"
       onClick={onClick}
-      className="oa-data-surface oa-pressable group flex min-h-11 items-center gap-2.5 rounded-lg border px-3 py-2 text-left hover:border-primary/30 hover:bg-primary/[0.045]"
+      className="oa-data-surface oa-pressable group flex min-h-12 items-center gap-3 rounded-xl px-3 py-2 text-left hover:border-foreground/20 hover:bg-muted/50"
     >
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center text-primary">
+      <span className="flex size-7 shrink-0 rounded-md bg-background items-center justify-center text-muted-foreground">
         {icon}
       </span>
-      <span className="min-w-0 truncate text-[13px] font-medium text-foreground">{title}</span>
+      <span className="min-w-0 text-sm font-medium text-foreground">{title}</span>
     </button>
   )
 }

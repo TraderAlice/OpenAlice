@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
 import { useLocaleStore } from '../i18n/store'
-import { LanguageSection } from './SettingsPage'
+import { LanguageSection } from '../components/settings/OverviewStatusCards'
 
 beforeEach(async () => {
   localStorage.clear()

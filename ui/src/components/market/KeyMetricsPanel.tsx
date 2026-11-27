@@ -94,7 +94,7 @@ export function KeyMetricsPanel({ symbol }: Props) {
   return (
     <Card title="Key Metrics" info={info}>
       {loading && (
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]" aria-hidden="true">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm" aria-hidden="true">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="flex items-baseline justify-between border-b border-border/30 py-1 last:border-b-0">
               <Skeleton className="h-3 w-16 rounded" />
@@ -103,9 +103,9 @@ export function KeyMetricsPanel({ symbol }: Props) {
           ))}
         </dl>
       )}
-      {error && !loading && <div className="text-[12px] text-destructive">{error}</div>}
+      {error && !loading && <div className="text-sm text-destructive">{error}</div>}
       {!loading && !error && data && (
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
           {rows.map(([k, v]) => (
             <div key={k} className="flex items-baseline justify-between border-b border-border/30 py-1 last:border-b-0">
               <dt className="text-muted-foreground/70">{k}</dt>

@@ -1,0 +1,52 @@
+.oa-status-indicator-badge {
+  display: inline-block;
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--status-indicator-size, 22px);
+  height: var(--status-indicator-size, 22px);
+  vertical-align: middle;
+}
+.oa-status-indicator-ring, .oa-status-indicator-arc, .oa-status-indicator-fill, .oa-status-indicator-disc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+.oa-status-indicator-ring { border: var(--status-indicator-ring-w) solid var(--border); }
+.oa-status-indicator-arc {
+  border: var(--status-indicator-ring-w) solid transparent;
+  border-top-color: var(--muted-foreground);
+  animation: oa-status-indicator-spin var(--status-indicator-spin-dur) linear infinite;
+  transition: opacity var(--motion-fast) var(--motion-ease-out);
+}
+.oa-status-indicator-fill {
+  background: var(--success);
+  opacity: 0;
+  transform: scale(0.65);
+  transition: opacity var(--status-indicator-fill-dur) var(--motion-ease-out), transform var(--status-indicator-pop-dur) var(--status-indicator-pop-ease);
+}
+.oa-status-indicator-disc { width: 100%; height: 100%; }
+.oa-status-indicator-mark, .oa-status-indicator-error {
+  stroke: var(--success-foreground);
+  stroke-width: var(--status-indicator-mark-w);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+.oa-status-indicator-mark {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset var(--status-indicator-draw-dur) var(--status-indicator-draw-ease) var(--status-indicator-draw-delay), opacity var(--motion-fast);
+}
+.oa-status-indicator-badge[data-state="done"] .oa-status-indicator-fill,
+.oa-status-indicator-badge[data-state="error"] .oa-status-indicator-fill { transform: scale(1); opacity: 1; }
+.oa-status-indicator-badge[data-state="done"] .oa-status-indicator-arc,
+.oa-status-indicator-badge[data-state="error"] .oa-status-indicator-arc { opacity: 0; animation: none; }
+.oa-status-indicator-badge[data-state="done"] .oa-status-indicator-mark { opacity: 1; stroke-dashoffset: 0; }
+.oa-status-indicator-badge[data-state="error"] .oa-status-indicator-fill { background: var(--destructive); }
+.oa-status-indicator-badge[data-state="error"] .oa-status-indicator-error { opacity: 1; stroke: var(--destructive-foreground); }
+.oa-status-indicator-badge[data-playing="false"] .oa-status-indicator-arc { animation-play-state: paused; }
+@keyframes oa-status-indicator-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .oa-status-indicator-arc { animation: none; }
+  .oa-status-indicator-arc, .oa-status-indicator-fill, .oa-status-indicator-mark { transition: none; }
+}

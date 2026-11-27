@@ -221,12 +221,12 @@ export function CommanderPage({ visible = true }: CommanderPageProps) {
     : unreadReports > 0
       ? {
           label: t('commander.pendingReports', { count: unreadReports }),
-          dotClass: 'bg-amber-500',
-          pillClass: 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400',
+          dotClass: 'bg-warning',
+          pillClass: 'border-warning/30 bg-warning/10 text-warning',
         }
       : {
           label: t('commander.statusReady'),
-          dotClass: 'bg-emerald-500',
+          dotClass: 'bg-success',
           pillClass: 'border-border/70 bg-secondary/60 text-muted-foreground',
         }
 
@@ -400,6 +400,8 @@ export function CommanderPage({ visible = true }: CommanderPageProps) {
                     <AgentLaunchSelectors
                       ref={launchSelectorsRef}
                       config={launchConfig}
+                      toolbar
+                      combinedAi
                       onConfigureProvider={goConfigureProvider}
                     />
                   </div>

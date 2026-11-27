@@ -3,6 +3,7 @@ import type { Resources } from './en'
 
 /** 日本語. Typed as `Resources` → must match en's key structure exactly. */
 export const ja: Resources = {
+
   activityPreferences: en.activityPreferences,
 
   sessionControl: {
@@ -329,9 +330,8 @@ export const ja: Resources = {
   },
   demoBanner: {
     badge: 'デモ',
-    compact: '記録済みプレビュー',
-    description:
-      '記録済みデータを使った OpenAlice のスナップショットを表示しています。変更は保存されず、Web の応答はシミュレーションです。',
+    description: '録画データとシミュレーションによる Web の返信を表示します。OpenAlice をインストールするとライブサービスに接続できます。',
+    terminal: 'OpenAlice をインストールしてターミナルセッションを実行できます。',
     install: 'OpenAlice をインストール',
   },
   issues: {
@@ -894,7 +894,7 @@ export const ja: Resources = {
       dayPaletteDescription: '昼モードと、自動が明るいシステム設定に追従する場合に使います。どのパレットでも選べます。',
       nightPalette: '夜用パレット',
       nightPaletteDescription: '夜モードと、自動が暗いシステム設定に追従する場合に使います。どのパレットでも選べます。',
-      currentPalette: '現在は{{slot}} · {{palette}}を使用中',
+      currentPalette: '現在の{{slot}}パレット：{{palette}}',
       followsSystem: 'システムに追従',
       themePair: '昼と夜の配色',
       themePairDescription: '自動モードは保存済みの昼/夜カラーを切り替えます。スタイルのおすすめ配色は上書きしません。',
@@ -1092,8 +1092,8 @@ export const ja: Resources = {
       "integrated": "統合モードでは App とバックエンドを一緒に更新します。",
       "separated": "クライアント、バックエンド、プロジェクト内容は個別に管理されます。",
       "review": "更新を確認",
-      "desktop": "この端末 · Electron",
-      "browser": "この端末 · ブラウザー / CLI",
+      "desktop": "この端末: Electron",
+      "browser": "この端末: ブラウザーと CLI",
       "uiBuild": "フロントエンドビルド",
       "offline": "切断",
       "connected": "接続中",
@@ -1314,6 +1314,10 @@ export const ja: Resources = {
       description: 'この AliceProject が起動できるネイティブ CLI を確認し、未インストールを直し、最大 4 件のクイックアクセスを選びます。',
       quickAccess: 'クイックアクセス',
       quickAccessDescription: 'Session の作成に成功すると、そのランタイムが自動で先頭に移動します。この一覧は最近の履歴に続くフォールバック順です。未インストールのランタイムは自動では入りません。',
+      quickAccessCount: '{{limit}} 件中 {{count}} 件をピン留め',
+      catalogCount: 'ランタイム {{count}} 件',
+      catalogCount_one: 'ランタイム {{count}} 件',
+      catalogCount_other: 'ランタイム {{count}} 件',
       quickAccessEmpty: 'まだピン留めがありません。下のカタログから最大 4 件追加できます。',
       catalog: '検出されたランタイム',
       catalogDescription: 'インストール状態はこのマシンで調べます。設定としては保存しません。',
@@ -1418,6 +1422,11 @@ export const ja: Resources = {
       },
     },
     tools: {
+      enabledCount: '{{total}} 個中 {{count}} 個有効',
+      search: 'ツールを検索…',
+      count_one: '{{count}} 個のツール',
+      count_other: '{{count}} 個のツール',
+      noMatches: '一致するツールがありません',
       summary: '{{groups}} グループ {{tools}} ツール——変更は次回の AI リクエストで反映されます',
       loadError: 'ツールカタログを読み込めませんでした。',
       emptyTitle: '登録されたツールはありません。',
@@ -1800,6 +1809,9 @@ export const ja: Resources = {
     }
   },
   common: {
+    helpFor: 'ヘルプ: {{name}}',
+    help: 'ヘルプ',
+    imageLoadFailed: "画像を読み込めませんでした。",
     back: '戻る',
     loading: '読み込み中…',
     searching: '検索中…',
@@ -1892,6 +1904,7 @@ export const ja: Resources = {
       offboard: '{{workspace}} を退役',
     },
     viewAllSessions: '{{count}} 件のセッションをすべて表示',
+    allConversations: 'すべての会話',
     viewAllConversations: '{{count}} 件の会話をすべて表示',
     deleteWorkspace: 'ワークスペースを退役',
     deleteWorkspaceTitle: 'チャットワークスペースを退役',
@@ -2202,12 +2215,12 @@ export const ja: Resources = {
       outline: '明確な輪郭とフラットな画面',
     },
     palette: {
-      codex: 'Codex',
+      codex: 'Alice',
       paper: 'ペーパー', porcelain: 'ポーセリン', linen: 'リネン', 'windows-classic': 'Windows クラシック',
       graphite: 'グラファイト', midnight: 'ミッドナイト', moss: 'モス', iris: 'アイリス',
     },
     paletteDescription: {
-      codex: '白とニュートラルなクールグレー',
+      codex: '白、フォレスト、ライムの操作色',
       paper: '温かみのある編集向け中間色',
       porcelain: '涼しく鮮明なワークスペース',
       linen: 'オート麦色、墨色、テラコッタ',
@@ -2256,7 +2269,7 @@ export const ja: Resources = {
     noMatches: '一致なし',
     watchlist: 'ウォッチリスト',
     emptyWatchlistHint: '銘柄の ☆ を押して追加。',
-    fxTitle: 'スポット、キャリー、マクロを一つの通貨ペア画面で。',
+    fxTitle: '通貨ペア',
     fxDescription: '主要通貨ペアを開き、価格リスク、金利・インフレ格差、参考フォワード、手動エクスポージャーシナリオを確認できます。ブローカーや銀行口座との接続は不要です。',
     fxGlobalTitle: '国別マクロ',
     fxGlobalDescription: '通貨圏ごとの金利、インフレ、成長モメンタム。',
@@ -2264,7 +2277,7 @@ export const ja: Resources = {
     fxUsDescription: 'ドル、米国債カーブ、インフレ、労働市場の指標。',
     fxFedTitle: 'FRB 政策',
     fxFedDescription: 'バランスシート、ディーラーポジション、FOMC 文書。',
-    overviewTitle: '空白ではなく、まず市場から始める。',
+    overviewTitle: '市場ボード',
     overviewHint: '本日の値動き、マクロ環境、セクターローテーション、今後の材料からライブボードを開けます。',
     removeFromWatchlist: '{{symbol}} を削除',
     sectorRotation: 'セクターローテーション',

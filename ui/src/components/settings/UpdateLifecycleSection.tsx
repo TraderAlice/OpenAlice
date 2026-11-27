@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useUpdateLifecycle, type UpdatePreferences } from '../../hooks/useUpdateLifecycle'
 import { Button } from '../ui/button'
 import { ConfigSection } from '../form'
+import { Collapsible, CollapsibleContent, CollapsibleDetailsTrigger } from '../ui/collapsible'
 import { Toggle } from '../Toggle'
 
 export function UpdatePreferencesPanel() {
@@ -74,10 +75,13 @@ export function UpdatePreferencesPanel() {
 export function UpdateLifecycleSection() {
   const { t } = useTranslation()
   return <ConfigSection title={t('settings.versions.preferences')}>
-    <details><summary className="cursor-pointer py-2 text-sm text-muted-foreground">{t('settings.versions.managePreferences')}</summary>
-    <div className="rounded-lg border border-border/70 bg-secondary/35 p-4">
-      <UpdatePreferencesPanel />
-    </div>
-    </details>
+    <Collapsible>
+      <CollapsibleDetailsTrigger>{t('settings.versions.managePreferences')}</CollapsibleDetailsTrigger>
+      <CollapsibleContent>
+        <div className="rounded-lg border border-border/70 bg-secondary/35 p-4">
+          <UpdatePreferencesPanel />
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   </ConfigSection>
 }

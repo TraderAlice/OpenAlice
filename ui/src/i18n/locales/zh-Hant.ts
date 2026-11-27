@@ -11,6 +11,7 @@ import type { Resources } from './en'
  * Content is UI chrome only — no geographic or other non-technical terms.
  */
 export const zhHant: Resources = {
+
   activityPreferences: en.activityPreferences,
 
   sessionControl: {
@@ -337,8 +338,8 @@ export const zhHant: Resources = {
   },
   demoBanner: {
     badge: '示範',
-    compact: '錄製預覽',
-    description: '你正在查看包含錄製資料的 OpenAlice 快照。變更不會儲存；Web 回覆為模擬產生。',
+    description: '此頁面使用錄製資料和模擬 Web 回覆。安裝 OpenAlice 後即可連接即時服務。',
+    terminal: '安裝 OpenAlice 後即可執行終端工作階段。',
     install: '安裝 OpenAlice',
   },
   issues: {
@@ -901,7 +902,7 @@ export const zhHant: Resources = {
       dayPaletteDescription: '用於日間模式，以及自動模式跟隨淺色系統偏好時；可選擇任意色卡。',
       nightPalette: '暗夜色卡',
       nightPaletteDescription: '用於暗夜模式，以及自動模式跟隨深色系統偏好時；可選擇任意色卡。',
-      currentPalette: '目前使用{{slot}} · {{palette}}',
+      currentPalette: '目前{{slot}}配色：{{palette}}',
       followsSystem: '跟隨系統',
       themePair: '日間與暗夜配色',
       themePairDescription: '自動模式會在這兩組已儲存配色間切換；樣式推薦色不會覆寫它們。',
@@ -1099,8 +1100,8 @@ export const zhHant: Resources = {
       "integrated": "整合模式下，App 與後端一起更新。",
       "separated": "用戶端、後端和專案內容分別管理。",
       "review": "查看更新",
-      "desktop": "本機 · Electron",
-      "browser": "本機 · 網頁 / CLI",
+      "desktop": "本機：Electron",
+      "browser": "本機：網頁與 CLI",
       "uiBuild": "前端建置版本",
       "offline": "已中斷",
       "connected": "已連線",
@@ -1321,6 +1322,10 @@ export const zhHant: Resources = {
       description: '查看這個 AliceProject 可以啟動的原生 CLI，修復缺失安裝，並選擇最多四個快捷執行環境。',
       quickAccess: '快捷入口',
       quickAccessDescription: '成功建立 Session 後，對應執行環境會自動移到最前面。這裡的順序作為最近使用記錄之後的候補基線；未安裝的執行環境不會自動填入。',
+      quickAccessCount: '已釘選 {{count}} 個，最多 {{limit}} 個',
+      catalogCount: '{{count}} 個執行環境',
+      catalogCount_one: '{{count}} 個執行環境',
+      catalogCount_other: '{{count}} 個執行環境',
       quickAccessEmpty: '還沒有釘選執行環境。可從下方目錄最多新增四個。',
       catalog: '已發現的執行環境',
       catalogDescription: '安裝狀態由本機探測，不會作為偏好儲存。',
@@ -1425,6 +1430,11 @@ export const zhHant: Resources = {
       },
     },
     tools: {
+      enabledCount: '已啟用 {{count}} 個，共 {{total}} 個',
+      search: '搜尋工具…',
+      count_one: '{{count}} 個工具',
+      count_other: '{{count}} 個工具',
+      noMatches: '沒有符合的工具',
       summary: '{{groups}} 個分組共 {{tools}} 個工具——變更會在下次 AI 請求時生效',
       loadError: '無法載入工具目錄。',
       emptyTitle: '尚未註冊任何工具。',
@@ -1807,6 +1817,9 @@ export const zhHant: Resources = {
     }
   },
   common: {
+    helpFor: '說明：{{name}}',
+    help: '說明',
+    imageLoadFailed: "圖片載入失敗。",
     back: '返回',
     loading: '載入中…',
     searching: '搜尋中…',
@@ -1899,6 +1912,7 @@ export const zhHant: Resources = {
       offboard: '辦理 {{workspace}} 離職',
     },
     viewAllSessions: '查看全部 {{count}} 個工作階段',
+    allConversations: '全部對話',
     viewAllConversations: '查看全部 {{count}} 個對話',
     deleteWorkspace: '辦理工作區離職',
     deleteWorkspaceTitle: '辦理對話工作區離職',
@@ -2209,12 +2223,12 @@ export const zhHant: Resources = {
       outline: '清晰描邊與通透平面',
     },
     palette: {
-      codex: 'Codex',
+      codex: 'Alice',
       paper: '紙張', porcelain: '白瓷', linen: '亞麻', 'windows-classic': 'Windows 經典',
       graphite: '石墨', midnight: '午夜', moss: '苔色', iris: '鳶尾',
     },
     paletteDescription: {
-      codex: '純白內容與中性冷灰',
+      codex: '純白、深綠與青檸色操作',
       paper: '溫暖的編輯風中性色',
       porcelain: '清爽的冷調工作區',
       linen: '燕麥紙、墨棕與陶土色',
@@ -2263,7 +2277,7 @@ export const zhHant: Resources = {
     noMatches: '無相符項目',
     watchlist: '自選',
     emptyWatchlistHint: '點擊標的旁的 ☆ 加入自選。',
-    fxTitle: '從現貨、套利到宏觀，集中在一個貨幣對視圖。',
+    fxTitle: '貨幣對',
     fxDescription: '開啟主要貨幣對，查看價格風險、利率與通膨分歧、指示性遠期，以及手動曝險情境；無需連接券商或銀行帳戶。',
     fxGlobalTitle: '跨國宏觀',
     fxGlobalDescription: '按貨幣經濟體比較利率、通膨與成長動能。',
@@ -2271,7 +2285,7 @@ export const zhHant: Resources = {
     fxUsDescription: '美元、美債殖利率曲線、通膨與就業訊號。',
     fxFedTitle: '聯準會政策',
     fxFedDescription: '資產負債表、交易商持倉與 FOMC 文件。',
-    overviewTitle: '先看市場，而不是面對空白頁。',
+    overviewTitle: '市場看板',
     overviewHint: '從當日異動、宏觀環境、類股輪動或近期催化中選擇一個即時看板。',
     removeFromWatchlist: '移除 {{symbol}}',
     sectorRotation: '類股輪動',

@@ -82,7 +82,7 @@ describe('SettingsPage loading', () => {
     expect(screen.getByRole('heading', { name: 'Agents & Models' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Trading & Brokers' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Connectors' })).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'Language' })).toBeNull()
+    expect(screen.getByRole('group', { name: 'Language' })).toBeTruthy()
     expect(screen.queryByText('openalice run --home <path>')).toBeNull()
     expect(mocks.configLoad).not.toHaveBeenCalled()
   })

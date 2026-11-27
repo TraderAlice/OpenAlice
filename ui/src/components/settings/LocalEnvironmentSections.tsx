@@ -5,6 +5,7 @@ import { preferencesApi, type WorkspaceShellStatus } from '../../api/preferences
 import { getBackendConnection } from '../../auth/backendConnection'
 import { useRelayConnection } from '../../hooks/useRelayConnection'
 import { ConfigSection, Field, inputClass } from '../form'
+import { Select } from '../ui/select'
 import { Button } from '../ui/button'
 
 export function DataHomeSection({ embedded = false }: { embedded?: boolean } = {}) {
@@ -158,14 +159,15 @@ export function WorkspaceShellSection({ embedded = false }: { embedded?: boolean
   const body = (
     <>
       <Field label={t('settings.workspaceShell.mode')}>
-        <select
-          className={inputClass}
+        <Select
+          aria-label={t('settings.workspaceShell.mode')}
           value={mode}
-          onChange={(event) => setMode(event.target.value as 'auto' | 'custom')}
-        >
-          <option value="auto">{t('settings.workspaceShell.auto')}</option>
-          <option value="custom">{t('settings.workspaceShell.custom')}</option>
-        </select>
+          onValueChange={(selectedValue) => setMode(selectedValue as 'auto' | 'custom')}
+          options={[
+            { value: 'auto', label: t('settings.workspaceShell.auto') },
+            { value: 'custom', label: t('settings.workspaceShell.custom') },
+          ]}
+        />
       </Field>
       {mode === 'custom' && (
         <Field

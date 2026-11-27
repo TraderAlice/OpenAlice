@@ -6,15 +6,13 @@ import { MachineManagementSection } from '../components/settings/MachineManageme
 
 export function MachinesSettingsPage() {
   const { t } = useTranslation()
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <PageHeader title={t('settings.machines.title')} />
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
-        <div className="mx-auto w-full max-w-[1100px] space-y-6">
-          <AliceLocationSection />
-          <MachineManagementSection />
-        </div>
-      </SettingsScrollArea>
-    </div>
-  )
+  return <div className="flex min-h-0 flex-1 flex-col">
+    <PageHeader title={t('settings.machines.title')} />
+    <SettingsScrollArea>
+      <div className="w-full max-w-[1100px] space-y-6">
+        <AliceLocationSection />
+        <MachineManagementSection />
+      </div>
+    </SettingsScrollArea>
+  </div>
 }

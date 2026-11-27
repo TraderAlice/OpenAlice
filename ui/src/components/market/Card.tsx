@@ -23,10 +23,10 @@ interface Props {
  */
 export function Card({ title, info, right, className, headerClassName, contentClassName, children }: Props) {
   return (
-    <section className={`oa-data-surface flex flex-col overflow-hidden rounded-lg border ${className ?? ''}`}>
-      <header className={`oa-data-surface-header flex min-h-9 gap-3 border-b px-3 py-2 ${headerClassName ?? 'items-center justify-between'}`}>
+    <section className={`oa-data-surface flex flex-col overflow-hidden rounded-2xl ${className ?? ''}`}>
+      <header className={`oa-data-surface-header flex min-h-12 flex-wrap gap-2 px-(--oa-panel-inset) pt-(--oa-panel-inset) pb-3 ${headerClassName ?? 'items-center justify-between'}`}>
         <div className="flex items-center gap-1.5 min-w-0">
-          <h3 className="text-[13px] leading-[18px] font-medium text-foreground truncate">{title}</h3>
+          <h3 className="text-base leading-6 font-semibold text-foreground break-words">{title}</h3>
           {info && (
             <Tooltip>
               <TooltipTrigger
@@ -48,9 +48,9 @@ export function Card({ title, info, right, className, headerClassName, contentCl
             </Tooltip>
           )}
         </div>
-        {right && <div className="shrink-0">{right}</div>}
+        {right && <div className="min-w-0 max-w-full">{right}</div>}
       </header>
-      <div className={contentClassName ?? 'p-3'}>{children}</div>
+      <div className={contentClassName ?? 'min-w-0 px-(--oa-panel-inset) pb-(--oa-panel-inset)'}>{children}</div>
     </section>
   )
 }

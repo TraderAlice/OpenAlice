@@ -1,3 +1,5 @@
+import { DetailsSummary } from '../components/ui/collapsible'
+import { CountBadge } from '../components/CountBadge'
 import { StickerManager } from '../components/workspace-capabilities/StickerManager'
 import { InjectionVersion, SkillProjectionBrowser } from '../components/workspace-capabilities/SkillProjectionBrowser'
 import { useState } from 'react'
@@ -20,8 +22,8 @@ export function WorkspaceInjectionPage() {
   const ready = state.data?.workspaces.filter((row) => ['update', 'record'].includes(injectionStatus(row))).length ?? 0
   return <div className="flex min-h-0 flex-1 flex-col">
     <PageHeader title={t('distribution.title')} />
-    <SettingsScrollArea className="px-4 py-4 md:px-6">
-      <div className="mx-auto max-w-[1100px] space-y-4">
+    <SettingsScrollArea>
+      <div className="max-w-[1100px] space-y-4">
         <ConfigSection title={t('settings.harness.releasesSection')}>
           <UnverifiedHarnessReleaseSetting />
         </ConfigSection>
@@ -35,7 +37,7 @@ export function WorkspaceInjectionPage() {
           <Tabs defaultValue="skills">
             <TabsList><TabsTrigger value="skills">{t('distribution.workspaces')}</TabsTrigger><TabsTrigger value="project">{t('skillManager.prototype')}</TabsTrigger><TabsTrigger value="cli">CLI</TabsTrigger><TabsTrigger value="stickers">{t('stickers.title')}</TabsTrigger></TabsList>
             <TabsContent value="stickers" className="mt-4"><StickerManager /></TabsContent><TabsContent value="skills" className="mt-4"><SkillProjectionBrowser data={state.data} disabled={state.busy || !!state.error} onChange={state.refresh} />
-              <details className="mt-6 border-t border-border pt-3"><summary className="cursor-pointer text-xs text-muted-foreground">{t('skillManager.bundleUpdates')}</summary>
+              <details className="mt-6 border-t border-border pt-3"><DetailsSummary>{t('skillManager.bundleUpdates')}</DetailsSummary>
               <div className="mt-4">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><p className="max-w-xl text-xs text-muted-foreground">{t('distribution.batchHint')}</p><Button disabled={state.busy || !!state.error || !ready} onClick={() => void state.updateReady()}>{state.busy ? t('common.loading') : t('distribution.updateReady', { count: ready })}</Button></div>
               {!state.data.workspaces.length && <p>{t('distribution.empty')}</p>}
@@ -50,7 +52,7 @@ export function WorkspaceInjectionPage() {
               </div></details>
             </TabsContent>
             <TabsContent value="project" className="mt-4"><SkillProjectionBrowser mode="project" data={state.data} disabled={state.busy} onChange={state.refresh} /></TabsContent>
-            <TabsContent value="cli" className="mt-5"><p className="mb-4 text-sm text-muted-foreground">{t('distribution.cliHint')}</p>{Object.entries(state.data.commands).map(([binary, groups]) => <section className="border-t border-border py-4" key={binary}><h3 className="font-mono font-semibold">{binary}</h3>{Object.entries(groups).map(([group, verbs]) => <details className="py-2" key={group}><summary className="font-mono text-sm">{group} <span className="text-muted-foreground">{verbs.length}</span></summary><div className="mt-2 grid gap-2 pl-4 text-xs sm:grid-cols-2">{verbs.map((verb) => <code key={verb}>{binary} {group} {verb}</code>)}</div></details>)}</section>)}</TabsContent>
+            <TabsContent value="cli" className="mt-5"><p className="mb-4 text-sm text-muted-foreground">{t('distribution.cliHint')}</p>{Object.entries(state.data.commands).map(([binary, groups]) => <section className="border-t border-border py-4" key={binary}><h3 className="font-mono font-semibold">{binary}</h3>{Object.entries(groups).map(([group, verbs]) => <details className="py-2" key={group}><DetailsSummary><span className="flex min-w-0 items-center gap-2"><code className="min-w-0 break-all">{group}</code><CountBadge count={verbs.length} label={`${group}: ${verbs.length}`} /></span></DetailsSummary><div className="mt-2 grid gap-2 pl-4 text-xs sm:grid-cols-2">{verbs.map((verb) => <code key={verb}>{binary} {group} {verb}</code>)}</div></details>)}</section>)}</TabsContent>
           </Tabs>
         </>}
       </div>

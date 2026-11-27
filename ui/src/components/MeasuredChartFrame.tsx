@@ -24,15 +24,19 @@ export function MeasuredChartFrame({ className, children }: MeasuredChartFramePr
     const el = ref.current
     if (!el) return
 
-    const measure = () => {
-      const rect = el.getBoundingClientRect()
-      setSize(rect.width > 0 && rect.height > 0
-        ? { width: Math.floor(rect.width), height: Math.floor(rect.height) }
-        : null)
+    const measure = (width: number, height: number) => {
+      const nextWidth = Math.floor(width)
+      const nextHeight = Math.floor(height)
+      if (nextWidth <= 0 || nextHeight <= 0) return
+      setSize(current => current?.width === nextWidth && current.height === nextHeight
+        ? current
+        : { width: nextWidth, height: nextHeight })
     }
 
-    measure()
-    const ro = new ResizeObserver(measure)
+    measure(el.clientWidth, el.clientHeight)
+    const ro = new ResizeObserver(([entry]) => {
+      if (entry) measure(entry.contentRect.width, entry.contentRect.height)
+    })
     ro.observe(el)
     return () => ro.disconnect()
   }, [])

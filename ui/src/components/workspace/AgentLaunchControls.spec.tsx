@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -149,8 +149,8 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     trigger.focus()
     await user.keyboard('{ArrowDown}')
 
-    const openCode = screen.getByRole('menuitem', { name: /OpenCode/ })
-    const pi = screen.getByRole('menuitem', { name: /^Pi/ })
+    const openCode = screen.getByRole('menuitemradio', { name: /OpenCode/ })
+    const pi = screen.getByRole('menuitemradio', { name: /^Pi/ })
     const others = screen.getByRole('menuitem', { name: i18n.t('chatLanding.otherRuntimes') })
     expect(document.activeElement).toBe(pi)
 
@@ -183,7 +183,7 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectAgent') })
     trigger.focus()
     await user.keyboard('{ArrowDown}')
-    const pi = await screen.findByRole('menuitem', { name: /^Pi/ })
+    const pi = await screen.findByRole('menuitemradio', { name: /^Pi/ })
     pi.focus()
     await user.keyboard('{Enter}')
 
@@ -206,14 +206,14 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     trigger.focus()
     await user.keyboard('{ArrowUp}')
     expect(screen.getByText(i18n.t('chatLanding.credentialMenuTitle', { runtime: 'OpenCode' }))).toBeTruthy()
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /Add API account/ }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /Add API account/ })))
 
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('menu')).toBeNull()
     expect(document.activeElement).toBe(trigger)
 
     await user.keyboard('{ArrowDown}')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /OpenCode account/ }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /OpenCode account/ })))
     await user.keyboard('{End}')
     expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /Add API account/ }))
     await user.keyboard('{ArrowUp}')
@@ -377,6 +377,14 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     const input = await screen.findByRole('combobox', { name: i18n.t('chatLanding.customModelId') })
     await user.clear(input)
     await user.type(input, 'private-model-1')
+
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
+    expect(document.activeElement).toBe(input)
+    expect(selectModel).not.toHaveBeenCalled()
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 })
+    expect(document.activeElement).toBe(input)
+    expect(selectModel).not.toHaveBeenCalled()
+
     await user.click(screen.getByRole('button', { name: i18n.t('common.save') }))
     expect(selectModel).toHaveBeenCalledWith('private-model-1')
   })
@@ -418,32 +426,7 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     expect(screen.getByText(i18n.t('chatLanding.noModelMatches', { query: 'nonexistent-xyz' }))).toBeTruthy()
   })
 
-  it('ignores Enter in the inline model editor while IME composition is active', () => {
-    const selectModel = vi.fn()
-    render(
-      <AgentLaunchSelectors
-        config={launchConfig({ selectModel })}
-        onConfigureProvider={vi.fn()}
-        showRuntime={false}
-      />,
-    )
 
-    const input = screen.getByRole('combobox', { name: i18n.t('chatLanding.selectModel') }) as HTMLInputElement
-    input.focus()
-    fireEvent.change(input, { target: { value: 'deepseek-r1' } })
-
-    fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
-    expect(document.activeElement).toBe(input)
-    expect(selectModel).not.toHaveBeenCalled()
-
-    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 })
-    expect(document.activeElement).toBe(input)
-    expect(selectModel).not.toHaveBeenCalled()
-
-    fireEvent.keyDown(input, { key: 'Enter', isComposing: false, keyCode: 13 })
-    expect(document.activeElement).not.toBe(input)
-    expect(selectModel).toHaveBeenCalledWith('deepseek-r1')
-  })
 })
 
 describe('AgentLaunchDetails setup notices', () => {

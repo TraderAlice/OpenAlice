@@ -192,7 +192,7 @@ describe('Connector overview state hierarchy', () => {
     expect(within(discord).getByRole('switch', { name: 'Turn Discord on or off' })).toBeTruthy()
     const details = within(discord).getByRole('button', { name: 'Discord setup details' })
     expect(details.className).toContain('bg-background/50')
-    expect(details.className).not.toContain('bg-primary text-primary-foreground')
+    expect(details.className).not.toContain('bg-action text-action-foreground')
   })
 
   it('promotes linking instructions only after the channel is awaiting /link', () => {
@@ -219,7 +219,7 @@ describe('Connector overview state hierarchy', () => {
     expect(within(discord).getByText('Waiting for /link')).toBeTruthy()
     expect(within(discord).getByText('Use Discord')).toBeTruthy()
     const linkingSteps = within(discord).getByRole('button', { name: 'Show Discord linking steps' })
-    expect(linkingSteps.className).toContain('bg-primary text-primary-foreground')
+    expect(linkingSteps.className).toContain('bg-action text-action-foreground')
   })
 
   it('announces a channel runtime change inside the affected card', async () => {

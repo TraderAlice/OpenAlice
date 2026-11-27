@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { ArrowRight, Cpu, Plug } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { SegmentedControl } from '../SegmentedControl'
+import { ContextHelp } from '../ContextHelp'
 import { api, type ConnectorSettingsSnapshot, type UTASummary } from '../../api'
 import { useAgentRuntimes } from '../../hooks/useAgentRuntimes'
 import { useAliceProject } from '../../hooks/useAliceProject'
@@ -13,6 +15,20 @@ import { useWorkspace } from '../../tabs/store'
 import { THEME_PALETTES } from '../../theme/palettes'
 import { useThemeStore } from '../../theme/store'
 import { useEffectivePalette } from '../../theme/useEffectiveTheme'
+
+export function LanguageSection() {
+  const { t } = useTranslation()
+  const locale = useLocale()
+  const setLocale = useSetLocale()
+  return (
+    <SegmentedControl
+      value={locale}
+      options={(['en', 'zh', 'ja', 'zh-Hant'] as const).map((value) => ({ value, label: LOCALE_LABELS[value] }))}
+      onChange={setLocale}
+      ariaLabel={t('settings.language.title')}
+    />
+  )
+}
 
 export function OverviewStatusCards() {
   const { t } = useTranslation()
@@ -30,9 +46,6 @@ export function OverviewStatusCards() {
   const activePaletteLabel = activePaletteDefinition
     ? t(activePaletteDefinition.labelKey)
     : activePalette
-
-  const locale = useLocale()
-  const setLocale = useSetLocale()
 
   const [credentialCount, setCredentialCount] = useState<number | null>(null)
   const [utas, setUtas] = useState<UTASummary[] | null>(null)
@@ -353,27 +366,12 @@ export function OverviewStatusCards() {
           <span className="text-xs font-medium text-muted-foreground">
             {t('settings.overview.quickPrefs.appearance')}
           </span>
-          <div
-            className="inline-flex items-center rounded-lg border border-border/70 bg-background p-0.5"
-            role="group"
-            aria-label={t('settings.overview.quickPrefs.appearance')}
-          >
-            {(['auto', 'day', 'night'] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setTheme(mode)}
-                aria-pressed={theme === mode}
-                className={`oa-pressable h-7 rounded-md border px-2.5 text-xs font-medium transition-colors ${
-                  theme === mode
-                    ? 'border-border/80 bg-card text-foreground shadow-2xs'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {t(`theme.mode.${mode}`)}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            value={theme}
+            onChange={setTheme}
+            ariaLabel={t('settings.overview.quickPrefs.appearance')}
+            options={(['auto', 'day', 'night'] as const).map((value) => ({ value, label: t(`theme.mode.${value}`) }))}
+          />
           <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className="size-2 shrink-0 rounded-full bg-primary" aria-hidden />
             <span>{activePaletteLabel}</span>
@@ -391,27 +389,8 @@ export function OverviewStatusCards() {
           <span className="text-xs font-medium text-muted-foreground">
             {t('settings.overview.quickPrefs.language')}
           </span>
-          <div
-            className="inline-flex flex-wrap items-center rounded-lg border border-border/70 bg-background p-0.5"
-            role="group"
-            aria-label={t('settings.overview.quickPrefs.language')}
-          >
-            {(['en', 'zh', 'ja', 'zh-Hant'] as const).map((l) => (
-              <button
-                key={l}
-                type="button"
-                onClick={() => setLocale(l)}
-                aria-pressed={locale === l}
-                className={`oa-pressable h-7 rounded-md border px-2.5 text-xs font-medium transition-colors ${
-                  locale === l
-                    ? 'border-border/80 bg-card text-foreground shadow-2xs'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {LOCALE_LABELS[l]}
-              </button>
-            ))}
-          </div>
+          <ContextHelp label={t('settings.language.title')}>{t('settings.language.description')}</ContextHelp>
+          <LanguageSection />
         </div>
       </article>
     </div>

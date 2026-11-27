@@ -40,7 +40,7 @@ function DocBody({ path, content, resolveRelativeHref }: { path: string; content
   }
   // Plain-text fallback (.txt, .log, no extension, code files…)
   return (
-    <pre className="text-[12px] text-foreground whitespace-pre-wrap font-mono leading-relaxed">
+    <pre className="text-sm text-foreground whitespace-pre-wrap font-mono leading-relaxed">
       {content}
     </pre>
   )
@@ -63,5 +63,5 @@ function DocTombstone({ result }: { result: ReadFileResult }): ReactElement {
         return ''
     }
   })()
-  return <div className="text-[12px] text-muted-foreground italic">{message}</div>
+  return <div className="text-sm text-muted-foreground italic">{message}</div>
 }

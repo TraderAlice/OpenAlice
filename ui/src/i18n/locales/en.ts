@@ -13,6 +13,7 @@
  */
 
 export const en = {
+
   activityPreferences: {
     title: 'Activity notifications', description: 'Filter activity announcements. Your activity history stays complete.',
     desktopOnly: 'Activity notification preferences require the desktop app.',
@@ -347,9 +348,8 @@ export const en = {
   },
   demoBanner: {
     badge: 'Demo',
-    compact: 'Recorded preview',
-    description:
-      'You’re looking at a snapshot of OpenAlice with recorded data. Changes aren’t saved; Web replies are simulated.',
+    description: 'Recorded data and simulated Web replies. Install OpenAlice to connect live services.',
+    terminal: 'Install OpenAlice to run terminal sessions.',
     install: 'Install OpenAlice',
   },
   issues: {
@@ -912,7 +912,7 @@ export const en = {
       dayPaletteDescription: 'Used for Day and when Auto follows a light system preference. Choose any palette.',
       nightPalette: 'Night palette',
       nightPaletteDescription: 'Used for Night and when Auto follows a dark system preference. Choose any palette.',
-      currentPalette: 'Currently using {{slot}} · {{palette}}',
+      currentPalette: 'Current {{slot}} palette: {{palette}}',
       followsSystem: 'follows system',
       themePair: 'Day & Night colors',
       themePairDescription: 'Your saved colors for Auto, Day, and Night. Style recommendations never overwrite them.',
@@ -1112,8 +1112,8 @@ export const en = {
       "integrated": "App and backend update together in integrated mode.",
       "separated": "Client, backend and project content are managed separately.",
       "review": "Review updates",
-      "desktop": "This device · Electron",
-      "browser": "This device · Browser / CLI",
+      "desktop": "This device: Electron",
+      "browser": "This device: Browser and CLI",
       "uiBuild": "Frontend build",
       "offline": "Disconnected",
       "connected": "Connected",
@@ -1332,6 +1332,10 @@ export const en = {
       description: 'See which native CLIs this AliceProject can launch, repair missing installs, and choose up to four quick-access runtimes.',
       quickAccess: 'Quick access',
       quickAccessDescription: 'Successful Session launches move their runtime to the front automatically. Use this list as the fallback order behind that recent history. Uninstalled runtimes never auto-fill.',
+      quickAccessCount: '{{count}} of {{limit}} pinned',
+      catalogCount: '{{count}} runtimes',
+      catalogCount_one: '{{count}} runtime',
+      catalogCount_other: '{{count}} runtimes',
       quickAccessEmpty: 'No pinned runtimes yet. Add up to four from the catalog below.',
       catalog: 'Discovered runtimes',
       catalogDescription: 'Installation state is probed on this machine. It is never stored as a preference.',
@@ -1436,6 +1440,11 @@ export const en = {
       },
     },
     tools: {
+      enabledCount: '{{count}} enabled, {{total}} total',
+      search: 'Search tools…',
+      count_one: '{{count}} tool',
+      count_other: '{{count}} tools',
+      noMatches: 'No matching tools',
       summary: '{{tools}} tools in {{groups}} groups — changes apply on next AI request',
       loadError: 'Could not load the tool catalog.',
       emptyTitle: 'No tools registered.',
@@ -1818,6 +1827,9 @@ export const en = {
     }
   },
   common: {
+    helpFor: 'Help: {{name}}',
+    help: 'Help',
+    imageLoadFailed: "The image could not be loaded.",
     back: 'Back',
     loading: 'Loading…',
     searching: 'searching…',
@@ -1910,6 +1922,7 @@ export const en = {
       offboard: 'Offboard {{workspace}}',
     },
     viewAllSessions: 'View all {{count}} sessions',
+    allConversations: 'All conversations',
     viewAllConversations: 'View all {{count}} conversations',
     deleteWorkspace: 'Offboard workspace',
     deleteWorkspaceTitle: 'Offboard chat workspace',
@@ -2241,17 +2254,17 @@ export const en = {
       outline: 'Crisp outlines and flat, open surfaces',
     },
     palette: {
-      codex: 'Codex',
+      codex: 'Alice',
       paper: 'Paper', porcelain: 'Porcelain', linen: 'Linen', 'windows-classic': 'Windows Classic',
       graphite: 'Graphite', midnight: 'Midnight', moss: 'Moss', iris: 'Iris',
     },
     paletteDescription: {
-      codex: 'Clean white with cool neutral grays',
+      codex: 'White, forest ink, and lime actions',
       paper: 'Warm, editorial neutrals',
       porcelain: 'Cool, crisp workspace',
       linen: 'Oat, ink, and terracotta',
       'windows-classic': 'System silver with navy selection',
-      graphite: 'Neutral low-glare dark',
+      graphite: 'Low-glare neutral dark tones',
       midnight: 'Deep blue night palette',
       moss: 'Forest ink with soft amber',
       iris: 'Violet dusk with cool cyan',
@@ -2295,7 +2308,7 @@ export const en = {
     noMatches: 'No matches',
     watchlist: 'Watchlist',
     emptyWatchlistHint: 'Use ☆ on an asset to add it here.',
-    fxTitle: 'From spot to carry and macro — in one pair view.',
+    fxTitle: 'Currencies',
     fxDescription: 'Open a major pair for price risk, rate and inflation divergence, indicative forwards, and a manual exposure scenario. No broker or bank-account connection required.',
     fxGlobalTitle: 'Cross-country macro',
     fxGlobalDescription: 'Rates, inflation and growth momentum by currency economy.',
@@ -2303,7 +2316,7 @@ export const en = {
     fxUsDescription: 'Dollar, Treasury curve, inflation and labor inputs.',
     fxFedTitle: 'Fed policy',
     fxFedDescription: 'Balance sheet, dealer positioning and FOMC documents.',
-    overviewTitle: 'Start with the market, not an empty screen.',
+    overviewTitle: 'Explore markets',
     overviewHint: 'Open a live board for the day’s movement, macro regime, sector rotation, or upcoming catalysts.',
     removeFromWatchlist: 'Remove {{symbol}}',
     sectorRotation: 'Sector Rotation',

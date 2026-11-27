@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../api'
+import { Button } from './ui/button'
 
 export function ReconnectButton({ accountId, disabled = false, disabledReason }: {
   accountId: string
@@ -37,16 +38,17 @@ export function ReconnectButton({ accountId, disabled = false, disabledReason }:
   // what knocked the header buttons out of alignment).
   return (
     <div className="flex items-center gap-2">
-      <button
+      <Button
         onClick={handleReconnect}
         disabled={disabled || status === 'loading'}
         title={disabled ? disabledReason : undefined}
-        className="btn-secondary-sm"
+        variant="secondary"
+        size="sm"
       >
         {status === 'loading' ? 'Connecting...' : 'Reconnect'}
-      </button>
-      {status === 'success' && <span className="text-[12px] text-success">{message}</span>}
-      {status === 'error' && <span className="text-[12px] text-destructive">{message}</span>}
+      </Button>
+      {status === 'success' && <span className="text-sm text-success">{message}</span>}
+      {status === 'error' && <span className="text-sm text-destructive">{message}</span>}
     </div>
   )
 }

@@ -152,7 +152,7 @@
   padding: 8px 12px;
   background: linear-gradient(180deg, var(--muted), var(--secondary));
   border-bottom: 1px solid var(--border);
-  font-size: 11px;
+  font-size: var(--text-sm);
   color: var(--muted-foreground);
   user-select: none;
   flex: 0 0 auto;
@@ -198,7 +198,7 @@
 
 .panel-pill {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 11px;
+  font-size: var(--text-sm);
   background: color-mix(in srgb, var(--info) 12%, transparent);
   color: var(--info);
   padding: 2px 8px;
@@ -212,7 +212,7 @@
 .panel-error {
   padding: 8px 12px;
   color: var(--destructive);
-  font-size: 12px;
+  font-size: var(--text-sm);
   border-bottom: 1px solid var(--border);
 }
 
@@ -220,7 +220,7 @@
   padding: 12px;
   text-align: center;
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 /* ── Git panel ────────────────────────────────────────────────────────────── */
@@ -241,7 +241,7 @@
   gap: 8px;
   padding: 3px 12px;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .git-status-badge {
@@ -250,7 +250,7 @@
   align-items: center;
   padding: 1px 6px;
   border-radius: 3px;
-  font-size: 10px;
+  font-size: var(--text-sm);
   font-family: inherit;
   letter-spacing: 0.2px;
   text-transform: lowercase;
@@ -317,11 +317,11 @@
 
 .git-log-row {
   display: grid;
-  grid-template-columns: 64px 36px 1fr;
+  grid-template-columns: 7ch 5ch minmax(0, 1fr);
   gap: 8px;
   padding: 3px 12px;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 12px;
+  font-size: var(--text-sm);
   align-items: baseline;
 }
 .git-log-row:hover {
@@ -353,7 +353,7 @@
   overflow-x: auto;
   white-space: nowrap;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 .files-crumb {
   background: none;
@@ -381,7 +381,7 @@
 
 .files-row {
   display: grid;
-  grid-template-columns: 18px 1fr auto;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
   gap: 8px;
   align-items: baseline;
   width: 100%;
@@ -390,7 +390,7 @@
   background: transparent;
   text-align: left;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 12px;
+  font-size: var(--text-sm);
   cursor: default;
 }
 button.files-row {
@@ -407,7 +407,7 @@ button.files-row:focus-visible {
 
 .files-icon {
   text-align: center;
-  font-size: 11px;
+  font-size: var(--text-sm);
   color: var(--muted-foreground);
 }
 .files-name {
@@ -423,7 +423,7 @@ button.files-row:focus-visible {
 .files-meta {
   color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
-  font-size: 11px;
+  font-size: var(--text-sm);
 }
 
 /* ── Terminal (the existing component) ────────────────────────────────────── */

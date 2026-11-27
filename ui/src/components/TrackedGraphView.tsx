@@ -1,3 +1,4 @@
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   useCallback,
   useEffect,
@@ -376,8 +377,8 @@ export function TrackedGraphView({
           </PopoverTrigger>
           <PopoverContent align="start" side="bottom" className="w-64 gap-3">
             <div>
-              <div className="text-[12px] font-semibold text-foreground">{t('tracked.graph.filters')}</div>
-              <div className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{t('tracked.graph.filtersDescription')}</div>
+              <div className="text-sm font-semibold text-foreground">{t('tracked.graph.filters')}</div>
+              <div className="mt-0.5 text-sm leading-relaxed text-muted-foreground">{t('tracked.graph.filtersDescription')}</div>
             </div>
             <div className="grid gap-1">
               <FilterRow checked={kindFilters.asset} onChange={(checked) => setKindFilters((value) => ({ ...value, asset: checked }))} icon={<TrendingUp size={13} />} label={t('tracked.assets')} />
@@ -388,7 +389,7 @@ export function TrackedGraphView({
             </div>
           </PopoverContent>
         </Popover>
-        <div className="hidden rounded-full border border-border/60 bg-background/85 px-2.5 py-1 text-[10px] tabular-nums text-muted-foreground backdrop-blur-sm sm:block">
+        <div className="hidden rounded-full border border-border/60 bg-background/85 px-2.5 py-1 text-sm tabular-nums text-muted-foreground backdrop-blur-sm sm:block">
           {t('tracked.graph.visibleCount', { nodes: visibleNodes.length, edges: visibleEdges.length })}
         </div>
       </div>
@@ -561,7 +562,7 @@ export function TrackedGraphView({
         </g>
       </svg>
 
-      <div className="pointer-events-none absolute bottom-3 left-3 hidden flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground sm:bottom-4 sm:left-4 sm:flex">
+      <div className="pointer-events-none absolute bottom-3 left-3 hidden flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground sm:bottom-4 sm:left-4 sm:flex">
         <LegendDot color="var(--chart-1)" label={t('tracked.graph.asset')} />
         <LegendDot color="var(--chart-4)" label={t('tracked.graph.topic')} />
         <LegendDot color="var(--muted-foreground)" label={t('tracked.graph.note')} />
@@ -575,7 +576,7 @@ export function TrackedGraphView({
         >
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 truncate font-mono text-[12px] font-semibold text-foreground">
+              <div className="flex items-center gap-1.5 truncate font-mono text-sm font-semibold text-foreground">
                 {selectedArtifactNode && (
                   selectedArtifactNode.artifactType === 'issue'
                     ? <ListChecks size={12} className="shrink-0 text-muted-foreground" aria-hidden />
@@ -584,20 +585,20 @@ export function TrackedGraphView({
                 <span className="truncate">{selectedNode.label}</span>
               </div>
               {selectedArtifactNode ? (
-                <div className="mt-0.5 min-w-0 text-[11px] leading-relaxed text-muted-foreground">
+                <div className="mt-0.5 min-w-0 text-sm leading-relaxed text-muted-foreground">
                   <div className="truncate">
                     {t(selectedArtifactNode.artifactType === 'issue' ? 'tracked.graph.issue' : 'tracked.graph.note')} · {selectedArtifactNode.workspaceTag}
                   </div>
-                  <div className="truncate font-mono text-[10px] opacity-80">{selectedArtifactNode.path}</div>
+                  <div className="truncate font-mono text-sm opacity-80">{selectedArtifactNode.path}</div>
                 </div>
               ) : (
-                <div className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">{selectedEntity?.description}</div>
+                <div className="mt-0.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground">{selectedEntity?.description}</div>
               )}
             </div>
             <button
               type="button"
               onClick={openPreviewDetails}
-              className="oa-pressable shrink-0 rounded-md border border-border bg-secondary px-2.5 py-1.5 text-[11px] font-medium text-foreground hover:border-primary/40 hover:bg-accent"
+              className="oa-pressable shrink-0 rounded-md border border-border bg-secondary px-2.5 py-1.5 text-sm font-medium text-foreground hover:border-primary/40 hover:bg-accent"
             >
               {t('tracked.graph.openDetails')}
             </button>
@@ -620,12 +621,10 @@ function FilterRow({
   label: string
 }) {
   return (
-    <label className="flex min-h-8 items-center gap-2 rounded-md px-2 text-[12px] text-foreground hover:bg-accent">
-      <input
-        type="checkbox"
+    <label className="flex min-h-8 items-center gap-2 rounded-md px-2 text-sm text-foreground hover:bg-accent">
+      <Checkbox
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="h-3.5 w-3.5 accent-primary"
       />
       {icon && <span className="text-muted-foreground" aria-hidden>{icon}</span>}
       <span>{label}</span>

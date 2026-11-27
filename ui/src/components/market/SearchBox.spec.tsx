@@ -18,6 +18,7 @@ vi.mock('./useAssetSearch', () => ({
 import { SearchBox } from './SearchBox'
 
 beforeEach(async () => {
+  Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
   state.loading = false
   state.results = []
   await i18n.changeLanguage('zh')
@@ -26,6 +27,7 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 afterAll(async () => {
+  delete (Element.prototype as Partial<Element>).scrollIntoView
   await i18n.changeLanguage('en')
 })
 

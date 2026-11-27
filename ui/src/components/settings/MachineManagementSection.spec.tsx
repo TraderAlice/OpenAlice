@@ -74,7 +74,7 @@ describe('MachineManagementSection', () => {
   it('keeps a stopped project selectable for reviewed activation recovery', async () => {
     render(<MachineManagementSection />)
     fireEvent.click(screen.getByRole('button', { name: /Cloud/ }))
-    expect(screen.getByRole('combobox', { name: 'AliceProject' })).toHaveProperty('value', 'research')
+    expect(screen.getByRole('combobox', { name: 'AliceProject' }).textContent).toBe('Research')
     fireEvent.click(screen.getByRole('button', { name: 'Probe and review' }))
     await waitFor(() => expect(manager.probe).toHaveBeenCalledWith({ mode: 'upgrade', machineKey: 'cloud', projectKey: 'research' }))
   })
