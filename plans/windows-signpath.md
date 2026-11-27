@@ -23,7 +23,7 @@ Decisions:
 
 ## Remaining work
 
-- [ ] Publish and review Code signing and privacy policy statements plus team
+- [x] Publish and review Code signing and privacy policy statements plus team
   roles on public home/download/release surfaces.
 - [ ] Send the tested request/build/policy links to SignPath for production
   certificate review. `Release certificate 2026` still showed `CSR PENDING`
