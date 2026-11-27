@@ -11,6 +11,7 @@ import {
   AUTO_QUANT_WORKSPACE_TEMPLATE,
   CHAT_WORKSPACE_TEMPLATE,
 } from '../workspaces/chat-workspace-resolver.js'
+import { COMMANDER_WORKSPACE_ID } from '../workspaces/commander-workspace.js'
 import { isAgentRuntime, type CliAdapter } from '../workspaces/cli-adapter.js'
 import { compatibleCredentials } from '../workspaces/credential-injection.js'
 import { logger as launcherLogger } from '../workspaces/logger.js'
@@ -74,8 +75,8 @@ async function resolveTargetWorkspace(
 
   const wsId = input.wsId
   if (!wsId) throw new Error('target workspace is required: pass --ws-id or --harness')
-  if (wsId === 'workspace-manager') {
-    throw new Error('workspace-manager has no business runtime settings; pass --ws-id or --harness')
+  if (wsId === COMMANDER_WORKSPACE_ID) {
+    throw new Error('commander has no business runtime settings; pass --ws-id or --harness')
   }
   const byId = svc.registry.get(wsId)
   if (byId) return byId

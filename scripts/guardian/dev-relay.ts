@@ -1,18 +1,19 @@
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 
-import { WebRelay, writeStartupTarget } from '../../packages/cli/src/web-relay.js'
+import { WebRelay, readStartupTarget, writeStartupTarget } from '../../packages/cli/src/web-relay.js'
 import { inspectLocalMachine, inspectMachineFleet, type MachineInventory } from '../../packages/cli/src/machine-inventory.js'
 import { readSupervisorAliceProjectRegistry } from '../../packages/cli/src/supervisor-config.js'
 import { resolveSupervisorRootPath } from '../../packages/cli/src/launch-context.js'
 
-interface DevRelayConfig {
+export interface DevRelayConfig {
   home: string
   projectId: string
   projectName: string
   backendPort: number
   uiPort: number
   vitePort: number
+  explicitLocalTarget?: boolean
 }
 
 /** Keep an isolated `pnpm dev -- --home …` selectable without persisting it in the user's registry. */
@@ -44,11 +45,16 @@ export async function createDevRelay(config: DevRelayConfig): Promise<WebRelay> 
       ? { ...project, runtime: { ...project.runtime, webEndpoint: `http://127.0.0.1:${config.backendPort}` } }
       : project),
   })
-  const options = { loadRegistry }
+  const options = { supervisorRoot, loadRegistry }
   const relay = new WebRelay({
     port: config.uiPort,
+    readStartup: () => readStartupTarget({ supervisorRoot }),
     // An ephemeral source-dev target cannot be reopened by an installed client.
-    writeStartup: async target => { if (target?.machine !== 'local' || existing) await writeStartupTarget(target) },
+    writeStartup: async (target, opts) => {
+      if (target?.machine !== 'local' || existing) {
+        await writeStartupTarget(target, { ...opts, supervisorRoot })
+      }
+    },
     uiOrigin: `http://127.0.0.1:${config.vitePort}`,
     inspectLocal: async () => {
       const inventory = await inspectLocalMachine(options)
@@ -61,7 +67,19 @@ export async function createDevRelay(config: DevRelayConfig): Promise<WebRelay> 
   })
   try {
     await relay.listen()
-    await relay.connect('local', devKey)
+    const saved = config.explicitLocalTarget
+      ? null
+      : await readStartupTarget({ supervisorRoot }).catch(() => null)
+    if (saved && !(saved.machine === 'local' && saved.project === devKey)) {
+      try {
+        await relay.connect(saved.machine, saved.project, { remember: false })
+      } catch (error) {
+        relay.setStartupError(error)
+        await relay.connect('local', devKey, { remember: false })
+      }
+    } else {
+      await relay.connect('local', devKey, { remember: false })
+    }
     return relay
   } catch (error) {
     await relay.close().catch(() => undefined)

@@ -604,4 +604,52 @@ describe('Workspace conversation control', () => {
     expect(sessionMailbox.hasActiveWatermark('resume-caller')).toBe(false)
     expect(sessionMailbox.pendingFor('resume-caller').map((m) => m.taskId)).toEqual(['task-2'])
   })
+
+  it('surfaces reportSource metadata for scheduled-issue reports in check()', async () => {
+    const stateDir = await mkdtemp(join(tmpdir(), 'conversation-report-'))
+    dirs.push(stateDir)
+    const sessionMailbox = await SessionMailbox.load(join(stateDir, 'session-mailbox.json'))
+    await sessionMailbox.enqueue({
+      recipientResumeId: 'resume-commander',
+      recipientWorkspaceId: 'commander',
+      taskId: 'task-sched-1',
+      childResumeId: 'resume-worker-1',
+      childWorkspaceId: 'ws-quant',
+      childAgent: 'claude',
+      taskStatus: 'done',
+      assistantPreview: 'All checks green.',
+      durationMs: 420,
+      createdAt: 100,
+      reportSource: {
+        kind: 'scheduled-issue',
+        workspaceId: 'ws-quant',
+        workspaceTag: 'Auto Quant',
+        issueId: 'daily-health',
+        issueTitle: 'Daily Health Check',
+        fire: 'schedule',
+      },
+    })
+    const { svc } = fakeService({ logsDir: stateDir, sessionMailbox })
+    const control = createWorkspaceConversationControl(svc)
+
+    await expect(control.check?.({ recipientResumeId: 'resume-commander' })).resolves.toEqual([{
+      id: 'mail-task-sched-1',
+      taskId: 'task-sched-1',
+      resumeId: 'resume-worker-1',
+      workspaceId: 'ws-quant',
+      agent: 'claude',
+      status: 'done',
+      assistantText: 'All checks green.',
+      durationMs: 420,
+      reportSource: {
+        kind: 'scheduled-issue',
+        workspaceId: 'ws-quant',
+        workspaceTag: 'Auto Quant',
+        issueId: 'daily-health',
+        issueTitle: 'Daily Health Check',
+        fire: 'schedule',
+      },
+      createdAt: 100,
+    }])
+  })
 })

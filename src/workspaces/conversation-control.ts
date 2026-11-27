@@ -466,6 +466,7 @@ export function createWorkspaceConversationControl(
           assistantText: task?.structured?.assistantText ?? message.assistantPreview,
           ...(error ? { error } : {}),
           ...(durationMs !== undefined ? { durationMs } : {}),
+          ...(message.reportSource ? { reportSource: message.reportSource } : {}),
           createdAt: message.createdAt,
         }
       }))

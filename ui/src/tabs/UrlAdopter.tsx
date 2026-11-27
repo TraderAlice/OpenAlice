@@ -32,6 +32,7 @@ export function UrlAdopter() {
             race a redirect and replace the default entry during startup. */}
         <Route path="/" element={<AdoptStatic spec={{ kind: 'quick-start', params: {} }} />} />
         <Route path="/quick-start" element={<AdoptStatic spec={{ kind: 'quick-start', params: {} }} />} />
+        <Route path="/commander" element={<AdoptStatic spec={{ kind: 'commander', params: {} }} />} />
         <Route path="/design/:project" element={<AdoptDesignProject />} />
 
         {/* Activities */}
@@ -39,8 +40,6 @@ export function UrlAdopter() {
             /chat/:channelId (the retired traditional-chat channels) still
             redirects to Inbox so stale bookmarks land on a live surface. */}
         <Route path="/chat" element={<AdoptStatic spec={{ kind: 'chat-landing', params: {} }} />} />
-        <Route path="/chat/manager" element={<AdoptStatic spec={{ kind: 'workspace-manager', params: {} }} />} />
-        <Route path="/chat/manager/s/:sessionId" element={<AdoptWorkspaceManager />} />
         <Route path="/chat/workspaces/:wsId/view/:path" element={<AdoptChatFileViewer />} />
         <Route path="/chat/workspaces/:wsId" element={<AdoptChatWorkspace />} />
         <Route path="/chat/workspaces/:wsId/details" element={<AdoptWorkspaceDetails source="chat" />} />
@@ -357,12 +356,6 @@ function AdoptHarnessSurface({ source }: { source: 'auto-quant' | 'prediction' }
   return <AdoptStatic spec={{ kind: 'harness-surface', params: { wsId, source, capability: 'studio' } }} />
 }
 
-function AdoptWorkspaceManager() {
-  const { sessionId } = useParams<{ sessionId: string }>()
-  if (!sessionId) return <Navigate to="/chat/manager" replace />
-  return <AdoptStatic spec={{ kind: 'workspace-manager', params: { sessionId } }} />
-}
-
 function AdoptFileViewer() {
   const { wsId, path } = useParams<{ wsId: string; path: string }>()
   const [search] = useSearchParams()
@@ -480,6 +473,7 @@ function RedirectUtaDetail() {
 function specToSection(spec: ViewSpec): ActivitySection {
   switch (spec.kind) {
     case 'quick-start':        return 'quick-start'
+    case 'commander':          return 'commander'
     case 'inbox':              return 'inbox'
     case 'tracked':            return 'tracked'
     case 'tracked-issue-detail': return 'tracked'
@@ -487,7 +481,6 @@ function specToSection(spec: ViewSpec): ActivitySection {
     case 'auto-quant-landing': return 'auto-quant'
     case 'auto-prediction-landing': return 'prediction'
     case 'harness-surface':    return spec.params.source
-    case 'workspace-manager':  return 'chat'
     case 'workspace-details': return spec.params.source
     case 'workspace':
       return spec.params.source === 'chat'

@@ -85,10 +85,10 @@ if (typeof location !== 'undefined' && new URLSearchParams(location.search).has(
 const demoSessionPresence = new Map<string, 'active' | 'archived' | 'deleted'>()
 
 
-let demoManagerSession: SessionRecord & { pid: number; startedAt: number } = {
-  id: 'demo-manager-session',
-  resumeId: 'demo-resume-manager',
-  wsId: 'workspace-manager',
+let demoCommanderSession: SessionRecord & { pid: number; startedAt: number } = {
+  id: 'demo-commander-session',
+  resumeId: 'demo-resume-commander',
+  wsId: 'commander',
   agent: 'pi',
   name: 'p1',
   createdAt: new Date().toISOString(),
@@ -97,10 +97,11 @@ let demoManagerSession: SessionRecord & { pid: number; startedAt: number } = {
   surface: 'webpi' as const,
   pid: 0,
   startedAt: Date.now(),
-  title: 'Audit the active Workspace floor',
+  title: 'Commander',
 }
 
-let demoManagerMessages: WebConversationMessage[] = []
+let demoCommanderInitialized = false
+let demoCommanderMessages: WebConversationMessage[] = []
 let demoQuickChatSequence = 0
 const demoResumedSessions = new Map<string, SessionRecord>()
 let demoWorkspaceCreateSequence = 0
@@ -139,7 +140,8 @@ export function resetDemoWorkspaceWebState(): void {
   demoTakeover = null; demoTakeoverSeconds = 60; demoTakeoverStarted = 0;
   demoReplyStreams.clear()
   demoSessionPresence.clear()
-  demoManagerMessages = []
+  demoCommanderInitialized = false
+  demoCommanderMessages = []
   demoQuickChatSequence = 0
   demoWebRequestSequence = 0
   demoWebSessions = createSeededWebSessions()
@@ -349,23 +351,23 @@ function demoAgentConfigBundle(workspaceId: string): AgentConfigBundle {
   }
 }
 
-function demoManagerSnapshot(): WebSessionSnapshot {
+function demoCommanderSnapshot(): WebSessionSnapshot {
   return {
-    recordId: demoManagerSession.id,
-    wsId: demoManagerSession.wsId,
-    resumeId: demoManagerSession.resumeId,
-    agent: demoManagerSession.agent,
-    wire: demoWebWire(demoManagerSession.agent),
-    nativeSessionId: 'demo-native-manager',
+    recordId: demoCommanderSession.id,
+    wsId: demoCommanderSession.wsId,
+    resumeId: demoCommanderSession.resumeId,
+    agent: demoCommanderSession.agent,
+    wire: demoWebWire(demoCommanderSession.agent),
+    nativeSessionId: 'demo-native-commander',
     pid: 0,
-    startedAt: demoManagerSession.startedAt,
+    startedAt: demoCommanderSession.startedAt,
     phase: 'idle' as const,
-    messages: demoManagerMessages,
+    messages: demoCommanderMessages,
     streamingMessage: null,
     requests: [],
     error: null,
     stderrTail: '',
-    revision: demoManagerMessages.length,
+    revision: demoCommanderMessages.length,
   }
 }
 
@@ -615,14 +617,18 @@ export const workspacesHandlers = [
   http.put('/api/workspaces/terminal-view-attributes', () =>
     HttpResponse.json({ ok: true, changed: true })),
   http.get('/api/workspaces', () => HttpResponse.json({ workspaces: demoWorkspaces.map(workspace => ({ ...workspace, sessions: workspace.sessions.map(session => ({ ...session, presence: demoSessionPresence.get(webKey(workspace.id, session.resumeId)) ?? session.presence ?? 'active' })) })) })),
-  http.get('/api/workspaces/manager', () => HttpResponse.json({
-    manager: {
-      id: 'workspace-manager', tag: 'Workspace Manager',
+  http.get('/api/workspaces/commander', () => HttpResponse.json({
+    commander: {
+      id: 'commander',
+      tag: 'Commander',
+      initialized: demoCommanderInitialized,
+      session: demoCommanderInitialized ? demoCommanderSession : null,
+      unreadReports: 0,
+      activeWorkers: 0,
       activeWorkspaceCount: demoWorkspaces.length,
-      sessions: demoManagerMessages.length > 0 ? [demoManagerSession] : [],
     },
   })),
-  http.post('/api/workspaces/manager/quick-start', async ({ request }) => {
+  http.post('/api/workspaces/commander/open', async ({ request }) => {
     const body = await request.json().catch(() => ({})) as {
       prompt?: string
       agent?: string
@@ -630,17 +636,26 @@ export const workspacesHandlers = [
       model?: string
       reasoningEffort?: string
     }
-    demoManagerMessages = [
-      { role: 'user', content: body.prompt ?? 'Audit the active Workspace floor.' },
-      { role: 'assistant', content: [{ type: 'text', text: 'Demo manager: active desks are inventoried and ready for coordination.' }] },
-    ]
+    demoCommanderInitialized = true
+    if (body.prompt?.trim()) {
+      demoCommanderMessages = [
+        ...demoCommanderMessages,
+        { role: 'user', content: body.prompt.trim() },
+        { role: 'assistant', content: [{ type: 'text', text: 'Demo Commander: active desks are inventoried and ready for delegation.' }] },
+      ]
+    }
     return HttpResponse.json({
-      manager: {
-        id: 'workspace-manager', tag: 'Workspace Manager',
-        activeWorkspaceCount: demoWorkspaces.length, sessions: [demoManagerSession],
+      commander: {
+        id: 'commander',
+        tag: 'Commander',
+        initialized: true,
+        session: demoCommanderSession,
+        unreadReports: 0,
+        activeWorkers: 0,
+        activeWorkspaceCount: demoWorkspaces.length,
       },
-      session: demoManagerSession,
-      snapshot: demoManagerSnapshot(),
+      session: demoCommanderSession,
+      snapshot: demoCommanderSnapshot(),
     }, { status: 201 })
   }),
   http.get('/api/workspaces/departed', () => HttpResponse.json({ workspaces: demoDepartedWorkspaces })),
@@ -1664,7 +1679,7 @@ export const workspacesHandlers = [
   }),
   http.get('/api/workspaces/:id/sessions/:sid/executions', ({ params }) => {
     const record = demoWorkspaces.find(workspace => workspace.id === String(params.id))?.sessions.find(session => session.id === String(params.sid))
-      ?? (demoManagerSession.wsId === String(params.id) && demoManagerSession.id === String(params.sid) ? demoManagerSession : undefined)
+      ?? (demoCommanderSession.wsId === String(params.id) && demoCommanderSession.id === String(params.sid) ? demoCommanderSession : undefined)
     if (!record) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
     const startedAt = Date.parse(record.createdAt)
     return HttpResponse.json({ executions: [{
@@ -1688,9 +1703,9 @@ export const workspacesHandlers = [
       ...(update.model ? { model: update.model } : {}),
       ...(update.reasoningEffort ? { reasoningEffort: update.reasoningEffort } : {}),
     } : undefined
-    if (wsId === demoManagerSession.wsId && sessionId === demoManagerSession.id) {
-      if (runtime) demoManagerSession = { ...demoManagerSession, runtime }
-      return HttpResponse.json({ snapshot: demoManagerSnapshot() })
+    if (wsId === demoCommanderSession.wsId && sessionId === demoCommanderSession.id) {
+      if (runtime) demoCommanderSession = { ...demoCommanderSession, runtime }
+      return HttpResponse.json({ snapshot: demoCommanderSnapshot() })
     }
     const record = demoWorkspaces
       .find((workspace) => workspace.id === wsId)
@@ -1715,8 +1730,8 @@ export const workspacesHandlers = [
   http.get('/api/workspaces/:id/sessions/:sid/web', ({ params, request }) => {
     const wsId = String(params.id)
     const sessionId = String(params.sid)
-    const snapshot = wsId === demoManagerSession.wsId && sessionId === demoManagerSession.id
-      ? demoManagerSnapshot()
+    const snapshot = wsId === demoCommanderSession.wsId && sessionId === demoCommanderSession.id
+      ? demoCommanderSnapshot()
       : advanceDemoReply(wsId, sessionId)
     if (!snapshot) return HttpResponse.json({ error: 'web_not_running' }, { status: 409 })
     const revision = Number.parseInt(new URL(request.url).searchParams.get('revision') ?? '', 10)
@@ -1730,13 +1745,13 @@ export const workspacesHandlers = [
     const sessionId = String(params.sid)
     const message = body.message?.trim() ?? ''
     if (!message) return HttpResponse.json({ error: 'bad_request', message: 'message is required' }, { status: 400 })
-    if (wsId === demoManagerSession.wsId && sessionId === demoManagerSession.id) {
-      demoManagerMessages = [
-        ...demoManagerMessages,
+    if (wsId === demoCommanderSession.wsId && sessionId === demoCommanderSession.id) {
+      demoCommanderMessages = [
+        ...demoCommanderMessages,
         { role: 'user', content: message },
-        { role: 'assistant', content: [{ type: 'text', text: 'Demo manager: I would inspect the live CLI indexes before changing any desk.' }] },
+        { role: 'assistant', content: [{ type: 'text', text: 'Demo Commander: I would inspect active Workspaces and delegate heavy work to a worker Thread.' }] },
       ]
-      return HttpResponse.json({ snapshot: demoManagerSnapshot() })
+      return HttpResponse.json({ snapshot: demoCommanderSnapshot() })
     }
     const current = findDemoWebSession(wsId, sessionId)
     if (current && (current.phase === 'awaiting-input' || current.phase === 'working')) {
@@ -1753,8 +1768,8 @@ export const workspacesHandlers = [
   http.post('/api/workspaces/:id/sessions/:sid/web/abort', ({ params }) => {
     const wsId = String(params.id)
     const sessionId = String(params.sid)
-    if (wsId === demoManagerSession.wsId && sessionId === demoManagerSession.id) {
-      return HttpResponse.json({ snapshot: demoManagerSnapshot() })
+    if (wsId === demoCommanderSession.wsId && sessionId === demoCommanderSession.id) {
+      return HttpResponse.json({ snapshot: demoCommanderSnapshot() })
     }
     demoReplyStreams.delete(webKey(wsId, sessionId))
     // Aborting mid-request drops the pending question and records the stop.

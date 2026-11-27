@@ -12,8 +12,15 @@ import type { SessionMailbox, SessionMailboxMessage } from './session-mailbox.js
 export type DeliveryResult = 'delivered' | 'busy' | 'absent'
 export type HeadlessDeliveryResult = 'delivered' | 'busy' | 'unavailable'
 
-export function formatSessionWakePointer(count: number, _recipientResumeId: string): string {
+export function formatSessionWakePointer(
+  count: number,
+  _recipientResumeId: string,
+  messages?: readonly SessionMailboxMessage[],
+): string {
   const plural = count === 1 ? '' : 's'
+  if (messages?.some((m) => m.reportSource?.kind === 'scheduled-issue')) {
+    return `You have ${count} pending task/schedule report${plural} from active Workspaces. Run \`alice conversation check\` to review and triage them.`
+  }
   return `You have ${count} completed peer task${plural}. Run \`alice conversation check\` to read the result${plural} and continue.`
 }
 
@@ -93,7 +100,7 @@ export class SessionWakeDelivery {
     }
 
     const pendingIds = pending.map((m) => m.id)
-    const pointerText = formatSessionWakePointer(pending.length, recipientResumeId)
+    const pointerText = formatSessionWakePointer(pending.length, recipientResumeId, pending)
     let surface: 'web' | 'pty' | 'headless' = 'web'
 
     try {

@@ -23,6 +23,7 @@ import {
 import { CountBadge } from './CountBadge'
 import { Button } from '@/components/ui/button'
 import { ChatWorkspaceSection } from './workspace/ChatWorkspaceSection'
+import { useOptionalWorkspaces } from '../contexts/workspaces-context'
 import { useUpdateLifecycle } from '../hooks/useUpdateLifecycle'
 import { focusVersionOverviewAfterNavigation } from '../lib/updates/focusVersionOverview'
 
@@ -33,6 +34,7 @@ import { focusVersionOverviewAfterNavigation } from '../lib/updates/focusVersion
 function activitySectionFor(page: Page): ActivitySection {
   switch (page) {
     case 'chat':                 return 'chat'
+    case 'commander':            return 'commander'
     case 'auto-quant':           return 'auto-quant'
     case 'prediction':           return 'prediction'
     case 'inbox':                return 'inbox'
@@ -119,6 +121,7 @@ export function ActivityBar({
   const unreadInbox = useUnreadInboxCount()
   const pendingPush = usePendingPushCount()
   const connectorWarnings = useConnectorWarningCount()
+  const commanderUnreadReports = useOptionalWorkspaces()?.commander?.unreadReports ?? 0
   const updateGuidance = useUpdateLifecycle({ optional: true })?.guidance
   const updateGuidanceCount = (updateGuidance?.availableCount ?? 0) + (updateGuidance?.needsAttentionCount ?? 0) + (updateGuidance?.setupCount ?? 0)
   const collapsedSections = useActivityBarCollapse((s) => s.collapsedSections)
@@ -194,10 +197,20 @@ export function ActivityBar({
                   <div className="flex flex-col gap-(--oa-row-gap)" id={`activity-section-${section.id}`}>
                     {section.items.map((item) => {
                       const sec = activitySectionFor(item.page)
-                      const isActive = item.page === 'chat' ? focusedKind === 'quick-start' : selectedSidebar === sec
+                      const isActive = item.page === 'chat'
+                        ? focusedKind === 'quick-start'
+                        : item.page === 'commander'
+                          ? focusedKind === 'commander' || selectedSidebar === 'commander'
+                          : selectedSidebar === sec
                       const Icon = item.icon
                       let badge: { count: number; label: string; tone: 'neutral' | 'info' } | null = null
-                      if (item.page === 'inbox' && unreadInbox > 0) {
+                      if (item.page === 'commander' && commanderUnreadReports > 0) {
+                        badge = {
+                          count: commanderUnreadReports,
+                          label: t('commander.pendingReports', { count: commanderUnreadReports }),
+                          tone: 'info',
+                        }
+                      } else if (item.page === 'inbox' && unreadInbox > 0) {
                         badge = {
                           count: unreadInbox,
                           label: t('nav.unread', { count: unreadInbox }),

@@ -26,7 +26,6 @@ vi.mock('../tabs/registry', () => {
     }),
     getViewShell: (spec: { kind: string; params: { source?: string } }) => (
       spec.kind === 'chat-landing' ||
-      spec.kind === 'workspace-manager' ||
       ((spec.kind === 'workspace' || spec.kind === 'file-viewer') && spec.params.source === 'chat')
         ? 'chat'
         : null

@@ -229,13 +229,13 @@ describe('makeWorkspaceRuntimeControl', () => {
     expect(tuiOnlyRes.runtime.interactive.defaultAgent).toBe('tui-only')
   })
 
-  it('rejects uninitialized harness and workspace-manager without explicit target', async () => {
+  it('rejects uninitialized harness and commander without explicit target', async () => {
     const svc = makeFakeService([])
     const control = makeWorkspaceRuntimeControl(svc, {
       readAutoQuantPreferences: async () => ({ defaultWorkspaceId: null }),
     })
 
     await expect(control.get({ harness: 'autoquant' })).rejects.toThrow(/AutoQuant workspace is not initialized/)
-    await expect(control.get({ wsId: 'workspace-manager' })).rejects.toThrow(/workspace-manager has no business runtime settings/)
+    await expect(control.get({ wsId: 'commander' })).rejects.toThrow(/commander has no business runtime settings/)
   })
 })

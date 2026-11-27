@@ -7,15 +7,18 @@ import { ConfigSection } from '../form'
 import { Collapsible, CollapsibleContent, CollapsibleDetailsTrigger } from '../ui/collapsible'
 import { Toggle } from '../Toggle'
 
-export function UpdateLifecycleSection() {
+export function UpdatePreferencesPanel() {
   const { t } = useTranslation()
   const updates = useUpdateLifecycle()
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const preferences = updates.preferences
+  const preferences = updates.preferences ?? null
+  const clientAutoCheck = updates.client?.preferences?.autoCheck ?? false
+  const canSaveClient = Boolean(updates.client?.preferences && updates.saveClientPreferences)
+  const canSavePreferences = Boolean(preferences && updates.savePreferences)
 
   const change = async (key: keyof UpdatePreferences, value: boolean) => {
-    if (!preferences) return
+    if (!preferences || !updates.savePreferences) return
     setSaving(true)
     setSaveError(null)
     try { await updates.savePreferences({ ...preferences, [key]: value }) }
@@ -23,14 +26,11 @@ export function UpdateLifecycleSection() {
     finally { setSaving(false) }
   }
 
-  return <ConfigSection title={t('settings.versions.preferences')}>
-    <Collapsible>
-    <CollapsibleDetailsTrigger>{t('settings.versions.managePreferences')}</CollapsibleDetailsTrigger>
-    <CollapsibleContent>
-    <div className="mt-3 rounded-lg border border-border/70 bg-secondary/35 p-4">
+  return (
+    <>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-2xl text-xs leading-5 text-muted-foreground">{t('settings.updateLifecycle.description')}</p>
-        <Button type="button" size="sm" variant="outline" disabled={updates.checking} onClick={() => void updates.refresh()}>
+        <Button type="button" size="sm" variant="outline" disabled={Boolean(updates.checking) || !updates.refresh} onClick={() => void updates.refresh?.()}>
           <RefreshCw className={`size-3.5 ${updates.checking ? 'animate-spin motion-reduce:animate-none' : ''}`} aria-hidden />
           {updates.checking ? t('settings.updateLifecycle.checking') : t('settings.updateLifecycle.checkNow')}
         </Button>
@@ -46,8 +46,9 @@ export function UpdateLifecycleSection() {
             <p className="text-sm font-medium">{t('settings.updateLifecycle.clientCheck')}</p>
             <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{t('settings.updateLifecycle.clientCheckDescription')}</p>
           </div>
-          <Toggle ariaLabel={t('settings.updateLifecycle.clientCheck')} checked={updates.client?.preferences.autoCheck ?? false}
-            disabled={!updates.client || saving} onChange={(autoCheck) => {
+          <Toggle ariaLabel={t('settings.updateLifecycle.clientCheck')} checked={clientAutoCheck}
+            disabled={!canSaveClient || saving} onChange={(autoCheck) => {
+              if (!updates.saveClientPreferences) return
               setSaving(true); setSaveError(null)
               void updates.saveClientPreferences({ autoCheck }).catch((cause: unknown) => setSaveError(cause instanceof Error ? cause.message : String(cause))).finally(() => setSaving(false))
             }} />
@@ -62,12 +63,25 @@ export function UpdateLifecycleSection() {
             <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{t(`settings.updateLifecycle.${description}`)}</p>
           </div>
           <Toggle ariaLabel={t(`settings.updateLifecycle.${label}`)} checked={preferences?.[key] ?? false}
-            disabled={!preferences || saving} onChange={(value) => void change(key, value)} />
+            disabled={!canSavePreferences || saving} onChange={(value) => void change(key, value)} />
         </div>)}
       </div>
 
       {(updates.error || updates.clientError || saveError) && <p className="mt-3 text-xs text-destructive" role="alert">{saveError || updates.clientError || updates.error}</p>}
-    </div>
-    </CollapsibleContent></Collapsible>
+    </>
+  )
+}
+
+export function UpdateLifecycleSection() {
+  const { t } = useTranslation()
+  return <ConfigSection title={t('settings.versions.preferences')}>
+    <Collapsible>
+      <CollapsibleDetailsTrigger>{t('settings.versions.managePreferences')}</CollapsibleDetailsTrigger>
+      <CollapsibleContent>
+        <div className="rounded-lg border border-border/70 bg-secondary/35 p-4">
+          <UpdatePreferencesPanel />
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   </ConfigSection>
 }

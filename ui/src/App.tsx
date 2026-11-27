@@ -30,7 +30,7 @@ import { PrimaryNavigationToggle, useNavigationToggleFocus } from './components/
  * Each maps to one or more tab kinds via tabs/registry.ts (defaultSpecForActivity).
  */
 export type Page =
-  | 'chat' | 'auto-quant' | 'prediction' | 'inbox' | 'tracked' | 'workspaces' | 'portfolio' | 'office' | 'automation' | 'market'
+  | 'chat' | 'commander' | 'auto-quant' | 'prediction' | 'inbox' | 'tracked' | 'workspaces' | 'portfolio' | 'office' | 'automation' | 'market'
   | 'issue'
   | 'connectors'
   | 'settings'

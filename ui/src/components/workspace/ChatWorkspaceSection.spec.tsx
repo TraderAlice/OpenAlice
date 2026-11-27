@@ -7,8 +7,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { WorkspacesContext, type WorkspacesContextValue } from '../../contexts/workspaces-context'
 import { i18n } from '../../i18n'
 import {
-  MANAGER_WORKSPACE_ID,
-  type ManagerWorkspaceSnapshot,
   type SessionRecord,
   type TemplateInfo,
   type Workspace,
@@ -105,7 +103,6 @@ function chatSession(index: number): SessionRecord {
 
 function workspaceContext(
   workspaces: readonly Workspace[],
-  workspaceManager: ManagerWorkspaceSnapshot | null = null,
 ): WorkspacesContextValue {
   return {
     workspaces,
@@ -114,9 +111,9 @@ function workspaceContext(
     defaultAgent: 'pi',
     issueDefaultAgent: null,
     listError: null,
-    workspaceManager,
-    workspaceManagerLoaded: true,
-    workspaceManagerError: null,
+    commander: null,
+    commanderLoaded: true,
+    commanderError: null,
     hasLoaded: true,
     templatesLoaded: true,
     templatesError: null,
@@ -126,8 +123,8 @@ function workspaceContext(
     refresh: vi.fn(),
     refreshTemplates: vi.fn(async () => undefined),
     refreshAutoQuantPreference: vi.fn(async () => undefined),
-    refreshWorkspaceManager: vi.fn(async () => undefined),
-    quickStartWorkspaceManager: vi.fn(async () => { throw new Error('not used') }),
+    refreshCommander: vi.fn(async () => undefined),
+    openCommander: vi.fn(async () => { throw new Error('not used') }),
     spawn: vi.fn(async () => undefined),
     openHeadlessRun: actions.openHeadlessRun,
     setDefaultAgent: vi.fn(async () => undefined),
@@ -151,13 +148,12 @@ function workspaceContext(
 
 function renderSection(
   workspaces: readonly Workspace[] = [chatWorkspace],
-  workspaceManager: ManagerWorkspaceSnapshot | null = null,
   onNavigate?: () => void,
   displayMode: 'focused' | 'recent' | 'multi' = 'multi',
   placement: 'sidebar' | 'navigation' = 'sidebar',
 ) {
   return render(
-    <WorkspacesContext.Provider value={workspaceContext(workspaces, workspaceManager)}>
+    <WorkspacesContext.Provider value={workspaceContext(workspaces)}>
       <ChatWorkspaceSection
         onNavigate={onNavigate}
         displayMode={displayMode}
@@ -203,7 +199,7 @@ describe('ChatWorkspaceSection actions', () => {
     const current = { ...chatWorkspace, sessions: Array.from({ length: 9 }, (_, index) => chatSession(index + 1)) }
     focusedTabState.tab = { spec: { kind: 'workspace', params: { source: 'chat', wsId: current.id, sessionId: current.sessions[0].id } } }
     const other = { ...chatWorkspace, id: 'other-chat', sessions: [{ ...chatSession(10), title: 'Other office conversation', wsId: 'other-chat' }] }
-    renderSection([current, other], null, undefined, 'focused', 'navigation')
+    renderSection([current, other], undefined, 'focused', 'navigation')
     expect(screen.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(3)
     expect(screen.queryByRole('button', { name: 'Other office conversation' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Conversation 1' }))
@@ -213,7 +209,7 @@ describe('ChatWorkspaceSection actions', () => {
   })
 
   it('keeps recent sessions visible without a disclosure and retains landing and management actions', () => {
-    renderSection([{ ...chatWorkspace, sessions: [chatSession(1)] }], null, undefined, 'focused', 'navigation')
+    renderSection([{ ...chatWorkspace, sessions: [chatSession(1)] }], undefined, 'focused', 'navigation')
     expect(screen.queryByRole('button', { name: 'Toggle Chat conversations' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Conversation 1' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Chat Workspace options' })).toBeTruthy()
@@ -222,13 +218,13 @@ describe('ChatWorkspaceSection actions', () => {
   })
 
   it('keeps the Chat office available before any workspace is initialized', () => {
-    renderSection([], null, undefined, 'focused', 'navigation')
+    renderSection([], undefined, 'focused', 'navigation')
     fireEvent.click(screen.getByRole('button', { name: 'Chat Harness' }))
     expect(actions.openOrFocus).toHaveBeenCalledWith({ kind: 'chat-landing', params: {} })
   })
 
   it('keeps one new-chat action after options when the navigation list is empty', () => {
-    renderSection([{ ...chatWorkspace, sessions: [] }], null, undefined, 'focused', 'navigation')
+    renderSection([{ ...chatWorkspace, sessions: [] }], undefined, 'focused', 'navigation')
     const create = screen.getByRole('button', { name: 'Chat: New chat' })
     const options = screen.getByRole('button', { name: 'Chat Workspace options' })
     expect(options.compareDocumentPosition(create) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
@@ -251,7 +247,7 @@ describe('ChatWorkspaceSection actions', () => {
     const focusedWorkspace = { ...chatWorkspace, sessions }
     const onNavigate = vi.fn()
 
-    renderSection([focusedWorkspace], null, onNavigate, 'focused')
+    renderSection([focusedWorkspace], onNavigate, 'focused')
 
     expect(screen.getByText('Recent conversations')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Chat Workspace options' }).textContent).toBe('Chat')
@@ -267,7 +263,7 @@ describe('ChatWorkspaceSection actions', () => {
 
   it('separates Workspace details and switching with keyboard-accessible actions', async () => {
     const user = userEvent.setup()
-    renderSection([chatWorkspace], null, undefined, 'focused')
+    renderSection([chatWorkspace], undefined, 'focused')
 
     const trigger = screen.getByRole('button', { name: 'Chat Workspace options' })
     trigger.focus()
@@ -292,7 +288,7 @@ describe('ChatWorkspaceSection actions', () => {
   })
 
   it('opens details from the current identity without opening configuration or switching', () => {
-    renderSection([chatWorkspace], null, undefined, 'focused')
+    renderSection([chatWorkspace], undefined, 'focused')
     fireEvent.click(screen.getByRole('button', { name: 'Chat Workspace options' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Current Workspace: chat-jul11' }))
     expect(openOrFocus).toHaveBeenCalledExactlyOnceWith({ kind: 'workspace-details', params: { wsId: 'chat-1', source: 'chat' } })
@@ -306,7 +302,7 @@ describe('ChatWorkspaceSection actions', () => {
       currentVersion: '1.8.2',
       upgradeAvailable: { from: '1.8.2', to: '1.8.3' },
     }
-    renderSection([upgradeWorkspace], null, undefined, 'focused')
+    renderSection([upgradeWorkspace], undefined, 'focused')
 
     const trigger = screen.getByRole('button', {
       name: 'Chat context: chat-jul11. Template update available to v1.8.3.',
@@ -321,7 +317,7 @@ describe('ChatWorkspaceSection actions', () => {
   })
 
   it('keeps Escape scoped to the open Workspace context menu', () => {
-    renderSection([chatWorkspace], null, undefined, 'focused')
+    renderSection([chatWorkspace], undefined, 'focused')
 
     const trigger = screen.getByRole('button', { name: 'Chat Workspace options' })
     fireEvent.click(trigger)
@@ -343,7 +339,7 @@ describe('ChatWorkspaceSection actions', () => {
       dir: '/tmp/chat-aug3',
       createdAt: '2026-08-03T00:00:00.000Z',
     }
-    renderSection([chatWorkspace, alternative], null, undefined, 'focused')
+    renderSection([chatWorkspace, alternative], undefined, 'focused')
 
     fireEvent.click(screen.getByRole('button', { name: 'Chat Workspace options' }))
     expect(screen.queryByRole('menuitem', { name: 'Workspace Manager' })).toBeNull()
@@ -364,7 +360,7 @@ describe('ChatWorkspaceSection actions', () => {
   it('keeps conversation creation primary and scopes workspace creation to the workspace list', async () => {
     const user = userEvent.setup()
     const onNavigate = vi.fn()
-    renderSection([chatWorkspace], null, onNavigate)
+    renderSection([chatWorkspace], onNavigate)
 
     const newChat = screen.getByRole('button', { name: 'New chat' })
     const workspaceHeading = screen.getByText('Workspaces', { selector: 'h3' })
@@ -519,7 +515,7 @@ describe('ChatWorkspaceSection actions', () => {
       expect(screen.getByTestId('harness-recent-heading').nextElementSibling?.textContent).toBe('9')
     }
 
-    const { unmount: unmountFocused } = renderSection([workspace], null, onNavigate, 'focused')
+    const { unmount: unmountFocused } = renderSection([workspace], onNavigate, 'focused')
     expectCappedSidebar()
     const inlineBrowse = screen.getByRole('button', { name: 'View all 9 conversations' })
     inlineBrowse.focus()
@@ -550,7 +546,7 @@ describe('ChatWorkspaceSection actions', () => {
     expect(onNavigate).toHaveBeenCalledTimes(1)
     unmountFocused()
 
-    const { unmount: unmountRecent } = renderSection([workspace], null, undefined, 'recent')
+    const { unmount: unmountRecent } = renderSection([workspace], undefined, 'recent')
     expectCappedSidebar()
     await user.click(screen.getByRole('button', { name: 'View all 9 conversations' }))
     dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
@@ -563,7 +559,7 @@ describe('ChatWorkspaceSection actions', () => {
         params: { wsId: chatWorkspace.id, sessionId: 'chat-session-1', source: 'chat' },
       },
     }
-    renderSection([workspace], null, undefined, 'focused')
+    renderSection([workspace], undefined, 'focused')
     expect(screen.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(8)
     expect(screen.getByRole('button', { name: 'Conversation 1' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Conversation 2' })).toBeNull()
@@ -583,7 +579,7 @@ describe('ChatWorkspaceSection actions', () => {
       sessions: Array.from({ length: 8 }, (_, index) => chatSession(index + 1)),
     }
 
-    renderSection([workspace], null, undefined, 'focused')
+    renderSection([workspace], undefined, 'focused')
 
     expect(screen.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(8)
     expect(screen.queryByRole('button', { name: /View all \d+ conversations/ })).toBeNull()
@@ -650,7 +646,7 @@ describe('ChatWorkspaceSection actions', () => {
         lastActiveAt: '2026-08-03T02:00:00.000Z',
       },
     ]
-    renderSection([{ ...chatWorkspace, sessions }], null, undefined, 'focused')
+    renderSection([{ ...chatWorkspace, sessions }], undefined, 'focused')
 
     const runningSection = screen.getByRole('region', { name: 'Running in background' })
     expect(within(runningSection).getByText('Scan Open')).toBeTruthy()
@@ -680,7 +676,7 @@ describe('ChatWorkspaceSection actions', () => {
         title: 'Current thesis',
       }],
     }
-    renderSection([olderWorkspace, currentWorkspace], null, undefined, 'focused')
+    renderSection([olderWorkspace, currentWorkspace], undefined, 'focused')
 
     const trigger = screen.getByRole('button', { name: 'Chat Workspace options' })
     fireEvent.click(trigger)
@@ -705,85 +701,9 @@ describe('ChatWorkspaceSection actions', () => {
     expect(document.activeElement).toBe(trigger)
   })
 
-  it('owns Manager Session navigation and lifecycle actions under the Manager entry', async () => {
-    const user = userEvent.setup()
-    const onNavigate = vi.fn()
-    const manager: ManagerWorkspaceSnapshot = {
-      id: MANAGER_WORKSPACE_ID,
-      tag: 'Workspace Manager',
-      activeWorkspaceCount: 2,
-      sessions: [
-        {
-          id: 'manager-opencode',
-          wsId: MANAGER_WORKSPACE_ID,
-          agent: 'opencode',
-          name: 'o1',
-          createdAt: '2026-07-16T00:00:00.000Z',
-          lastActiveAt: '2026-07-16T00:02:00.000Z',
-          state: 'running',
-          surface: 'terminal',
-          resumeId: 'resume-opencode',
-          pid: 42,
-          startedAt: 1,
-          title: 'Inspect the floor',
-        },
-        {
-          id: 'manager-pi',
-          wsId: MANAGER_WORKSPACE_ID,
-          agent: 'pi',
-          name: 'p1',
-          createdAt: '2026-07-16T00:00:00.000Z',
-          lastActiveAt: '2026-07-16T00:01:00.000Z',
-          state: 'paused',
-          surface: 'webpi',
-          resumeId: 'resume-pi',
-          pid: null,
-          startedAt: null,
-          title: 'Coordinate owners',
-        },
-      ],
-    }
-
-    renderSection([], manager, onNavigate)
-
-    const managerButton = screen.getByRole('button', { name: 'Workspace Manager' })
-    const managerSection = managerButton.parentElement?.parentElement
-    expect(managerSection).toBeTruthy()
-    const managerUi = within(managerSection as HTMLElement)
-
-    expect(managerUi.queryByRole('button', { name: 'Inspect the floor' })).toBeNull()
-    fireEvent.click(managerUi.getByRole('button', { name: 'Expand sessions' }))
-
-    const runningSession = managerUi.getByRole('button', { name: 'Inspect the floor' })
-    const pausedSession = managerUi.getByRole('button', { name: 'Coordinate owners' })
-
-    fireEvent.click(runningSession)
-    expect(openOrFocus).toHaveBeenCalledWith({
-      kind: 'workspace-manager',
-      params: { sessionId: 'manager-opencode' },
-    })
-    expect(onNavigate).toHaveBeenCalledTimes(1)
-
-    fireEvent.click(managerUi.getByRole('button', { name: 'Stop Inspect the floor' }))
-    expect(actions.pauseSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-opencode')
-    expect(onNavigate).toHaveBeenCalledTimes(1)
-
-    fireEvent.click(managerUi.getByRole('button', { name: 'Resume Coordinate owners' }))
-    expect(actions.openWebSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-pi')
-    expect(onNavigate).toHaveBeenCalledTimes(2)
-
-    const pausedRow = pausedSession.parentElement
-    expect(pausedRow).toBeTruthy()
-    const managerMore = within(pausedRow as HTMLElement).getByRole('button', { name: 'More actions for Coordinate owners' })
-    managerMore.focus()
-    await user.keyboard('{ArrowDown}')
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Coordinate owners' }))
-    expect(actions.requestDeleteSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-pi')
-    expect(onNavigate).toHaveBeenCalledTimes(2)
-
-    fireEvent.click(managerUi.getByRole('button', { name: 'Collapse sessions' }))
-    expect(managerUi.queryByRole('button', { name: 'Inspect the floor' })).toBeNull()
-    expect(onNavigate).toHaveBeenCalledTimes(2)
+  it('does not render the retired Workspace Manager row in the Chat sidebar', () => {
+    renderSection([chatWorkspace])
+    expect(screen.queryByRole('button', { name: 'Workspace Manager' })).toBeNull()
   })
 
   it('confirms before archiving a running interactive Session and stops it first', async () => {
@@ -794,7 +714,7 @@ describe('ChatWorkspaceSection actions', () => {
       pid: 99,
       startedAt: Date.parse('2026-07-01T12:00:00.000Z'),
     }
-    renderSection([{ ...chatWorkspace, sessions: [running] }], null, undefined, 'focused')
+    renderSection([{ ...chatWorkspace, sessions: [running] }], undefined, 'focused')
 
     const more = screen.getByRole('button', { name: 'More actions for Conversation 1' })
     more.focus()
@@ -838,7 +758,7 @@ describe('ChatWorkspaceSection actions', () => {
       latestExecution: { taskId: 'run-1', status: 'running', startedAt: 1 } }
     directoryState.directories = new Map([[chatWorkspace.id, { sessions: [entry] }]])
     const workspaces = [{ ...chatWorkspace, sessions: [session] }]
-    const rendered = renderSection(workspaces, null, undefined, 'focused', 'navigation')
+    const rendered = renderSection(workspaces, undefined, 'focused', 'navigation')
     fireEvent.click(screen.getByRole('button', { name: '1 running' }))
     fireEvent.click(screen.getByRole('button', { name: 'Conversation 1' }))
     expect(screen.getByRole('dialog')).toBeTruthy()
@@ -928,7 +848,7 @@ describe('ChatWorkspaceSection actions', () => {
       ],
     }
 
-    renderSection([headlessWorkspace], null, onNavigate, 'focused')
+    renderSection([headlessWorkspace], onNavigate, 'focused')
 
     const runningSection = screen.getByRole('region', { name: 'Running in background' })
     expect(within(runningSection).getByText('Scan Open')).toBeTruthy()
@@ -985,7 +905,7 @@ describe('ChatWorkspaceSection actions', () => {
         },
       ],
     }
-    renderSection([hiddenWorkspace], null, undefined, 'focused')
+    renderSection([hiddenWorkspace], undefined, 'focused')
     expect(screen.getByRole('button', { name: 'Interactive thesis' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'x1' })).toBeNull()
   })
@@ -1026,7 +946,7 @@ describe('ChatWorkspaceSection actions', () => {
         },
       ],
     }
-    renderSection([pausedWorkspace], null, undefined, 'focused')
+    renderSection([pausedWorkspace], undefined, 'focused')
 
     fireEvent.click(screen.getByRole('button', { name: 'Chat Workspace options' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Browse all conversations' }))
@@ -1182,7 +1102,6 @@ describe('ChatWorkspaceSection actions', () => {
 
     const { unmount: unmountFocused } = renderSection(
       [focusedWorkspace, otherWorkspace],
-      null,
       undefined,
       'focused',
     )
@@ -1193,7 +1112,6 @@ describe('ChatWorkspaceSection actions', () => {
 
     const { unmount: unmountRecent } = renderSection(
       [focusedWorkspace, otherWorkspace],
-      null,
       undefined,
       'recent',
     )
@@ -1203,7 +1121,7 @@ describe('ChatWorkspaceSection actions', () => {
     expect(screen.getByText('Conversation · chat-aug3')).toBeTruthy()
     unmountRecent()
 
-    renderSection([focusedWorkspace, otherWorkspace], null, undefined, 'multi')
+    renderSection([focusedWorkspace, otherWorkspace], undefined, 'multi')
     expectSharedTitles()
     expect(screen.getByRole('button', { name: longCjk })).toBeTruthy()
     expect(screen.getAllByText('Issue')).toHaveLength(2)

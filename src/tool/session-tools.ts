@@ -8,6 +8,7 @@ import { z } from 'zod'
 
 import { MODEL_REASONING_EFFORTS } from '../ai-providers/model-semantics.js'
 import type { WorkspaceToolFactory } from '../core/workspace-tool-center.js'
+import { COMMANDER_WORKSPACE_ID } from '../workspaces/commander-workspace.js'
 
 const errMsg = (err: unknown): string => err instanceof Error ? err.message : String(err)
 
@@ -18,12 +19,12 @@ export const sessionListFactory: WorkspaceToolFactory = {
       description: [
         "List product Sessions with their presence, agent, and unread mailbox count.",
         '',
-        "Defaults to this Workspace's active Sessions. From the workspace-manager",
+        "Defaults to this Workspace's active Sessions. From the commander",
         'context, omitting wsId aggregates across every registered Workspace.',
         'Pass state "deleted" to inspect archived Sessions or "all" for both.',
       ].join('\n'),
       inputSchema: z.object({
-        wsId: z.string().min(1).optional().describe('Workspace id. Defaults to this Workspace; omit only from workspace-manager to aggregate.'),
+        wsId: z.string().min(1).optional().describe('Workspace id. Defaults to this Workspace; omit only from commander to aggregate.'),
         state: z.enum(['active', 'deleted', 'all']).optional().describe('Presence filter (default "active").'),
         limit: z.coerce.number().int().min(1).max(100).optional().describe('Newest Sessions to return (default 50).'),
       }),
@@ -43,9 +44,9 @@ export const sessionListFactory: WorkspaceToolFactory = {
               .map((s) => ({ ...s, unreadMailboxCount: ctx.sessionControl?.unreadCount(String(s['resumeId'])) ?? 0 }))
 
           const targetWsId = wsId ?? ctx.workspaceId
-          if (!wsId && ctx.workspaceId === 'workspace-manager') {
+          if (!wsId && ctx.workspaceId === COMMANDER_WORKSPACE_ID) {
             if (!ctx.workspaceInventory) {
-              return { ok: false as const, error: 'workspace-manager requires --ws-id (workspace inventory unavailable in this context)' }
+              return { ok: false as const, error: 'commander requires --ws-id (workspace inventory unavailable in this context)' }
             }
             const inventory = await ctx.workspaceInventory()
             const workspaces = await Promise.all(inventory.map(async (meta) => {

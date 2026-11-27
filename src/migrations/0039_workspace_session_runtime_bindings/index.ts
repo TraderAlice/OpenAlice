@@ -2,7 +2,7 @@ import { copyFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 import type { SessionRuntimeBinding } from '../../workspaces/cli-adapter.js'
-import { MANAGER_WORKSPACE_ID } from '../../workspaces/manager-workspace.js'
+import { LEGACY_MANAGER_WORKSPACE_ID } from '../../workspaces/commander-workspace.js'
 import type { Migration } from '../types.js'
 
 interface LegacyResumeRecord extends Record<string, unknown> {
@@ -167,7 +167,7 @@ function sessionPath(
   record: LegacyResumeRecord,
 ): string {
   const fileName = assertedFileName(record.resumeId)
-  if (record.wsId === MANAGER_WORKSPACE_ID) {
+  if (record.wsId === LEGACY_MANAGER_WORKSPACE_ID) {
     return join(launcherRoot, 'state', 'workspace-manager-sessions', fileName)
   }
   const location = locations.get(record.wsId)

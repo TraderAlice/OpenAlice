@@ -11,6 +11,7 @@ vi.mock('../../auth/AuthContext', () => ({ useBackendRecoverySignal: () => ({ ba
 import '../../i18n'
 import { i18n } from '../../i18n'
 import { WorkspacePlanStore } from '../../lib/updates/workspacePlans'
+import { useWorkspace } from '../../tabs/store'
 import { VersionOverviewSection } from './VersionOverviewSection'
 beforeAll(async () => { await i18n.changeLanguage('en') })
 beforeEach(async () => {
@@ -29,8 +30,10 @@ beforeEach(async () => {
   }
 })
 afterEach(() => { cleanup(); vi.clearAllMocks(); Reflect.deleteProperty(window, 'openAlice') })
-it('shows three parent objects with optional read-only default content, without selection or a chooser', () => {
+it('shows three parent objects when expanded, with optional read-only default content, without selection or a chooser', () => {
   render(<VersionOverviewSection />)
+  expect(screen.queryByRole('heading', { level: 3 })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Version details' }))
   expect(screen.getAllByRole('heading', { level: 3 }).map(node => node.textContent)).toEqual(['App', 'Backend', 'Alice Project'])
   expect(screen.queryByText('my-chat')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'Project details' }))
@@ -43,6 +46,7 @@ it('shows three parent objects with optional read-only default content, without 
 })
 it('prepares the project directly, then requires one explicit update action', async () => {
   render(<VersionOverviewSection />)
+  fireEvent.click(screen.getByRole('button', { name: 'Version details' }))
   fireEvent.click(within(document.getElementById('settings-version-project')!).getByRole('button', { name: 'View update' }))
   await waitFor(() => expect(mocks.updates.review).toHaveBeenCalledWith({ client: false, backend: false, projectUnits: ['template:chat'] }))
   const apply = await screen.findByRole('button', { name: 'Update Alice Project' })
@@ -56,6 +60,7 @@ it('keeps a stale review response from approving a changed default', async () =>
   let finish!: (value: unknown) => void
   mocks.updates.review.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
   const { rerender } = render(<VersionOverviewSection />)
+  fireEvent.click(screen.getByRole('button', { name: 'Version details' }))
   fireEvent.click(within(document.getElementById('settings-version-project')!).getByRole('button', { name: 'View update' }))
   mocks.updates.projectWorkspaces[0] = { ...mocks.updates.projectWorkspaces[0], workspace: null }
   rerender(<VersionOverviewSection />)
@@ -63,10 +68,14 @@ it('keeps a stale review response from approving a changed default', async () =>
   await waitFor(() => expect(screen.getByRole('button', { name: 'Update Alice Project' }).hasAttribute('disabled')).toBe(true))
   expect(mocks.updates.approve).not.toHaveBeenCalled()
 })
-it('opens native confirmation directly, without a second review step', async () => {
+it('opens native confirmation directly from the Bento hero CTA or expanded App row', async () => {
+  mocks.updates.versionInfo = { current: '0.94.1', latest: '0.94.1', hasUpdate: false, channel: 'stable', updateAuthority: 'cli' }
+  mocks.updates.workspaceStates = [{ workspaceId: 'chat', template: 'chat', phase: 'current', fromVersion: '2' }]
   mocks.updates.nativeReady = { phase: 'downloaded', version: '0.94.2' }
   render(<VersionOverviewSection />)
-  fireEvent.click(within(document.getElementById('settings-version-app')!).getByRole('button', { name: 'View update' }))
+  expect(screen.getByText('v0.94.2')).toBeTruthy()
+  expect(screen.getByText('Update ready')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'View update' }))
   expect(mocks.install).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'Restart and update' }))
   await waitFor(() => expect(mocks.install).toHaveBeenCalledOnce())
@@ -98,6 +107,7 @@ it('renders successful current discovery even if an old plan cache contains a fa
   mocks.updates.workspaceStates = [{ workspaceId: 'chat', template: 'chat', phase: 'current', fromVersion: '2' }]
   await mocks.updates.workspacePlans.resource({ kind: 'template', workspaceId: 'chat' }).check(async () => { throw new Error('old preview failure') })
   render(<VersionOverviewSection />)
+  fireEvent.click(screen.getByRole('button', { name: 'Version details' }))
   const project = within(document.getElementById('settings-version-project')!)
   expect(project.getByText('Up to date')).toBeTruthy()
   expect(project.queryByText('Needs attention')).toBeNull()
@@ -129,4 +139,79 @@ it('does not offer installation from a retained candidate after discovery fails'
   const app = within(document.getElementById('settings-version-app')!)
   expect(app.getByText('Update check failed')).toBeTruthy()
   expect(app.queryByRole('button', { name: 'View update' })).toBeNull()
+})
+
+it('collapses version rows into a calm Bento KPI tile when up to date and toggles details on demand', () => {
+  mocks.updates.versionInfo = { current: '0.94.1', latest: '0.94.1', hasUpdate: false, channel: 'stable', updateAuthority: 'cli' }
+  mocks.updates.workspaceStates = [{ workspaceId: 'chat', template: 'chat', phase: 'current', fromVersion: '2' }]
+  render(<VersionOverviewSection />)
+
+  expect(screen.getByText('v0.94.1')).toBeTruthy()
+  expect(screen.getByText('Current')).toBeTruthy()
+  expect(document.getElementById('settings-version-app')).toBeNull()
+  expect(document.getElementById('settings-version-backend')).toBeNull()
+  expect(document.getElementById('settings-version-project')).toBeNull()
+
+  const toggle = screen.getByRole('button', { name: 'Version details' })
+  expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  fireEvent.click(toggle)
+
+  expect(screen.getByRole('button', { name: 'Hide details' }).getAttribute('aria-expanded')).toBe('true')
+  expect(screen.getAllByRole('heading', { level: 3 }).map(node => node.textContent)).toEqual(['App', 'Backend', 'Alice Project'])
+
+  fireEvent.click(screen.getByRole('button', { name: 'Hide details' }))
+  expect(document.getElementById('settings-version-app')).toBeNull()
+})
+
+it('opens the Update preferences dialog cleanly even with partial update mocks', async () => {
+  const savePreferences = vi.fn(async () => undefined)
+  const saveClientPreferences = vi.fn(async () => undefined)
+  mocks.updates.client = {
+    kind: 'cli',
+    currentVersion: '0.94.1',
+    preferences: { autoCheck: true },
+    discovery: { value: { status: 'current', channel: 'stable' } },
+  }
+  mocks.updates.preferences = { autoCheckApp: true, autoUpdateAutoQuant: false, autoUpdateAutoPrediction: false }
+  mocks.updates.savePreferences = savePreferences
+  mocks.updates.saveClientPreferences = saveClientPreferences
+
+  render(<VersionOverviewSection />)
+  fireEvent.click(screen.getByRole('button', { name: 'Update preferences' }))
+
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByText('Update preferences')).toBeTruthy()
+  const appToggle = within(dialog).getByRole('switch', { name: 'Check this app for updates automatically' })
+  expect(appToggle.getAttribute('aria-checked')).toBe('true')
+  fireEvent.click(appToggle)
+  await waitFor(() => expect(saveClientPreferences).toHaveBeenCalledWith({ autoCheck: false }))
+
+  const quantToggle = within(dialog).getByRole('switch', { name: 'Auto-update Auto Quant' })
+  fireEvent.click(quantToggle)
+  await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({
+    autoCheckApp: true,
+    autoUpdateAutoQuant: true,
+    autoUpdateAutoPrediction: false,
+  }))
+})
+
+it('shows the Bento environment tile and navigates to Machines on Manage in Machines', () => {
+  const openOrFocus = vi.spyOn(useWorkspace.getState(), 'openOrFocus')
+  render(<VersionOverviewSection />)
+
+  expect(screen.getByText('Railway Linux')).toBeTruthy()
+  expect(screen.getByText('Main Cloud')).toBeTruthy()
+  expect(screen.getByText('Connected')).toBeTruthy()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Manage in Machines' }))
+  expect(openOrFocus).toHaveBeenCalledWith({ kind: 'settings', params: { category: 'machines' } })
+  openOrFocus.mockRestore()
+})
+
+it('expands the breakdown when multiple components have updates and hero View update is clicked', () => {
+  render(<VersionOverviewSection />)
+  expect(document.getElementById('settings-version-backend')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'View update' }))
+  expect(document.getElementById('settings-version-backend')).toBeTruthy()
+  expect(document.getElementById('settings-version-project')).toBeTruthy()
 })

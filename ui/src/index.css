@@ -1722,45 +1722,45 @@ html[lang="ja"] .oa-onboarding-title {
   border-top-right-radius: 0 !important;
 }
 
-/* Workspace Manager lives beside both the activity rail and the Ask Alice
-   sidebar, so viewport breakpoints overestimate the width it can actually use.
-   Size the layout against the page container and keep every grid track
-   shrinkable so long conversation titles cannot force horizontal overflow. */
-.workspace-manager-layout {
-  container: workspace-manager-layout / inline-size;
+/* Commander adapts to both full-width views and narrow split panes using
+   container queries so header metadata and starter cards never overflow. */
+.commander-page {
+  container: commander-page / inline-size;
 }
 
-.workspace-manager-suggestions {
+.commander-layout {
+  container: commander-layout / inline-size;
+}
+
+.commander-starters-section {
+  container: commander-starters / inline-size;
+}
+
+.commander-starters {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.workspace-manager-suggestions-section {
-  container: workspace-manager-suggestions / inline-size;
+.commander-topbar-meta {
+  display: none;
 }
 
-@container workspace-manager-layout (min-width: 34rem) {
-  .workspace-manager-composer-actions {
+@container commander-page (min-width: 34rem) {
+  .commander-topbar-meta {
+    display: inline-flex;
+  }
+}
+
+@container commander-layout (min-width: 34rem) {
+  .commander-composer-actions {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
   }
 }
 
-@container workspace-manager-layout (min-width: 48rem) {
-  .workspace-manager-hero {
-    flex-direction: row;
-    align-items: flex-end;
-    justify-content: space-between;
-  }
-
-  .workspace-manager-stats {
-    width: 18rem;
-  }
-}
-
-@container workspace-manager-suggestions (min-width: 34rem) {
-  .workspace-manager-suggestions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@container commander-starters (min-width: 40rem) {
+  .commander-starters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

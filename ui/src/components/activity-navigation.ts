@@ -1,6 +1,7 @@
 import {
   BarChart3,
   Building2,
+  Compass,
   Inbox,
   LineChart,
   ListChecks,
@@ -24,6 +25,7 @@ import {
 
 type NavItemKey =
   | 'nav.quickStart'
+  | 'nav.item.commander'
   | 'nav.item.inbox' | 'nav.item.tracked' | 'nav.item.chat' | 'nav.item.autoQuant' | 'nav.item.autoPrediction' | 'nav.item.workspaces'
   | 'nav.item.market' | 'nav.item.office' | 'nav.item.issue'
   | 'nav.item.trading' | 'nav.item.connectors' | 'nav.item.automation'
@@ -80,6 +82,7 @@ export const NAV_SECTIONS: NavSection[] = [
     sectionLabel: '',
     items: [
       { page: 'chat',       labelKey: 'nav.quickStart',      icon: SquarePen, defaultTab: { kind: 'quick-start', params: {} } },
+      { page: 'commander',  labelKey: 'nav.item.commander',  icon: Compass, defaultTab: { kind: 'commander', params: {} } },
       { page: 'inbox',      labelKey: 'nav.item.inbox',      icon: Inbox, defaultTab: { kind: 'inbox', params: {} } },
       { page: 'issue',      labelKey: 'nav.item.issue',      icon: ListChecks, defaultTab: { kind: 'issue', params: {} } },
       { page: 'auto-quant', labelKey: 'nav.item.autoQuant',  icon: Microscope, defaultTab: { kind: 'auto-quant-landing', params: {} } },

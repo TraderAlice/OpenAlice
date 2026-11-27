@@ -205,9 +205,37 @@ export class AgentConversationLog {
     readonly page?: number
     readonly pageSize?: number
   } = {}): Promise<AgentConversationQueryResult> {
-    await this.appendChain
     const page = Math.max(1, Math.floor(opts.page ?? 1))
     const pageSize = Math.min(100, Math.max(1, Math.floor(opts.pageSize ?? 50)))
+    const all = (await this.readJoinedRecords()).sort((a, b) => b.dispatchedAt - a.dispatchedAt)
+    const total = all.length
+    const totalPages = Math.max(1, Math.ceil(total / pageSize))
+    const start = (page - 1) * pageSize
+    return {
+      entries: all.slice(start, start + pageSize),
+      total,
+      page,
+      pageSize,
+      totalPages,
+    }
+  }
+
+  /** Read UI-safe joined records overlapping `[fromMs, toMs]`, oldest-first. */
+  async queryWindow(opts: {
+    readonly fromMs: number
+    readonly toMs: number
+    readonly limit?: number
+  }): Promise<AgentConversationRecord[]> {
+    const now = Date.now()
+    const limit = Math.max(1, Math.floor(opts.limit ?? 300))
+    const records = (await this.readJoinedRecords())
+      .filter((rec) => rec.dispatchedAt <= opts.toMs && (rec.completedAt ?? now) >= opts.fromMs)
+      .sort((a, b) => a.dispatchedAt - b.dispatchedAt)
+    return records.length > limit ? records.slice(records.length - limit) : records
+  }
+
+  private async readJoinedRecords(): Promise<AgentConversationRecord[]> {
+    await this.appendChain
     const events = await this.readEvents()
     const completions = new Map<string, AgentConversationCompletedEvent>()
     const dispatches: AgentConversationDispatchedEvent[] = []
@@ -219,36 +247,24 @@ export class AgentConversationLog {
       }
     }
 
-    const all = dispatches
-      .map((dispatch): AgentConversationRecord => {
-        const completion = completions.get(dispatch.taskId)
-        return {
-          taskId: dispatch.taskId,
-          ...(dispatch.parentTaskId ? { parentTaskId: dispatch.parentTaskId } : {}),
-          dispatchedAt: dispatch.at,
-          ...(completion ? { completedAt: completion.at } : {}),
-          status: completion?.status ?? 'running',
-          source: publicConversationSource(dispatch.source),
-          target: dispatch.target,
-          requestedTarget: dispatch.requestedTarget,
-          resolution: dispatch.resolution,
-          prompt: dispatch.prompt,
-          assistantText: completion?.assistantText ?? null,
-          ...(completion?.durationMs !== undefined ? { durationMs: completion.durationMs } : {}),
-          ...(completion?.error ? { error: completion.error } : {}),
-        }
-      })
-      .sort((a, b) => b.dispatchedAt - a.dispatchedAt)
-    const total = all.length
-    const totalPages = Math.max(1, Math.ceil(total / pageSize))
-    const start = (page - 1) * pageSize
-    return {
-      entries: all.slice(start, start + pageSize),
-      total,
-      page,
-      pageSize,
-      totalPages,
-    }
+    return dispatches.map((dispatch): AgentConversationRecord => {
+      const completion = completions.get(dispatch.taskId)
+      return {
+        taskId: dispatch.taskId,
+        ...(dispatch.parentTaskId ? { parentTaskId: dispatch.parentTaskId } : {}),
+        dispatchedAt: dispatch.at,
+        ...(completion ? { completedAt: completion.at } : {}),
+        status: completion?.status ?? 'running',
+        source: publicConversationSource(dispatch.source),
+        target: dispatch.target,
+        requestedTarget: dispatch.requestedTarget,
+        resolution: dispatch.resolution,
+        prompt: dispatch.prompt,
+        assistantText: completion?.assistantText ?? null,
+        ...(completion?.durationMs !== undefined ? { durationMs: completion.durationMs } : {}),
+        ...(completion?.error ? { error: completion.error } : {}),
+      }
+    })
   }
 
   private async append(event: AgentConversationLogEvent): Promise<void> {

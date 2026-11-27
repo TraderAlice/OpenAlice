@@ -3,7 +3,7 @@ import type { IssueListItem } from '../api/issues'
 export const ISSUE_COLUMNS = ['id', 'status', 'priority', 'workspace', 'schedule', 'assignee'] as const
 export type IssueColumn = typeof ISSUE_COLUMNS[number]
 export interface IssueListView {
-  tab: 'active' | 'backlog' | 'all'
+  tab: 'active' | 'backlog' | 'all' | 'dispatch'
   query: string
   statuses: string[]
   priorities: string[]
@@ -40,7 +40,7 @@ export function readIssueView(): IssueListView {
   try {
     const saved = JSON.parse(localStorage.getItem('openalice-issue-list-view') || '{}')
     const next = { ...DEFAULT_ISSUE_VIEW }
-    for (const [key, values] of Object.entries({ tab: ['active', 'backlog', 'all'], grouping: ['status', 'priority', 'workspace', 'none'], ordering: ['importance', 'priority', 'title', 'due'] })) {
+    for (const [key, values] of Object.entries({ tab: ['active', 'backlog', 'all', 'dispatch'], grouping: ['status', 'priority', 'workspace', 'none'], ordering: ['importance', 'priority', 'title', 'due'] })) {
       if (values.includes(saved[key])) Object.assign(next, { [key]: saved[key] })
     }
     if (typeof saved.completed === 'boolean') next.completed = saved.completed

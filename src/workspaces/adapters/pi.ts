@@ -387,8 +387,10 @@ export const piAdapter: CliAdapter = {
   ): readonly string[] {
     return [
       ...piCommandHead(_ctx.env),
-      ...piHeadlessApproveArgs(_ctx.env),
+      ...(_ctx.approveProject ? ['--approve'] : piHeadlessApproveArgs(_ctx.env)),
       ...(_ctx.sessionRuntime?.headlessArgs ?? []),
+      ...(_ctx.appendSystemPrompt ? ['--append-system-prompt', _ctx.appendSystemPrompt] : []),
+      ...(_ctx.skills ?? []).flatMap((path) => ['--skill', path]),
       ...(_ctx.resume === 'last'
         ? ['--continue']
         : _ctx.resume

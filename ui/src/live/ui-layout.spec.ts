@@ -94,11 +94,42 @@ describe('ui-layout document', () => {
     expect(saved).toEqual(original)
     expect(layout.groups.map(group => group.id)).toEqual(['custom:desk', 'primary', 'system'])
     expect(layout.groups[0]).toEqual(saved.groups[1])
-    expect(layout.groups[1].items).toEqual([...saved.groups[2].items, 'connectors', 'prediction'])
+    expect(layout.groups[1].items).toEqual([
+      'market', 'chat', 'commander', 'inbox', 'issue', 'auto-quant', 'tracked', 'connectors', 'prediction',
+    ])
     expect(layout.hidden).toEqual(['prediction'])
     expect(normalizeUiLayout(layout)).toEqual(layout)
     expect(normalizeUiLayout(defaultUiLayout())).toEqual(defaultUiLayout())
     const reordered = movePage(layout, 'prediction', 'primary', 1)
     expect(reordered.groups[1].items.slice(0, 3)).toEqual(['market', 'prediction', 'chat'])
+  })
+
+  it('splices unseen commander immediately after chat inside primary for existing saved layouts', () => {
+    const saved = {
+      version: 1,
+      groups: [
+        { id: 'primary', items: ['chat', 'inbox', 'issue', 'auto-quant', 'tracked', 'market', 'prediction', 'office', 'portfolio', 'connectors'] },
+        { id: 'system', items: ['workspaces', 'automation'] },
+      ],
+      hidden: [],
+    }
+    const layout = normalizeUiLayout(saved)
+    const primary = layout.groups.find((group) => group.id === 'primary')
+    expect(primary?.items.slice(0, 3)).toEqual(['chat', 'commander', 'inbox'])
+  })
+
+  it('appends unseen commander to primary when chat lives in a custom group', () => {
+    const saved = {
+      version: 1,
+      groups: [
+        { id: 'custom:pinned', label: 'Pinned', items: ['chat'] },
+        { id: 'primary', items: ['inbox', 'issue'] },
+      ],
+      hidden: [],
+    }
+    const layout = normalizeUiLayout(saved)
+    const primary = layout.groups.find((group) => group.id === 'primary')
+    expect(primary?.items).toContain('commander')
+    expect(primary?.items.indexOf('commander')).toBe(2)
   })
 })

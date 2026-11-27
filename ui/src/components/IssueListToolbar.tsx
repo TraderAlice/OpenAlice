@@ -1,4 +1,5 @@
-import { Filter, SlidersHorizontal, List, ChevronDown, Search, X } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Activity, Filter, SlidersHorizontal, List, ChevronDown, Search, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { SegmentedControl } from './SegmentedControl'
 import { CountBadge } from './CountBadge'
@@ -23,13 +24,15 @@ function Choice({ label, value, choices, onChange }: { label: string; value: str
   </div>
 }
 
-export function IssueListToolbar({ view, onChange, workspaces, visible, total }: {
+export function IssueListToolbar({ view, onChange, workspaces, visible, total, rightSlot, dispatchRunningCount = 0 }: {
   view: IssueListView; onChange: (patch: Partial<IssueListView>) => void
   workspaces: { id: string; label: string }[]; visible: number; total: number
+  rightSlot?: ReactNode; dispatchRunningCount?: number
 }) {
   const { t } = useTranslation()
   const label = (key: string) => t(`issues.view.${key}` as 'issues.view.all')
   const choices = (values: string[]) => values.map((value) => ({ value, label: label(value === 'all' ? 'anyValue' : value) }))
+  const isDispatch = view.tab === 'dispatch'
   const count = view.statuses.length + view.priorities.length + Number(Boolean(view.workspace)) + Number(view.assignee !== 'all') + Number(view.schedule !== 'all') + Number(Boolean(view.query))
   const clear = () => onChange({ query: '', statuses: [], priorities: [], workspace: '', assignee: 'all', schedule: 'all' })
   return <div className="sticky top-0 z-20 bg-background pb-2 pt-1">
@@ -37,8 +40,27 @@ export function IssueListToolbar({ view, onChange, workspaces, visible, total }:
       <div className="flex min-w-0 items-center gap-2">
         <SegmentedControl value={view.tab} onChange={(tab) => onChange({ tab })} ariaLabel={label('views')}
           options={(['active', 'backlog', 'all'] as const).map((value) => ({ value, label: label(value) }))} />
-        <CountBadge count={visible} label={t('issues.view.results', { count: visible, total })} />
+        {!isDispatch && <CountBadge count={visible} label={t('issues.view.results', { count: visible, total })} />}
+        <span className="mx-0.5 h-4 w-px bg-border" aria-hidden />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-pressed={isDispatch}
+          onClick={() => onChange({ tab: 'dispatch' })}
+          className={`rounded-full px-3 font-medium ${isDispatch ? 'bg-muted border-transparent' : 'bg-background'}`}
+        >
+          {dispatchRunningCount > 0 ? (
+            <span className="size-1.5 shrink-0 rounded-full bg-primary animate-pulse motion-reduce:animate-none" aria-hidden />
+          ) : (
+            <Activity size={13} className="shrink-0 text-muted-foreground" aria-hidden />
+          )}
+          {label('dispatch')}
+        </Button>
       </div>
+      {isDispatch ? (
+        rightSlot ?? null
+      ) : (
       <div className="ml-auto flex items-center gap-1.5">
         <Popover><PopoverTrigger aria-label={label('filter')} title={label('filter')} render={<Button variant="outline" size="sm" className={`px-2 ${count ? 'bg-muted' : ''}`} />}><Filter size={15} /><span className="hidden text-xs sm:inline">{label('filter')}</span>{count > 0 && <CountBadge count={count} label={`${label('filter')}: ${count}`} />}</PopoverTrigger>
           <PopoverContent align="end" className="w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-6rem)] overflow-y-auto space-y-4 p-4">
@@ -66,7 +88,8 @@ export function IssueListToolbar({ view, onChange, workspaces, visible, total }:
           </PopoverContent>
         </Popover>
       </div>
+      )}
     </div>
-    {(count > 0 || visible !== total) && <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground"><span>{t('issues.view.results', { count: visible, total })}</span>{count > 0 && <Button variant="ghost" size="sm" onClick={clear} className="text-xs"><X size={12} />{label('clear')}</Button>}</div>}
+    {!isDispatch && (count > 0 || visible !== total) && <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground"><span>{t('issues.view.results', { count: visible, total })}</span>{count > 0 && <Button variant="ghost" size="sm" onClick={clear} className="text-xs"><X size={12} />{label('clear')}</Button>}</div>}
   </div>
 }

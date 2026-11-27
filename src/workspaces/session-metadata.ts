@@ -8,7 +8,7 @@
  */
 import type { HeadlessInquirySubject } from './headless-task-registry.js'
 
-export type SessionInteractiveSurface = 'spawn' | 'quick-chat' | 'auto-quant' | 'prediction' | 'manager'
+export type SessionInteractiveSurface = 'spawn' | 'quick-chat' | 'auto-quant' | 'prediction' | 'commander' | 'manager'
 
 export type SessionIssueBirthPolicy = 'new-each-run' | 'new-then-resume'
 
@@ -51,6 +51,9 @@ export type SessionCreatedBy =
       readonly reason: SessionConversationBirthReason
       readonly subject?: HeadlessInquirySubject
     }
+  | {
+      readonly kind: 'commander'
+    }
 
 /** Immutable product-Session bag. Birth is first-write-wins. */
 export interface SessionMetadata {
@@ -79,6 +82,7 @@ export function parseSessionCreatedBy(value: unknown): SessionCreatedBy | null {
       || surface === 'quick-chat'
       || surface === 'auto-quant'
       || surface === 'prediction'
+      || surface === 'commander'
       || surface === 'manager'
     ) {
       return { kind: 'interactive', surface }
@@ -117,6 +121,9 @@ export function parseSessionCreatedBy(value: unknown): SessionCreatedBy | null {
       reason,
       ...(subject ? { subject } : {}),
     }
+  }
+  if (kind === 'commander') {
+    return { kind: 'commander' }
   }
   return null
 }
@@ -169,24 +176,24 @@ function parseInquirySubject(value: unknown): HeadlessInquirySubject | null {
     const issueId = record['issueId']
     const relation = record['relation']
     if (
-      typeof workspaceId !== 'string'
-      || workspaceId.length === 0
-      || typeof issueId !== 'string'
-      || issueId.length === 0
-      || (relation !== 'creator' && relation !== 'owner' && relation !== 'run')
+      typeof workspaceId === 'string'
+      && workspaceId.length > 0
+      && typeof issueId === 'string'
+      && issueId.length > 0
+      && (relation === 'creator' || relation === 'owner' || relation === 'run')
     ) {
-      return null
+      const runId = record['runId']
+      const commentId = record['commentId']
+      return {
+        kind: 'issue',
+        workspaceId,
+        issueId,
+        relation,
+        ...(typeof runId === 'string' && runId.length > 0 ? { runId } : {}),
+        ...(typeof commentId === 'string' && commentId.length > 0 ? { commentId } : {}),
+      }
     }
-    const runId = record['runId']
-    const commentId = record['commentId']
-    return {
-      kind: 'issue',
-      workspaceId,
-      issueId,
-      relation,
-      ...(typeof runId === 'string' && runId.length > 0 ? { runId } : {}),
-      ...(typeof commentId === 'string' && commentId.length > 0 ? { commentId } : {}),
-    }
+    return null
   }
   return null
 }

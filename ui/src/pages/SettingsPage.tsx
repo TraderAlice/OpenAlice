@@ -9,13 +9,11 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../componen
 import { ContextHelp } from '../components/ContextHelp'
 import { Toggle } from '../components/Toggle'
 import { SaveIndicator } from '../components/SaveIndicator'
-import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
+import { ConfigSection, SettingsScrollArea } from '../components/form'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { PageHeader } from '../components/PageHeader'
 import { PageLoading, EmptyState } from '../components/StateViews'
 import { useTranslation } from 'react-i18next'
-import { useLocale, useSetLocale, LOCALE_LABELS } from '../i18n/useLocale'
-import { preferencesApi, type WorkspaceShellStatus } from '../api/preferences'
 import {
   DEFAULT_DAY_PALETTE,
   DEFAULT_NIGHT_PALETTE,
@@ -32,12 +30,13 @@ import {
 } from '../theme/styleProfiles'
 import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
 import { VersionOverviewSection } from '../components/settings/VersionOverviewSection'
-import { UpdateLifecycleSection } from '../components/settings/UpdateLifecycleSection'
-import { AliceLocationSection } from '../components/settings/AliceLocationSection'
-import { SelectionCheckIcon } from '../components/ui/selection-check-icon'
+import { OverviewStatusCards } from '../components/settings/OverviewStatusCards'
+import {
+  DataHomeSection,
+  WorkspaceShellSection,
+} from '../components/settings/LocalEnvironmentSections'
 import { Button } from '../components/ui/button'
-import { getBackendConnection } from '../auth/backendConnection'
-import { useRelayConnection } from '../hooks/useRelayConnection'
+import { SelectionCheckIcon } from '../components/ui/selection-check-icon'
 
 // ==================== Appearance ====================
 
@@ -505,248 +504,17 @@ function PalettePicker({
   )
 }
 
-// ==================== Language ====================
+// ==================== Data location & Windows workspace shell ====================
 
-export function LanguageSection() {
-  const { t } = useTranslation()
-  const locale = useLocale()
-  const setLocale = useSetLocale()
-  return (
-    <SegmentedControl
-      value={locale}
-      options={(['en', 'zh', 'ja', 'zh-Hant'] as const).map((value) => ({ value, label: LOCALE_LABELS[value] }))}
-      onChange={setLocale}
-      ariaLabel={t('settings.language.title')}
-    />
-  )
-}
-
-// ==================== Data location ====================
-
-export function DataHomeSection() {
-  const { t } = useTranslation()
-  const bridge = window.openAlice?.dataHome
-  const backendConnection = getBackendConnection()
-  const relay = useRelayConnection()
-  const [status, setStatus] = useState<OpenAliceDataHomeStatus | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!bridge) return
-    bridge.getStatus()
-      .then(setStatus)
-      .catch(() => setError(t('settings.dataHome.loadError')))
-  }, [bridge, t])
-
-  if (!bridge) {
-    return (
-      <ConfigSection
-        title={t('settings.dataHome.title')}
-        help={t('settings.dataHome.description')}
-      >
-        <div className="rounded-lg border border-border/60 bg-secondary/50 px-3 py-3">
-          {relay.status?.target?.machine && relay.status.target.machine !== 'local' ? (
-            <p className="text-sm leading-relaxed text-foreground">
-              {t('settings.dataHome.remoteManaged')}
-            </p>
-          ) : (
-            <>
-              <p className="text-sm text-foreground">{t('settings.dataHome.browserOnly')}</p>
-              <p className="mt-2 break-all font-mono text-sm leading-5 text-muted-foreground">
-                openalice run --home &lt;path&gt;
-              </p>
-              <p className="mt-1 break-all font-mono text-sm leading-5 text-muted-foreground">
-                pnpm dev -- --home &lt;path&gt;
-              </p>
-            </>
-          )}
-        </div>
-      </ConfigSection>
-    )
-  }
-
-  const lockDescription = status?.selectionLock === 'openalice-home-env'
-    ? t('settings.dataHome.lockedByHome')
-    : status?.selectionLock === 'workspace-root-env'
-      ? t('settings.dataHome.lockedByWorkspace')
-      : null
-
-  return (
-    <ConfigSection
-      title={t('settings.dataHome.title')}
-      help={t('settings.dataHome.description')}
-    >
-      <div className="rounded-lg border border-border/60 bg-secondary/50 px-3 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-medium text-muted-foreground">
-            {t('settings.dataHome.current')}
-          </p>
-          {status && (
-            <span className="rounded-full border border-border px-2 py-0.5 text-sm leading-5 text-muted-foreground">
-              {t(`settings.dataHome.source.${status.source}`)}
-            </span>
-          )}
-        </div>
-        <p data-testid="data-home-current" className="mt-1 break-all font-mono text-sm leading-5 text-foreground">
-          {status?.currentHome ?? t('settings.dataHome.loading')}
-        </p>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          {t('settings.dataHome.switchNote')}
-        </p>
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="min-h-10 sm:min-h-8"
-          disabled={!status}
-          onClick={() => void bridge.openCurrent()
-            .then((message) => { if (message) setError(t('settings.dataHome.openError')) })
-            .catch(() => setError(t('settings.dataHome.openError')))}
-        >
-          {t('settings.dataHome.open')}
-        </Button>
-      </div>
-
-      {lockDescription && (
-        <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-sm leading-relaxed text-warning">
-          {lockDescription}
-        </p>
-      )}
-      {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
-    </ConfigSection>
-  )
-}
-
-// ==================== Windows workspace shell ====================
-
-function WorkspaceShellSection() {
-  const { t } = useTranslation()
-  const [status, setStatus] = useState<WorkspaceShellStatus | null>(null)
-  const [mode, setMode] = useState<'auto' | 'custom'>('auto')
-  const [customPath, setCustomPath] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    preferencesApi.getWorkspaceShell()
-      .then((next) => {
-        setStatus(next)
-        if (next.supported) {
-          setMode(next.mode)
-          setCustomPath(next.customPath ?? '')
-        }
-      })
-      .catch(() => setStatus({ supported: false }))
-  }, [])
-
-  if (!status?.supported) return null
-
-  const save = async () => {
-    setSaving(true)
-    setError(null)
-    try {
-      const next = await preferencesApi.saveWorkspaceShell({
-        mode,
-        ...(mode === 'custom' ? { customPath } : { customPath: null }),
-      })
-      setStatus(next)
-      if (next.supported) {
-        setMode(next.mode)
-        setCustomPath(next.customPath ?? '')
-      }
-    } catch {
-      setError(t('settings.workspaceShell.saveError'))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <ConfigSection
-      title={t('settings.workspaceShell.title')}
-      help={t('settings.workspaceShell.description')}
-    >
-      <Field label={t('settings.workspaceShell.mode')}>
-        <Select
-          aria-label={t('settings.workspaceShell.mode')}
-          value={mode}
-          onValueChange={(selectedValue) => setMode(selectedValue as 'auto' | 'custom')}
-          options={[
-            { value: 'auto', label: t('settings.workspaceShell.auto') },
-            { value: 'custom', label: t('settings.workspaceShell.custom') },
-          ]}
-        />
-      </Field>
-      {mode === 'custom' && (
-        <Field
-          label={t('settings.workspaceShell.path')}
-          description={t('settings.workspaceShell.pathDescription')}
-        >
-          <input
-            data-testid="workspace-shell-path"
-            className={`${inputClass} font-mono`}
-            value={customPath}
-            placeholder="C:\\Program Files\\Git\\bin\\bash.exe"
-            onChange={(event) => setCustomPath(event.target.value)}
-          />
-        </Field>
-      )}
-      <div className="rounded-lg border border-border/60 bg-secondary/50 px-3 py-2.5 mb-3">
-        <p className="text-sm font-medium text-muted-foreground">
-          {t('settings.workspaceShell.resolved')}
-        </p>
-        <p className="mt-1 break-all font-mono text-sm leading-5 text-foreground">
-          {status.resolvedPath ?? t('settings.workspaceShell.notFound')}
-        </p>
-        <p className={`mt-1 text-sm ${status.valid ? 'text-success' : 'text-destructive'}`}>
-          {status.valid
-            ? t('settings.workspaceShell.source', { source: status.source })
-            : status.message ?? t('settings.workspaceShell.notFound')}
-        </p>
-      </div>
-      <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          size="sm"
-          className="min-h-10 sm:min-h-8"
-          disabled={saving || (mode === 'custom' && customPath.trim().length === 0)}
-          onClick={() => void save()}
-        >
-          {saving ? t('settings.workspaceShell.saving') : t('settings.workspaceShell.save')}
-        </Button>
-        {error && <span className="text-sm text-destructive">{error}</span>}
-      </div>
-    </ConfigSection>
-  )
-}
+export { DataHomeSection, WorkspaceShellSection }
 
 // ==================== Settings Section ====================
 
 function SettingsSection() {
-  const { t } = useTranslation()
   return (
-    <div className="w-full max-w-[1100px] [&>*+*]:mt-6">
-      <section className="flex flex-wrap items-center justify-between gap-4 px-4 sm:px-6">
-        <div className="flex items-center gap-2">
-          <h3 className="text-base font-semibold">{t('settings.language.title')}</h3>
-          <ContextHelp label={t('settings.language.title')}>{t('settings.language.description')}</ContextHelp>
-        </div>
-        <LanguageSection />
-      </section>
-      <AliceLocationSection />
-
-      {/* Installation and update ownership */}
+    <div className="mx-auto w-full max-w-[1100px] space-y-3.5">
       <VersionOverviewSection />
-      <UpdateLifecycleSection />
-
-      {/* Complete OpenAlice home + runtime lock boundary */}
-      <DataHomeSection />
-
-      {/* Windows-only workspace shell */}
-      <WorkspaceShellSection />
+      <OverviewStatusCards />
     </div>
   )
 }
