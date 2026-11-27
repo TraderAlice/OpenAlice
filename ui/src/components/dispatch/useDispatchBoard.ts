@@ -1,6 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { api, type DispatchBoardSnapshot } from '../../api'
+import {
+  api,
+  type DispatchBoardSnapshot as ApiDispatchBoardSnapshot,
+  type DispatchEdge as ApiDispatchEdge,
+  type DispatchLane as ApiDispatchLane,
+  type DispatchTemplateKind as ApiDispatchTemplateKind,
+} from '../../api'
+
+export const COMMANDER_LANE_ID = 'commander'
+
+export type DispatchTemplateKind = ApiDispatchTemplateKind | 'commander'
+
+export interface DispatchLane extends Omit<ApiDispatchLane, 'templateKind'> {
+  templateKind: DispatchTemplateKind
+}
+
+export interface DispatchEdge extends ApiDispatchEdge {
+  messageKind?: 'scheduled_report'
+}
+
+export interface DispatchBoardSnapshot extends Omit<ApiDispatchBoardSnapshot, 'lanes' | 'edges'> {
+  lanes: readonly DispatchLane[]
+  edges: readonly DispatchEdge[]
+}
 
 export type DispatchWindowPreset = '1h' | '6h' | '24h'
 

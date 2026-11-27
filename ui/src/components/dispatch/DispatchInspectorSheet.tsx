@@ -15,13 +15,9 @@ import {
 
 import type {
   DispatchArtifact,
-  DispatchBoardSnapshot,
-  DispatchEdge,
   DispatchEdgeKind,
-  DispatchLane,
   DispatchScheduleMarker,
   DispatchSpan,
-  DispatchTemplateKind,
 } from '../../api/dispatch'
 import { useWorkspaces } from '../../contexts/workspaces-context'
 import { formatRelativeTime } from '../../lib/intl'
@@ -48,6 +44,13 @@ import {
   resolveSpanTitle,
   spanTriggerIdentity,
 } from './layout'
+import {
+  COMMANDER_LANE_ID,
+  type DispatchBoardSnapshot,
+  type DispatchEdge,
+  type DispatchLane,
+  type DispatchTemplateKind,
+} from './useDispatchBoard'
 
 export type DispatchSelectedItem =
   | { readonly kind: 'span'; readonly item: DispatchSpan; readonly siblings?: readonly DispatchSpan[] }
@@ -95,6 +98,19 @@ export function edgeKindLabel(kind: DispatchEdgeKind, t: TFunction, full = false
   }
 }
 
+export function edgeDisplayLabel(edge: DispatchEdge, t: TFunction, full = false): string {
+  if (edge.messageKind === 'scheduled_report') {
+    return full
+      ? t('dispatch.edgeScheduledReportFull', { defaultValue: 'Scheduled report' })
+      : t('dispatch.edgeScheduledReport', { defaultValue: 'Report' })
+  }
+  return edgeKindLabel(edge.kind, t, full)
+}
+
+function isCommanderWorkspace(wsId: string): boolean {
+  return wsId === COMMANDER_LANE_ID
+}
+
 export function DispatchInspectorSheet({
   selected,
   snapshot,
@@ -123,14 +139,18 @@ export function DispatchInspectorSheet({
     (snapshot?.lanes ?? []).map((lane) => [lane.workspaceId, lane]),
   )
 
-  const laneLabel = (wsId: string) => laneById.get(wsId)?.label ?? wsId
+  const laneLabel = (wsId: string) =>
+    laneById.get(wsId)?.label
+    ?? (isCommanderWorkspace(wsId) ? t('dispatch.commanderBadge', { defaultValue: 'Commander' }) : wsId)
 
   const openSession = (wsId: string, resumeId: string, title?: string) => {
+    if (isCommanderWorkspace(wsId)) return
     setSidebar('chat')
     void openHeadlessRun(wsId, resumeId, title ? { title } : undefined)
   }
 
   const openIssue = (wsId: string, issueId: string) => {
+    if (isCommanderWorkspace(wsId)) return
     setSidebar('issue')
     openOrFocus({ kind: 'issue-detail', params: { wsId, id: issueId } })
   }
@@ -143,6 +163,7 @@ export function DispatchInspectorSheet({
   }
 
   const openReport = (wsId: string, path: string) => {
+    if (isCommanderWorkspace(wsId)) return
     const source = fileViewerSourceForLane(laneById.get(wsId)?.templateKind)
     openOrFocus({
       kind: 'file-viewer',
@@ -347,16 +368,22 @@ function SpanDetail({
             {span.finishedAt ? ` – ${formatClock(span.finishedAt, referenceMs, i18n.language)}` : ' – …'}
           </span>
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="h-7 gap-1.5 text-xs"
-          onClick={() => onOpenSession(span.workspaceId, span.resumeId, span.sessionLabel || span.id)}
-        >
-          <Terminal size={12} aria-hidden />
-          {t('issues.dispatch.openSession')}
-        </Button>
+        {isCommanderWorkspace(span.workspaceId) ? (
+          <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+            {t('dispatch.commanderBadge', { defaultValue: 'Commander' })}
+          </span>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1.5 text-xs"
+            onClick={() => onOpenSession(span.workspaceId, span.resumeId, span.sessionLabel || span.id)}
+          >
+            <Terminal size={12} aria-hidden="true" />
+            {t('issues.dispatch.openSession')}
+          </Button>
+        )}
       </div>
 
       {siblingRuns.length > 1 && siblingIndex !== -1 && (
@@ -532,16 +559,16 @@ function SpanDetail({
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 font-medium text-foreground">
-                    <GitFork size={11} className="shrink-0 text-primary" aria-hidden />
-                    <span>{edgeKindLabel(edge.kind, t, true)}</span>
+                    <GitFork size={11} className="shrink-0 text-primary" aria-hidden="true" />
+                    <span>{edgeDisplayLabel(edge, t, true)}</span>
                     <span className="text-muted-foreground">·</span>
                     <span className="truncate text-muted-foreground">
                       {laneLabel(edge.fromWorkspaceId)} → {laneLabel(edge.toWorkspaceId)}
                     </span>
                   </div>
-                  {(edge.subject || edge.body || edge.spec) && (
+                  {(edge.summary || edge.subject || edge.body || edge.spec) && (
                     <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">
-                      {edge.subject || edge.body || edge.spec}
+                      {edge.summary || edge.subject || edge.body || edge.spec}
                     </p>
                   )}
                 </div>
@@ -598,7 +625,7 @@ function SpanDetail({
               {t('issues.dispatch.openInbox')}
             </Button>
           ))}
-          {relatedArtifacts.filter((art) => art.kind === 'report').slice(0, 1).map((art) => (
+          {relatedArtifacts.filter((art) => art.kind === 'report' && !isCommanderWorkspace(art.workspaceId)).slice(0, 1).map((art) => (
             <Button
               key={art.id}
               type="button"
@@ -606,7 +633,7 @@ function SpanDetail({
               variant="outline"
               onClick={() => onOpenReport(art.workspaceId, art.kind === 'report' ? art.path : '')}
             >
-              <FileText size={12} aria-hidden />
+              <FileText size={12} aria-hidden="true" />
               {t('issues.dispatch.openReport')}
             </Button>
           ))}
@@ -647,8 +674,8 @@ function EdgeDetail({
     <>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-0.5 text-[11px] font-medium text-foreground">
-          <MessageSquare size={11} className="text-primary" aria-hidden />
-          {edgeKindLabel(edge.kind, t, true)}
+          <MessageSquare size={11} className="text-primary" aria-hidden="true" />
+          {edgeDisplayLabel(edge, t, true)}
         </span>
         {deliveryLabel && (
           <span className="text-[11px] text-muted-foreground">
@@ -661,28 +688,52 @@ function EdgeDetail({
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-muted/30 p-3">
         <div className="min-w-0">
           <span className="block text-[10px] text-muted-foreground">{t('issues.dispatch.fromLabel')}</span>
-          <span className="font-medium text-foreground">{laneLabel(edge.fromWorkspaceId)}</span>
+          {isCommanderWorkspace(edge.fromWorkspaceId) ? (
+            <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+              {t('dispatch.commanderBadge', { defaultValue: 'Commander' })}
+            </span>
+          ) : (
+            <span className="font-medium text-foreground">{laneLabel(edge.fromWorkspaceId)}</span>
+          )}
           {edge.fromResumeId && (
-            <button
-              type="button"
-              onClick={() => onOpenSession(edge.fromWorkspaceId, edge.fromResumeId!)}
-              className="ml-1.5 text-[11px] text-primary hover:underline"
-            >
-              {edge.fromResumeId}
-            </button>
+            isCommanderWorkspace(edge.fromWorkspaceId) ? (
+              <span className="ml-1.5 font-mono text-[11px] text-muted-foreground">
+                {edge.fromResumeId}
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onOpenSession(edge.fromWorkspaceId, edge.fromResumeId!)}
+                className="ml-1.5 inline-flex min-h-6 items-center text-[11px] text-primary hover:underline"
+              >
+                {edge.fromResumeId}
+              </button>
+            )
           )}
         </div>
-        <ArrowRight size={13} className="shrink-0 text-muted-foreground" aria-hidden />
+        <ArrowRight size={13} className="shrink-0 text-muted-foreground" aria-hidden="true" />
         <div className="min-w-0">
           <span className="block text-[10px] text-muted-foreground">{t('issues.dispatch.toLabel')}</span>
-          <span className="font-medium text-foreground">{laneLabel(edge.toWorkspaceId)}</span>
-          <button
-            type="button"
-            onClick={() => onOpenSession(edge.toWorkspaceId, edge.toResumeId)}
-            className="ml-1.5 text-[11px] text-primary hover:underline"
-          >
-            {edge.toResumeId}
-          </button>
+          {isCommanderWorkspace(edge.toWorkspaceId) ? (
+            <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+              {t('dispatch.commanderBadge', { defaultValue: 'Commander' })}
+            </span>
+          ) : (
+            <span className="font-medium text-foreground">{laneLabel(edge.toWorkspaceId)}</span>
+          )}
+          {isCommanderWorkspace(edge.toWorkspaceId) ? (
+            <span className="ml-1.5 font-mono text-[11px] text-muted-foreground">
+              {edge.toResumeId}
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onOpenSession(edge.toWorkspaceId, edge.toResumeId)}
+              className="ml-1.5 inline-flex min-h-6 items-center text-[11px] text-primary hover:underline"
+            >
+              {edge.toResumeId}
+            </button>
+          )}
         </div>
       </div>
 
@@ -763,8 +814,11 @@ function EdgeDetail({
           <h4 className="font-medium text-foreground">{t('issues.dispatch.deliverablesTitle')}</h4>
           <div className="space-y-1.5">
             {deliverables.map((del) => {
-              const targetWs = del.workspaceId || edge.fromWorkspaceId
-              return (
+              const targetWs =
+                del.workspaceId
+                || (!isCommanderWorkspace(edge.fromWorkspaceId) ? edge.fromWorkspaceId : edge.toWorkspaceId)
+              const canOpen = !isCommanderWorkspace(targetWs)
+              return canOpen ? (
                 <button
                   key={`${targetWs}:${del.path}`}
                   type="button"
@@ -773,13 +827,26 @@ function EdgeDetail({
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 font-mono text-[11px] text-foreground">
-                      <FileText size={12} className="shrink-0 text-primary" aria-hidden />
+                      <FileText size={12} className="shrink-0 text-primary" aria-hidden="true" />
                       <span className="truncate">{del.path}</span>
                     </div>
                     {del.summary && <p className="mt-0.5 text-[11px] text-muted-foreground">{del.summary}</p>}
                   </div>
-                  <ExternalLink size={12} className="shrink-0 text-muted-foreground" aria-hidden />
+                  <ExternalLink size={12} className="shrink-0 text-muted-foreground" aria-hidden="true" />
                 </button>
+              ) : (
+                <div
+                  key={`${targetWs}:${del.path}`}
+                  className="flex w-full items-center justify-between gap-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-left"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 font-mono text-[11px] text-foreground">
+                      <FileText size={12} className="shrink-0 text-primary" aria-hidden="true" />
+                      <span className="truncate">{del.path}</span>
+                    </div>
+                    {del.summary && <p className="mt-0.5 text-[11px] text-muted-foreground">{del.summary}</p>}
+                  </div>
+                </div>
               )
             })}
           </div>
@@ -806,6 +873,8 @@ function ArtifactDetail({
 }) {
   const { t } = useTranslation()
 
+  const isCommanderArt = isCommanderWorkspace(artifact.workspaceId)
+
   if (artifact.kind === 'report') {
     return (
       <>
@@ -816,18 +885,20 @@ function ArtifactDetail({
         {artifact.summary && (
           <p className="rounded-lg border border-border/70 bg-background p-3 text-foreground">{artifact.summary}</p>
         )}
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" onClick={() => onOpenReport(artifact.workspaceId, artifact.path)}>
-            <FileText size={13} aria-hidden />
-            {t('issues.dispatch.openReport')}
-          </Button>
-          {artifact.resumeId && (
-            <Button type="button" size="sm" variant="outline" onClick={() => onOpenSession(artifact.workspaceId, artifact.resumeId!, artifact.path)}>
-              <Terminal size={13} aria-hidden />
-              {t('issues.dispatch.openSession')}
+        {!isCommanderArt && (
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" onClick={() => onOpenReport(artifact.workspaceId, artifact.path)}>
+              <FileText size={13} aria-hidden="true" />
+              {t('issues.dispatch.openReport')}
             </Button>
-          )}
-        </div>
+            {artifact.resumeId && (
+              <Button type="button" size="sm" variant="outline" onClick={() => onOpenSession(artifact.workspaceId, artifact.resumeId!, artifact.path)}>
+                <Terminal size={13} aria-hidden="true" />
+                {t('issues.dispatch.openSession')}
+              </Button>
+            )}
+          </div>
+        )}
       </>
     )
   }
@@ -836,7 +907,7 @@ function ArtifactDetail({
     <>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${artifact.unread ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-muted/40 text-muted-foreground'}`}>
-          <Inbox size={11} aria-hidden />
+          <Inbox size={11} aria-hidden="true" />
           {artifact.unread ? t('issues.dispatch.inboxUnread') : t('issues.dispatch.inboxRead')}
         </span>
         <span className="text-[11px] text-muted-foreground">{formatRelativeTime(artifact.at)}</span>
@@ -845,7 +916,7 @@ function ArtifactDetail({
       <div className="rounded-lg border border-border/70 bg-background p-3.5">
         <MarkdownContent
           text={artifact.body}
-          onFileReference={(path) => onOpenReport(artifact.workspaceId, path)}
+          onFileReference={isCommanderArt ? undefined : (path) => onOpenReport(artifact.workspaceId, path)}
         />
       </div>
 
@@ -854,15 +925,24 @@ function ArtifactDetail({
           <h4 className="font-medium text-foreground">{t('issues.dispatch.referencedFilesTitle')}</h4>
           <div className="space-y-1">
             {artifact.files.map((path) => (
-              <button
-                key={path}
-                type="button"
-                onClick={() => onOpenReport(artifact.workspaceId, path)}
-                className="flex w-full items-center justify-between gap-2 rounded-md border border-border/70 bg-muted/20 px-3 py-1.5 font-mono text-[11px] hover:bg-muted/50"
-              >
-                <span className="truncate">{path}</span>
-                <ExternalLink size={11} className="shrink-0 text-muted-foreground" aria-hidden />
-              </button>
+              isCommanderArt ? (
+                <div
+                  key={path}
+                  className="flex w-full items-center justify-between gap-2 rounded-md border border-border/70 bg-muted/20 px-3 py-1.5 font-mono text-[11px]"
+                >
+                  <span className="truncate">{path}</span>
+                </div>
+              ) : (
+                <button
+                  key={path}
+                  type="button"
+                  onClick={() => onOpenReport(artifact.workspaceId, path)}
+                  className="flex w-full items-center justify-between gap-2 rounded-md border border-border/70 bg-muted/20 px-3 py-1.5 font-mono text-[11px] hover:bg-muted/50"
+                >
+                  <span className="truncate">{path}</span>
+                  <ExternalLink size={11} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+                </button>
+              )
             ))}
           </div>
         </div>
@@ -870,18 +950,18 @@ function ArtifactDetail({
 
       <div className="flex flex-wrap gap-2">
         <Button type="button" size="sm" onClick={() => onOpenInbox(artifact.entryId)}>
-          <Inbox size={13} aria-hidden />
+          <Inbox size={13} aria-hidden="true" />
           {t('issues.dispatch.openInbox')}
         </Button>
-        {artifact.resumeId && (
+        {!isCommanderArt && artifact.resumeId && (
           <Button type="button" size="sm" variant="outline" onClick={() => onOpenSession(artifact.workspaceId, artifact.resumeId!, artifact.title)}>
-            <Terminal size={13} aria-hidden />
+            <Terminal size={13} aria-hidden="true" />
             {t('issues.dispatch.openSession')}
           </Button>
         )}
-        {artifact.issueId && (
+        {!isCommanderArt && artifact.issueId && (
           <Button type="button" size="sm" variant="outline" onClick={() => onOpenIssue(artifact.workspaceId, artifact.issueId!)}>
-            <Clock size={13} aria-hidden />
+            <Clock size={13} aria-hidden="true" />
             {t('issues.dispatch.openIssue')}
           </Button>
         )}
