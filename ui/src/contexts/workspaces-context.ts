@@ -2,8 +2,9 @@ import { createContext, useContext } from 'react'
 import type {
   AgentId,
   AgentInfo,
-  ManagerQuickStartResult,
-  ManagerWorkspaceSnapshot,
+  CommanderOpenInput,
+  CommanderOpenResult,
+  CommanderSnapshot,
   SpawnOptions,
   TemplateInfo,
   Workspace,
@@ -19,10 +20,10 @@ export interface WorkspacesContextValue {
   readonly defaultAgent: string | null
   readonly issueDefaultAgent: string | null
   readonly listError: string | null
-  /** Launcher-owned Manager state; deliberately separate from business Workspaces. */
-  readonly workspaceManager: ManagerWorkspaceSnapshot | null
-  readonly workspaceManagerLoaded: boolean
-  readonly workspaceManagerError: string | null
+  /** Global persistent Commander state; deliberately separate from business Workspaces. */
+  readonly commander: CommanderSnapshot | null
+  readonly commanderLoaded: boolean
+  readonly commanderError: string | null
   /** True once the first workspaces-list fetch has resolved. */
   readonly hasLoaded: boolean
   /** True once the templates fetch has settled (success OR failure). */
@@ -43,15 +44,8 @@ export interface WorkspacesContextValue {
   refreshTemplates(): Promise<void>
   refreshAutoQuantPreference(): Promise<void>
   refreshAutoPredictionPreference?(): Promise<void>
-  refreshWorkspaceManager(): Promise<void>
-  quickStartWorkspaceManager(
-    prompt: string,
-    agent: string,
-    credentialSlug?: string,
-    model?: string | null,
-    reasoningEffort?: import('../api').ModelReasoningEffort,
-    credentialSource?: 'native',
-  ): Promise<ManagerQuickStartResult>
+  refreshCommander(): Promise<void>
+  openCommander(input?: CommanderOpenInput): Promise<CommanderOpenResult>
   spawn(wsId: string, opts?: SpawnOpts, source?: WorkspaceSource): Promise<void>
   openHeadlessRun(
     wsId: string,
@@ -114,4 +108,8 @@ export function useWorkspaces(): WorkspacesContextValue {
   const ctx = useContext(WorkspacesContext)
   if (!ctx) throw new Error('useWorkspaces must be used within WorkspacesProvider')
   return ctx
+}
+
+export function useOptionalWorkspaces(): WorkspacesContextValue | null {
+  return useContext(WorkspacesContext)
 }

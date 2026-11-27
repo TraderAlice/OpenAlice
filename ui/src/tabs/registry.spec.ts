@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 
 import { getView, getViewShell } from './registry'
 
-it('keeps Quick Start and Chat as separate URL identities', () => {
+it('keeps Quick Start, Commander, and Chat as separate URL identities', () => {
   expect(getView('quick-start').toUrl({ kind: 'quick-start', params: {} })).toBe('/quick-start')
+  expect(getView('commander').toUrl({ kind: 'commander', params: {} })).toBe('/commander')
   expect(getView('chat-landing').toUrl({ kind: 'chat-landing', params: {} })).toBe('/chat')
 })
 
@@ -118,9 +119,9 @@ describe('Settings URL projection', () => {
 })
 
 describe('shared product shells', () => {
-  it('assigns every Ask Alice surface to the shared chat shell', () => {
+  it('assigns every Ask Alice surface to the shared chat shell and keeps Commander standalone', () => {
     expect(getViewShell({ kind: 'chat-landing', params: {} })).toBe('chat')
-    expect(getViewShell({ kind: 'workspace-manager', params: {} })).toBe('chat')
+    expect(getViewShell({ kind: 'commander', params: {} })).toBeNull()
     expect(getViewShell({
       kind: 'workspace',
       params: { wsId: 'chat-1', sessionId: 'pi-1', source: 'chat' },

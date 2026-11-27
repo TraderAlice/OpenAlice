@@ -1290,50 +1290,57 @@ export async function initializeChatWorkspace(): Promise<Workspace> {
   return body.workspace
 }
 
-export const MANAGER_WORKSPACE_ID = 'workspace-manager'
+export const COMMANDER_WORKSPACE_ID = 'commander'
 
-export interface ManagerWorkspaceSnapshot {
-  readonly id: typeof MANAGER_WORKSPACE_ID
-  readonly tag: string
+export interface CommanderSnapshot {
+  readonly id: typeof COMMANDER_WORKSPACE_ID
+  readonly tag: 'Commander'
+  readonly initialized: boolean
+  readonly session: SessionRecord | null
+  readonly unreadReports: number
+  readonly activeWorkers: number
   readonly activeWorkspaceCount: number
-  readonly sessions: readonly SessionRecord[]
 }
 
-export interface ManagerQuickStartResult {
-  readonly manager: ManagerWorkspaceSnapshot
+export interface CommanderOpenInput {
+  readonly prompt?: string
+  readonly agent?: string
+  readonly credentialSlug?: string
+  readonly credentialSource?: 'native'
+  readonly model?: string | null
+  readonly reasoningEffort?: ModelReasoningEffort
+}
+
+export interface CommanderOpenResult {
+  readonly commander: CommanderSnapshot
   readonly session: SessionRecord
-  /** Pi opens in the Web surface; native TUI runtimes return no structured snapshot. */
+  /** Web-capable runtimes return a live snapshot; native TUI runtimes return null. */
   readonly snapshot: WebSessionSnapshot | null
 }
 
-export async function getWorkspaceManager(): Promise<ManagerWorkspaceSnapshot> {
-  const res = await fetch('/api/workspaces/manager')
-  const body = (await res.json().catch(() => null)) as { manager?: ManagerWorkspaceSnapshot; message?: string } | null
-  if (!res.ok || !body?.manager) throw new Error(body?.message ?? `manager load failed: ${res.status}`)
-  return body.manager
+export async function getCommander(): Promise<CommanderSnapshot> {
+  const res = await fetch('/api/workspaces/commander')
+  const body = (await res.json().catch(() => null)) as { commander?: CommanderSnapshot; message?: string; error?: string } | null
+  if (!res.ok || !body?.commander) throw new Error(body?.message ?? body?.error ?? `commander load failed: ${res.status}`)
+  return body.commander
 }
 
-export async function quickStartWorkspaceManager(
-  prompt: string,
-  agent: string,
-  credentialSlug?: string,
-  model?: string | null,
-  reasoningEffort?: ModelReasoningEffort,
-  credentialSource?: 'native',
-): Promise<ManagerQuickStartResult> {
-  const request: Record<string, unknown> = { prompt, agent };
-  if (credentialSource !== undefined) request['credentialSource'] = credentialSource;
-  if (credentialSlug !== undefined) request['credentialSlug'] = credentialSlug;
-  if (model) request['model'] = model;
-  if (reasoningEffort) request['reasoningEffort'] = reasoningEffort;
-  const res = await fetch('/api/workspaces/manager/quick-start', {
+export async function openCommander(input: CommanderOpenInput = {}): Promise<CommanderOpenResult> {
+  const request: Record<string, unknown> = {}
+  if (input.prompt !== undefined) request['prompt'] = input.prompt
+  if (input.agent !== undefined) request['agent'] = input.agent
+  if (input.credentialSource !== undefined) request['credentialSource'] = input.credentialSource
+  if (input.credentialSlug !== undefined) request['credentialSlug'] = input.credentialSlug
+  if (input.model) request['model'] = input.model
+  if (input.reasoningEffort) request['reasoningEffort'] = input.reasoningEffort
+  const res = await fetch('/api/workspaces/commander/open', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(request),
   })
-  const body = (await res.json().catch(() => null)) as (ManagerQuickStartResult & { message?: string; error?: string }) | null
-  if (!res.ok || !body?.manager || !body.session || !('snapshot' in body)) {
-    throw new Error(body?.message ?? body?.error ?? `manager start failed: ${res.status}`)
+  const body = (await res.json().catch(() => null)) as (CommanderOpenResult & { message?: string; error?: string }) | null
+  if (!res.ok || !body?.commander || !body.session || !('snapshot' in body)) {
+    throw new Error(body?.message ?? body?.error ?? `commander open failed: ${res.status}`)
   }
   return body
 }
