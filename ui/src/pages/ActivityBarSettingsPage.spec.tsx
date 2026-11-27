@@ -108,10 +108,10 @@ describe('ActivityBarSettingsPage', () => {
 
       const pages = [...document.querySelectorAll('[data-nav-group-card="primary"] [data-nav-item]')]
         .map((node) => node.getAttribute('data-nav-item'))
-      expect(pages.slice(0, 2)).toEqual(['inbox', 'chat'])
+      expect(pages.slice(0, 2)).toEqual(['commander', 'chat'])
       fireEvent.pointerUp(window, { pointerId: 1, clientX: 20, clientY: 70 })
       await waitFor(() => expect(mocks.save).toHaveBeenCalledOnce(), { timeout: 1_500 })
-      expect(mocks.save.mock.calls[0]?.[0].groups[0]?.items.slice(0, 2)).toEqual(['inbox', 'chat'])
+      expect(mocks.save.mock.calls[0]?.[0].groups[0]?.items.slice(0, 2)).toEqual(['commander', 'chat'])
     } finally {
       HTMLElement.prototype.getBoundingClientRect = originalRect
     }
