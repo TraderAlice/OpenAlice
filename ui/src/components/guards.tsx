@@ -16,15 +16,14 @@ export interface GuardEntry {
 
 // ==================== Presets ====================
 
-/** Crypto guards (superset — includes max-leverage) */
+/** Crypto guards */
 export const CRYPTO_GUARD_TYPES: GuardType[] = [
   { type: 'max-position-size', label: 'Max Position Size', desc: 'Limits each position as a percentage of account equity.' },
-  { type: 'max-leverage', label: 'Max Leverage', desc: 'Caps leverage for all symbols, with optional per-symbol overrides.' },
   { type: 'cooldown', label: 'Cooldown', desc: 'Enforces a minimum interval between trades on the same symbol.' },
   { type: 'symbol-whitelist', label: 'Symbol Whitelist', desc: 'Restricts trading to a specific set of symbols.' },
 ]
 
-/** Securities guards (no max-leverage) */
+/** Securities guards */
 export const SECURITIES_GUARD_TYPES: GuardType[] = [
   { type: 'max-position-size', label: 'Max Position Size', desc: 'Limits each position as a percentage of account equity.' },
   { type: 'cooldown', label: 'Cooldown', desc: 'Enforces a minimum interval between trades on the same symbol.' },
@@ -33,7 +32,6 @@ export const SECURITIES_GUARD_TYPES: GuardType[] = [
 
 const GUARD_DEFAULTS: Record<string, Record<string, unknown>> = {
   'max-position-size': { maxPercentOfEquity: 25 },
-  'max-leverage': { maxLeverage: 10 },
   cooldown: { minIntervalMs: 60000 },
   'symbol-whitelist': { symbols: [] },
 }
@@ -45,10 +43,6 @@ export function guardSummary(g: GuardEntry): string {
     case 'max-position-size': {
       const pct = Number(g.options.maxPercentOfEquity ?? 25)
       return `${pct}% of equity`
-    }
-    case 'max-leverage': {
-      const lev = Number(g.options.maxLeverage ?? 10)
-      return `${lev}x max`
     }
     case 'cooldown': {
       const ms = Number(g.options.minIntervalMs ?? 60000)
@@ -134,6 +128,11 @@ export function GuardsSection({ guards, guardTypes, description, onChange, onCha
                     <span className="text-muted-foreground font-normal ml-2 text-[12px]">
                       {guardSummary(guard)}
                     </span>
+                    {!meta && (
+                      <span className="block text-destructive font-normal text-[11px] mt-0.5">
+                        Not a built-in guard — UTA skips it unless an extension registers this type.
+                      </span>
+                    )}
                   </span>
                   <div className="flex items-center gap-0.5">
                     <button
@@ -245,8 +244,6 @@ function GuardOptionsEditor({
   switch (type) {
     case 'max-position-size':
       return <MaxPositionSizeEditor options={options} onChange={onChange} />
-    case 'max-leverage':
-      return <MaxLeverageEditor options={options} onChange={onChange} />
     case 'cooldown':
       return <CooldownEditor options={options} onChange={onChange} />
     case 'symbol-whitelist':
@@ -275,25 +272,6 @@ function MaxPositionSizeEditor({ options, onChange }: EditorProps) {
       />
       <p className="text-[10px] text-muted-foreground/60 mt-1">
         Rejects orders where estimated position value exceeds this % of account equity.
-      </p>
-    </Field>
-  )
-}
-
-function MaxLeverageEditor({ options, onChange }: EditorProps) {
-  const lev = Number(options.maxLeverage ?? 10)
-  return (
-    <Field label="Maximum Leverage">
-      <input
-        className={inputClass}
-        type="number"
-        min={1}
-        max={125}
-        value={lev}
-        onChange={(e) => onChange({ ...options, maxLeverage: Number(e.target.value) })}
-      />
-      <p className="text-[10px] text-muted-foreground/60 mt-1">
-        Rejects orders and leverage adjustments exceeding this limit.
       </p>
     </Field>
   )
