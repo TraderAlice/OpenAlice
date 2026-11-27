@@ -278,7 +278,7 @@ export class WebPlugin implements Plugin {
     app.route('/api/market', createMarketRoutes(ctx))
     app.route('/api/bars', createBarsRoutes(ctx))
     app.route('/api/reference', createReferenceRoutes(ctx))
-    app.route('/api/inbox', createInboxRoutes({ inboxStore: ctx.inboxStore, resolveWorkspace: id => this.workspaceService?.registry.get(id) }))
+    app.route('/api/inbox', createInboxRoutes({ inboxStore: ctx.inboxStore, resolveWorkspace: id => this.workspaceService?.resolveRuntimeWorkspace(id) ?? this.workspaceService?.registry.get(id) }))
     app.route('/api/version', createVersionRoutes())
     app.route('/api/alice-project', createAliceProjectRoutes())
 

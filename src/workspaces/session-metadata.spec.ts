@@ -14,6 +14,17 @@ describe('session-metadata', () => {
       kind: 'interactive',
       surface: 'quick-chat',
     })
+    expect(parseSessionCreatedBy({ kind: 'interactive', surface: 'commander' })).toEqual({
+      kind: 'interactive',
+      surface: 'commander',
+    })
+    expect(parseSessionCreatedBy({ kind: 'interactive', surface: 'manager' })).toEqual({
+      kind: 'interactive',
+      surface: 'manager',
+    })
+    expect(parseSessionCreatedBy({ kind: 'commander' })).toEqual({
+      kind: 'commander',
+    })
     expect(parseSessionCreatedBy({
       kind: 'issue',
       workspaceId: 'ws-1',

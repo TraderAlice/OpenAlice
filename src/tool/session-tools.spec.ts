@@ -67,9 +67,9 @@ describe('session_list', () => {
     expect(schema(tool).safeParse({ limit: '101' }).success).toBe(false)
   })
 
-  it('aggregates across workspaces from the workspace-manager context', async () => {
+  it('aggregates across workspaces from the commander context', async () => {
     const result = await run(sessionListFactory.build(ctx({
-      workspaceId: 'workspace-manager',
+      workspaceId: 'commander',
       workspaceInventory: async () => [
         { id: 'ws-a', tag: 'A', createdAt: '2026-01-01', sessions: { total: 0, running: 0, recent: [] }, headlessRunning: 0 },
         { id: 'ws-b', tag: 'B', createdAt: '2026-01-01', sessions: { total: 0, running: 0, recent: [] }, headlessRunning: 0 },
@@ -84,8 +84,8 @@ describe('session_list', () => {
     expect((workspaces[1]!['sessions'] as unknown[])).toHaveLength(0)
   })
 
-  it('errors from workspace-manager without an inventory', async () => {
-    const result = await run(sessionListFactory.build(ctx({ workspaceId: 'workspace-manager' })), {})
+  it('errors from commander without an inventory', async () => {
+    const result = await run(sessionListFactory.build(ctx({ workspaceId: 'commander' })), {})
     expect(result).toMatchObject({ ok: false })
     expect(String(result['error'])).toContain('--ws-id')
   })

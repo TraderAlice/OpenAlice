@@ -6,8 +6,8 @@ import { workspaceListFactory } from './workspace-list.js'
 
 function ctx(overrides: Partial<WorkspaceToolContext> = {}): WorkspaceToolContext {
   return {
-    workspaceId: 'workspace-manager',
-    workspaceLabel: 'Workspace Manager',
+    workspaceId: 'commander',
+    workspaceLabel: 'Commander',
     inboxStore: {} as never,
     entityStore: {} as never,
     workspaceInventory: async () => [{

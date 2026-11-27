@@ -130,11 +130,12 @@ import { TemplateUpgradeError } from '../../workspaces/template-upgrade.js';
 import { HarnessSourceUpgradeError } from '../../workspaces/harness-source-upgrade.js';
 import { WorkspaceAbsorbError } from '../../workspaces/workspace-absorb.js';
 import {
-  MANAGER_WORKSPACE_ID,
-  MANAGER_SYSTEM_PROMPT,
-  managerTerminalPrompt,
-  managerSkillPath,
-} from '../../workspaces/manager-workspace.js';
+  COMMANDER_WORKSPACE_ID,
+  COMMANDER_WORKSPACE_TAG,
+  COMMANDER_SYSTEM_PROMPT,
+  commanderTerminalPrompt,
+  commanderSkillPath,
+} from '../../workspaces/commander-workspace.js';
 
 const workspaceRuntimeModeDefaultsRequestSchema = z.object({
   defaultAgent: z.string().trim().min(1).max(64).nullable(),
@@ -425,7 +426,7 @@ export function createWorkspaceRoutes(
       return { ok: false, status: 409, body: { error: 'resume_busy', message: 'this conversation already has a running turn' } };
     }
     if (requestedIdentity?.agentSessionId) resume = { sessionId: requestedIdentity.agentSessionId };
-    const freshProductSession = !requestedIdentity && meta.id !== MANAGER_WORKSPACE_ID;
+    const freshProductSession = !requestedIdentity && meta.id !== COMMANDER_WORKSPACE_ID;
     const runtimeSettings = freshProductSession
       ? await readWorkspaceRuntimeSettings(meta.dir)
       : null;
@@ -766,72 +767,199 @@ export function createWorkspaceRoutes(
     }
   };
 
-  const managerWebOptions = {
-    appendSystemPrompt: MANAGER_SYSTEM_PROMPT,
-    skills: [managerSkillPath(svc.config.launcherRepoRoot)],
+  const commanderWebOptions = {
+    appendSystemPrompt: COMMANDER_SYSTEM_PROMPT,
+    skills: [commanderSkillPath(svc.config.launcherRepoRoot)],
     // The Web surface has no TUI in which it could render Pi's trust prompt. Entering the
-    // explicit manager surface is the user's approval for its launcher-owned
+    // explicit Commander surface is the user's approval for its launcher-owned
     // skill and active-office-floor cwd.
     approveProject: true,
   } as const;
 
-  const publicManager = async () => {
-    const meta = svc.managerWorkspace;
+  const resolveCommanderSessionRecord = async () => {
+    const meta = svc.commanderWorkspace;
     await svc.sessionRegistry.ensureLoaded(meta.id);
+    const pointer = await svc.getCommanderPointer?.() ?? null;
+    const isUsable = (candidate: SessionRecord | undefined): candidate is SessionRecord => {
+      if (!candidate) return false;
+      const identity = svc.resumeRegistry.get(candidate.resumeId);
+      return identity?.lifecycle !== 'retired' && sessionPresence(identity) !== 'deleted';
+    };
+    const byPointer = pointer
+      ? svc.sessionRegistry.findByResumeId?.(meta.id, pointer.resumeId)
+        ?? svc.sessionRegistry.listFor(meta.id).find((row) => row.resumeId === pointer.resumeId)
+      : undefined;
+    const fallback = svc.sessionRegistry
+      .listFor(meta.id)
+      .filter(isUsable)
+      .sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt))[0];
+    const record = isUsable(byPointer) ? byPointer : fallback ?? null;
+    return { meta, pointer, record };
+  };
+
+  const publicCommander = async () => {
+    const { meta, pointer, record } = await resolveCommanderSessionRecord();
     void svc.refreshSessionTitles?.(meta);
+    const resumeId = record?.resumeId ?? pointer?.resumeId ?? null;
+    const mailbox = svc.commanderMailbox ?? svc.sessionMailbox;
+    const unreadReports = resumeId && mailbox ? mailbox.pendingFor(resumeId).length : 0;
+    const activeWorkers = resumeId && svc.orchestration
+      ? svc.orchestration
+          .listTasks({ parentResumeId: resumeId })
+          .filter((task) => task.status === 'running' || task.status === 'waiting_parent').length
+      : 0;
+    const activeWorkspaceCount = svc.listActiveWorkspaces
+      ? (await svc.listActiveWorkspaces()).length
+      : svc.registry.list().length;
     return {
       id: meta.id,
       tag: meta.tag,
-      activeWorkspaceCount: svc.registry.list().length,
-      sessions: svc.sessionRegistry
-        .listFor(meta.id)
-        .filter((record) => {
-          const identity = svc.resumeRegistry.get(record.resumeId);
-          return identity?.lifecycle !== 'retired' && sessionPresence(identity) !== 'deleted';
-        })
-        .map(publicSession)
-        .sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt)),
+      initialized: Boolean(record),
+      session: record ? publicSession(record) : null,
+      unreadReports,
+      activeWorkers,
+      activeWorkspaceCount,
     };
   };
 
-  // ── launcher-owned Workspace manager ───────────────────────────────────
-  // The manager's cwd is the active office floor, but it is intentionally not
-  // inserted into the business Workspace registry. Its sessions live in the
-  // same durable Session/Resume registries. Pi opens through the Web surface
-  // with the manager contract; the other runtimes keep their native TUI until
-  // they gain a manager-prompt injection path.
-  app.get('/manager', async (c) => c.json({ manager: await publicManager() }));
+  // ── launcher-owned global Commander ────────────────────────────────────
+  // Single persistent Commander session per AliceProject operating one level
+  // above all active business Workspaces. Web-capable runtimes launch directly
+  // on the Web surface with COMMANDER_SYSTEM_PROMPT + commander skill; native
+  // TUI runtimes fall back to Terminal PTY seeded with commanderTerminalPrompt.
+  app.get('/commander', async (c) => c.json({ commander: await publicCommander() }));
 
-  app.post('/manager/quick-start', async (c) => {
-    let prompt: string;
+  app.post('/commander/open', async (c) => {
+    let prompt: string | undefined;
     let agentId: string | undefined;
     let credentialSource: 'native' | undefined;
     let credentialSlug: string | undefined;
     let model: string | undefined;
     let reasoningEffort: ModelReasoningEffort | undefined;
     try {
-      const body = await safeJson(c);
-      const fields = body && typeof body === 'object' ? body as Record<string, unknown> : {};
-      const seed = parseSeedPrompt(fields['prompt']);
-      if (seed === null) return c.json({ error: 'prompt_required' }, 400);
-      if ('error' in seed) return c.json(seed, 400);
-      prompt = seed.prompt;
-      if (typeof fields['agent'] === 'string' && fields['agent'].length > 0) {
-        agentId = fields['agent'];
+      const rawText = await c.req.text();
+      if (rawText.trim().length > 0) {
+        const body: unknown = JSON.parse(rawText);
+        const fields = body && typeof body === 'object' && !Array.isArray(body)
+          ? body as Record<string, unknown>
+          : {};
+        if (fields['prompt'] !== undefined && fields['prompt'] !== null) {
+          if (typeof fields['prompt'] !== 'string') {
+            return c.json({ error: 'bad_request', message: 'prompt must be a string' }, 400);
+          }
+          if (fields['prompt'].trim().length > 0) {
+            const seed = parseSeedPrompt(fields['prompt']);
+            if (seed && 'error' in seed) return c.json(seed, 400);
+            if (seed) prompt = seed.prompt;
+          }
+        }
+        if (typeof fields['agent'] === 'string' && fields['agent'].length > 0) {
+          agentId = fields['agent'];
+        }
+        if (typeof fields['credentialSlug'] === 'string' && fields['credentialSlug'].length > 0) {
+          credentialSlug = fields['credentialSlug'];
+        }
+        if (fields['credentialSource'] === 'native') credentialSource = 'native';
+        const rawModel = fields['model'];
+        if (typeof rawModel === 'string' && rawModel.trim().length > 0) model = rawModel.trim();
+        const rawEffort = fields['reasoningEffort'];
+        if (isModelReasoningEffort(rawEffort)) reasoningEffort = rawEffort;
       }
-      if (typeof fields['credentialSlug'] === 'string' && fields['credentialSlug'].length > 0) {
-        credentialSlug = fields['credentialSlug'];
-      }
-      if (fields['credentialSource'] === 'native') credentialSource = 'native';
-      const rawModel = fields['model'];
-      if (typeof rawModel === 'string' && rawModel.trim().length > 0) model = rawModel.trim();
-      const rawEffort = fields['reasoningEffort'];
-      if (isModelReasoningEffort(rawEffort)) reasoningEffort = rawEffort;
     } catch (error) {
       return c.json({ error: 'bad_request', message: (error as Error).message }, 400);
     }
 
-    const meta = svc.managerWorkspace;
+    const { meta, record: existingRecord } = await resolveCommanderSessionRecord();
+    if (existingRecord) {
+      const adapter = svc.adapters.get(existingRecord.agent);
+      if (!adapter) {
+        return c.json({ error: 'unknown_agent', message: `no adapter: ${existingRecord.agent}` }, 400);
+      }
+      if (adapter.capabilities.web && adapter.composeWebCommand) {
+        try {
+          await prepareAgentRuntimeWorkspace(adapter, {
+            wsId: meta.id,
+            cwd: meta.dir,
+            launcherRepoRoot: svc.config.launcherRepoRoot,
+          });
+          let snapshot = svc.web.get(existingRecord.id)
+            ?? await svc.executions.web(
+              meta,
+              existingRecord,
+              { kind: 'user', entry: 'commander-open' },
+              commanderWebOptions,
+            );
+          if (prompt && snapshot.phase === 'idle') {
+            snapshot = await svc.web.prompt(existingRecord.id, prompt);
+          }
+          return c.json({
+            commander: await publicCommander(),
+            session: publicSession(existingRecord),
+            snapshot,
+          }, 200);
+        } catch (error) {
+          if (error instanceof SessionAdmissionError) {
+            return c.json({ error: error.code, message: error.message, blocks: error.blocks, retryAt: error.retryAt }, 409);
+          }
+          if (error instanceof HeadlessResumeError) {
+            return c.json({ error: 'resume_busy', message: error.message }, 409);
+          }
+          return c.json({ error: 'commander_open_failed', message: (error as Error).message }, 500);
+        }
+      }
+
+      if (!svc.pool.get(existingRecord.id)) {
+        const identity = svc.resumeRegistry.get(existingRecord.resumeId);
+        if (identity?.agentSessionId) {
+          const resumed = await spawnInteractiveSession(meta, {
+            origin: { kind: 'user', entry: 'commander-open' },
+            resumeId: existingRecord.resumeId,
+            agentId: existingRecord.agent,
+          });
+          if (!resumed.ok) return c.json(resumed.body, resumed.status as 400 | 409 | 500);
+        } else {
+          try {
+            await prepareAgentRuntimeWorkspace(adapter, {
+              wsId: meta.id,
+              cwd: meta.dir,
+              launcherRepoRoot: svc.config.launcherRepoRoot,
+            });
+            const sessionRuntime = identity?.runtimeBinding
+              ? await resolveSessionRuntimeBinding({
+                  adapter,
+                  cwd: meta.dir,
+                  binding: identity.runtimeBinding,
+                })
+              : createNativeSessionRuntimeBinding({ adapter });
+            await svc.executions.terminal(
+              meta.id,
+              {
+                agentId: existingRecord.agent,
+                recordId: existingRecord.id,
+                recordName: existingRecord.name,
+                initialPrompt: commanderTerminalPrompt(prompt),
+                sessionRuntime,
+              },
+              { kind: 'user', entry: 'commander-open' },
+            );
+          } catch (error) {
+            if (error instanceof SessionAdmissionError) {
+              return c.json({ error: error.code, message: error.message, blocks: error.blocks, retryAt: error.retryAt }, 409);
+            }
+            if (error instanceof HeadlessResumeError) {
+              return c.json({ error: 'resume_busy', message: error.message }, 409);
+            }
+            return c.json({ error: 'commander_open_failed', message: (error as Error).message }, 500);
+          }
+        }
+      }
+      return c.json({
+        commander: await publicCommander(),
+        session: publicSession(existingRecord),
+        snapshot: null,
+      }, 200);
+    }
+
     const resolvedAgentId = agentId ?? await resolveDefaultAgentId(meta);
     if (!resolvedAgentId) {
       return c.json({ error: 'no_agent_runtime', message: 'no agent runtime is registered' }, 400);
@@ -846,43 +974,146 @@ export function createWorkspaceRoutes(
         message: `${resolvedAgentId} is not an agent runtime`,
       }, 400);
     }
+
+    const useWeb = Boolean(resolvedAdapter.capabilities.web && resolvedAdapter.composeWebCommand);
+
+    if (svc.ensureCommanderIdentity) {
+      let ensured: Awaited<ReturnType<NonNullable<typeof svc.ensureCommanderIdentity>>>;
+      try {
+        ensured = await svc.ensureCommanderIdentity({
+          agent: resolvedAgentId,
+          ...(credentialSource ? { credentialSource } : {}),
+          ...(credentialSlug ? { credentialSlug } : {}),
+          ...(model ? { model } : {}),
+          ...(reasoningEffort ? { reasoningEffort } : {}),
+          createdBy: { kind: 'interactive', surface: 'commander' },
+          surface: useWeb ? 'webpi' : 'terminal',
+          fallbackTitle: prompt ?? COMMANDER_WORKSPACE_TAG,
+        });
+      } catch (err) {
+        if (err instanceof SessionRuntimeBindingError) {
+          return c.json({ error: err.code, message: err.message }, 400);
+        }
+        return c.json({ error: 'commander_open_failed', message: (err as Error).message }, 500);
+      }
+      const record = ensured?.sessionRecord ?? null;
+      if (!record) {
+        return c.json({ error: 'registry_failed', message: 'Commander Session record is missing' }, 500);
+      }
+      if (useWeb) {
+        try {
+          await prepareAgentRuntimeWorkspace(resolvedAdapter, {
+            wsId: meta.id,
+            cwd: meta.dir,
+            launcherRepoRoot: svc.config.launcherRepoRoot,
+          });
+          let snapshot = await svc.executions.web(
+            meta,
+            record,
+            { kind: 'user', entry: 'commander-open' },
+            commanderWebOptions,
+          );
+          if (prompt && snapshot.phase === 'idle') {
+            snapshot = await svc.web.prompt(record.id, prompt);
+          }
+          return c.json({
+            commander: await publicCommander(),
+            session: publicSession(record),
+            snapshot,
+          }, 201);
+        } catch (error) {
+          if (error instanceof SessionAdmissionError) {
+            return c.json({ error: error.code, message: error.message, blocks: error.blocks, retryAt: error.retryAt }, 409);
+          }
+          if (error instanceof HeadlessResumeError) {
+            return c.json({ error: 'resume_busy', message: error.message }, 409);
+          }
+          return c.json({ error: 'commander_open_failed', message: (error as Error).message }, 500);
+        }
+      }
+
+      try {
+        await prepareAgentRuntimeWorkspace(resolvedAdapter, {
+          wsId: meta.id,
+          cwd: meta.dir,
+          launcherRepoRoot: svc.config.launcherRepoRoot,
+        });
+        const identity = svc.resumeRegistry.get(record.resumeId);
+        const sessionRuntime = identity?.runtimeBinding
+          ? await resolveSessionRuntimeBinding({
+              adapter: resolvedAdapter,
+              cwd: meta.dir,
+              binding: identity.runtimeBinding,
+            })
+          : createNativeSessionRuntimeBinding({ adapter: resolvedAdapter });
+        await svc.executions.terminal(
+          meta.id,
+          {
+            agentId: resolvedAgentId,
+            recordId: record.id,
+            recordName: record.name,
+            initialPrompt: commanderTerminalPrompt(prompt),
+            sessionRuntime,
+          },
+          { kind: 'user', entry: 'commander-open' },
+        );
+        return c.json({
+          commander: await publicCommander(),
+          session: publicSession(record),
+          snapshot: null,
+        }, 201);
+      } catch (error) {
+        if (error instanceof SessionAdmissionError) {
+          return c.json({ error: error.code, message: error.message, blocks: error.blocks, retryAt: error.retryAt }, 409);
+        }
+        if (error instanceof HeadlessResumeError) {
+          return c.json({ error: 'resume_busy', message: error.message }, 409);
+        }
+        return c.json({ error: 'commander_open_failed', message: (error as Error).message }, 500);
+      }
+    }
+
     const spawned = await spawnInteractiveSession(meta, {
-      origin: { kind: 'user', entry: 'manager-quick-start' },
+      origin: { kind: 'user', entry: 'commander-open' },
       agentId: resolvedAgentId,
       ...(credentialSource ? { credentialSource } : {}),
       ...(credentialSlug ? { credentialSlug } : {}),
       ...(model ? { model } : {}),
       ...(reasoningEffort ? { reasoningEffort } : {}),
-      ...(resolvedAgentId === 'pi' ? {} : { initialPrompt: managerTerminalPrompt(prompt) }),
-      title: prompt,
-      createdBy: { kind: 'interactive', surface: 'manager' },
+      ...(useWeb ? {} : { initialPrompt: commanderTerminalPrompt(prompt) }),
+      title: prompt ?? COMMANDER_WORKSPACE_TAG,
+      createdBy: { kind: 'interactive', surface: 'commander' },
     });
     if (!spawned.ok) return c.json(spawned.body, spawned.status as 400 | 409 | 500);
 
     const record = svc.sessionRegistry.get(meta.id, spawned.session.sessionId);
-    if (!record) return c.json({ error: 'registry_failed', message: 'manager Session record is missing' }, 500);
+    if (!record) return c.json({ error: 'registry_failed', message: 'Commander Session record is missing' }, 500);
 
-    if (record.agent !== 'pi') {
+    if (!useWeb) {
       return c.json({
-        manager: await publicManager(),
+        commander: await publicCommander(),
         session: publicSession(record),
         snapshot: null,
       }, 201);
     }
 
     try {
-      // A fresh native Pi id is allocated by the ordinary interactive spawn
-      // seam. Stop its unused TUI immediately, then reopen that exact native
-      // conversation in RPC mode and submit the visible user prompt.
-      await svc.executions.web(meta, record, { kind: 'user', entry: 'manager-quick-start' }, managerWebOptions);
-      const snapshot = await svc.web.prompt(record.id, prompt);
+      let snapshot = await svc.executions.web(
+        meta,
+        record,
+        { kind: 'user', entry: 'commander-open' },
+        commanderWebOptions,
+      );
+      if (prompt && snapshot.phase === 'idle') {
+        snapshot = await svc.web.prompt(record.id, prompt);
+      }
       return c.json({
-        manager: await publicManager(),
+        commander: await publicCommander(),
         session: publicSession(record),
         snapshot,
       }, 201);
     } catch (error) {
-      return c.json({ error: 'manager_start_failed', message: (error as Error).message }, 500);
+      return c.json({ error: 'commander_open_failed', message: (error as Error).message }, 500);
     }
   });
 
@@ -2693,7 +2924,7 @@ export function createWorkspaceRoutes(
         meta,
         record,
         { kind: 'user', entry: runtimeSelection ? 'web-reconfigure' : 'web-open' },
-        { ...(id === svc.managerWorkspace?.id ? managerWebOptions : {}), ...(runtimeSelection ? { runtimeSelection } : {}) },
+        { ...(id === svc.commanderWorkspace?.id ? commanderWebOptions : {}), ...(runtimeSelection ? { runtimeSelection } : {}) },
       );
       return c.json({ ok: true, snapshot, session: publicSession(record) });
     } catch (err) {

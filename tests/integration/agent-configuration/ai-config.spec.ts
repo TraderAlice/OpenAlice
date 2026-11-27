@@ -972,21 +972,21 @@ describe('piAdapter AI-config', () => {
     ]);
   });
 
-  it('composeWebCommand can explicitly load the launcher manager contract', () => {
+  it('composeWebCommand can explicitly load the launcher commander contract', () => {
     const spawn = {
       cwd: dir,
       env: mcpEnv,
-      resume: { sessionId: 'sess-manager' },
+      resume: { sessionId: 'sess-commander' },
       approveProject: true,
-      appendSystemPrompt: 'Manage the office floor.',
-      skills: ['/repo/default/skills/workspace-manager'],
+      appendSystemPrompt: 'Coordinate the active office floor.',
+      skills: ['/repo/default/skills/commander'],
     } as const;
     expect(piAdapter.composeWebCommand?.([], spawn)).toEqual([
       'pi',
       '--approve',
-      '--append-system-prompt', 'Manage the office floor.',
-      '--skill', '/repo/default/skills/workspace-manager',
-      '--session-id', 'sess-manager',
+      '--append-system-prompt', 'Coordinate the active office floor.',
+      '--skill', '/repo/default/skills/commander',
+      '--session-id', 'sess-commander',
       '--mode', 'rpc',
     ]);
   });

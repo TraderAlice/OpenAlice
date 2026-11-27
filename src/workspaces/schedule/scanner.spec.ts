@@ -9,11 +9,13 @@ import type { CliAdapter } from '../cli-adapter.js'
 import type { Logger } from '../logger.js'
 import type { WorkspaceMeta, WorkspaceRegistry } from '../workspace-registry.js'
 
+import { THREAD_REPORTING_CONVENTION_NOTE } from '../commander-workspace.js'
 import { SessionAdmissionError } from '../session-admission.js'
 import { HeadlessCapacityError, HeadlessResumeError } from '../service.js'
 import {
   BACKOFF_STEPS_MS,
   classifyScheduleSkip,
+  composeScheduledIssuePrompt,
   ScheduleDispatchError,
   ScheduledIssueRunNowError,
   ScheduleScanner,
@@ -253,7 +255,7 @@ describe('ScheduleScanner', () => {
     expect(dispatch).toHaveBeenCalledWith(
       ws,
       headlessAdapter,
-      'same exact prompt', expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
+      composeScheduledIssuePrompt('same exact prompt'), expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
       undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 'retry-me', retryOfTaskId: 'run-failed' },
       undefined,
@@ -292,7 +294,7 @@ describe('ScheduleScanner', () => {
     expect(limitedDispatch).toHaveBeenCalledWith(
       limited,
       headlessAdapter,
-      'go', expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
+      composeScheduledIssuePrompt('go'), expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
       45 * 60_000,
       { kind: 'issue', workspaceId: 'w1', issueId: 'limited' },
       undefined,
@@ -310,7 +312,7 @@ describe('ScheduleScanner', () => {
     expect(unlimitedDispatch).toHaveBeenCalledWith(
       unlimited,
       headlessAdapter,
-      'go', expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
+      composeScheduledIssuePrompt('go'), expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
       undefined,
       { kind: 'issue', workspaceId: 'w2', issueId: 'open' },
       undefined,
@@ -331,7 +333,7 @@ describe('ScheduleScanner', () => {
     expect(retryDispatch).toHaveBeenCalledWith(
       limited,
       headlessAdapter,
-      'go', expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
+      composeScheduledIssuePrompt('go'), expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
       45 * 60_000,
       { kind: 'issue', workspaceId: 'w1', issueId: 'limited' },
       undefined,
@@ -392,7 +394,7 @@ describe('ScheduleScanner', () => {
     expect(dispatch).toHaveBeenCalledWith(
       ws,
       headlessAdapter,
-      'go', expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
+      composeScheduledIssuePrompt('go'), expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
       undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 't1' },
       undefined,
@@ -447,7 +449,7 @@ describe('ScheduleScanner', () => {
     expect(dispatch).toHaveBeenCalledWith(
       ws,
       headlessAdapter,
-      'go', expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
+      composeScheduledIssuePrompt('go'), expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
       undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 'tuned' },
       undefined,
@@ -480,7 +482,7 @@ describe('ScheduleScanner', () => {
     expect(dispatch).toHaveBeenCalledWith(
       ws,
       headlessAdapter,
-      'go', expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
+      composeScheduledIssuePrompt('go'), expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
       undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 'native' },
       undefined,
@@ -513,7 +515,7 @@ describe('ScheduleScanner', () => {
     expect(dispatch).toHaveBeenCalledWith(
       ws,
       headlessAdapter,
-      'continue', expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
+      composeScheduledIssuePrompt('continue'), expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
       undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 'owned' },
       'resume-kind-owl-abc123',
@@ -538,7 +540,7 @@ describe('ScheduleScanner', () => {
     expect(dispatch).toHaveBeenCalledWith(
       ws,
       headlessAdapter,
-      'own this work from now on', expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
+      composeScheduledIssuePrompt('own this work from now on'), expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
       undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 'sticky' },
       undefined,
@@ -594,7 +596,7 @@ describe('ScheduleScanner', () => {
     expect(dispatch).toHaveBeenCalledWith(
       execution,
       headlessAdapter,
-      'revisit your report', expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
+      composeScheduledIssuePrompt('revisit your report'), expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
       undefined,
       { kind: 'issue', workspaceId: 'home', issueId: 'review-report' },
       'resume-peer-author',
@@ -622,7 +624,7 @@ describe('ScheduleScanner', () => {
     expect(dispatch).toHaveBeenCalledWith(
       ws,
       headlessAdapter,
-      'go', expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
+      composeScheduledIssuePrompt('go'), expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
       undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 'sched' },
       undefined,
@@ -649,7 +651,7 @@ describe('ScheduleScanner', () => {
     expect(dispatch).toHaveBeenCalledWith(
       ws,
       headlessAdapter,
-      'scan movers', expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
+      composeScheduledIssuePrompt('scan movers'), expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
       undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 't1' },
       undefined,
@@ -1358,6 +1360,7 @@ describe('comment owner handoff', () => {
     const { scanner, dispatch, markers } = scannerFor([ws], { claimFreshSession })
     await scanner.runIssueComment({ workspaceId: 'w1', issueId: 'desk', prompt: 'Hello', commentId: 'c1' })
     const first = dispatch.mock.calls[0]
+    expect(first[2]).not.toContain(THREAD_REPORTING_CONVENTION_NOTE)
     expect(first[5]).toBeUndefined() // never a cron turn: no no-reply suppression
     expect(first[6]).toBeUndefined()
     expect(first[7]).toMatchObject({ subject: { relation: 'owner', commentId: 'c1' } })

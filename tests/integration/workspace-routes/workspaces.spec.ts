@@ -1570,9 +1570,9 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
     expect([a.body, b.body].filter((x) => x.alreadyRunning)).toHaveLength(1);
   });
 
-  it('resumes a native Manager runtime through the reserved runtime resolver', async () => {
-    const { app, spawn } = buildResume('workspace-manager', true);
-    const result = await post(app, `/workspace-manager/sessions/${TOKEN}/resume`);
+  it('resumes a native Commander runtime through the reserved runtime resolver', async () => {
+    const { app, spawn } = buildResume('commander', true);
+    const result = await post(app, `/commander/sessions/${TOKEN}/resume`);
 
     expect(result.body.ok).toBe(true);
     expect(spawn).toHaveBeenCalledOnce();
@@ -1819,17 +1819,17 @@ describe('Web surface routes', () => {
   });
 });
 
-describe('Workspace manager surface routes', () => {
-  it('diagnoses a Manager Session through the reserved runtime workspace', async () => {
+describe('Global Commander surface routes', () => {
+  it('diagnoses a Commander Session through the reserved runtime workspace', async () => {
     const meta = {
-      id: 'workspace-manager',
-      tag: 'Workspace Manager',
+      id: 'commander',
+      tag: 'Commander',
       dir: '/floor/workspaces',
       createdAt: new Date(0).toISOString(),
     };
     const session = {
-      id: 'opencode-manager-test',
-      resumeId: 'resume-manager-test',
+      id: 'opencode-commander-test',
+      resumeId: 'resume-commander-test',
       wsId: meta.id,
       agent: 'opencode',
       name: 'o1',
@@ -1847,7 +1847,7 @@ describe('Workspace manager surface routes', () => {
       spawnCwd: meta.dir,
       envPWD: meta.dir,
       transcriptDir: null,
-      projectKey: 'manager-key',
+      projectKey: 'commander-key',
       composedCommand: ['opencode', '--session', 'native-opencode'],
       resumeMode: 'by-id',
       nativeSessionId: 'native-opencode',
@@ -1875,12 +1875,12 @@ describe('Workspace manager surface routes', () => {
 
     const result = await get(
       createWorkspaceRoutes(installExecutionFixture(svc)),
-      `/workspace-manager/sessions/${session.id}/diagnostics`,
+      `/commander/sessions/${session.id}/diagnostics`,
     );
 
     expect(result.status).toBe(200);
     expect(result.body).toMatchObject({
-      workspace: { id: 'workspace-manager', dir: '/floor/workspaces' },
+      workspace: { id: 'commander', dir: '/floor/workspaces' },
       record: { id: session.id, agent: 'opencode' },
       wouldResume: {
         mode: 'by-id',
@@ -1895,10 +1895,10 @@ describe('Workspace manager surface routes', () => {
     );
   });
 
-  it('starts a launcher-owned Pi conversation directly in the Web surface with the manager contract', async () => {
+  it('initializes and idempotently reopens the single Commander Web session with the commander contract', async () => {
     const meta = {
-      id: 'workspace-manager',
-      tag: 'Workspace Manager',
+      id: 'commander',
+      tag: 'Commander',
       dir: '/floor/workspaces',
       createdAt: new Date(0).toISOString(),
     };
@@ -1906,17 +1906,18 @@ describe('Workspace manager surface routes', () => {
     const adapter = {
       id: 'pi',
       namePrefix: 'p',
-      capabilities: { resumeById: true },
+      capabilities: { resumeById: true, web: { wire: 'pi-rpc', permissionPrompts: false, freshSession: true } },
+      composeWebCommand: vi.fn(() => ['pi', '--mode', 'rpc']),
       lifecycle: { prepareWorkspace: vi.fn(async () => undefined) },
       sessionRuntime: emptyAgentSessionRuntime,
     };
-    const snapshot = {
-      recordId: 'pi-manager-test',
+    const idleSnapshot = {
+      recordId: 'pi-commander-test',
       wsId: meta.id,
-      resumeId: 'resume-manager-test',
+      resumeId: 'resume-commander-test',
       pid: 91,
       startedAt: 1,
-      phase: 'working',
+      phase: 'idle',
       state: {},
       messages: [],
       streamingMessage: null,
@@ -1924,19 +1925,27 @@ describe('Workspace manager surface routes', () => {
       stderrTail: '',
       revision: 1,
     };
-    const executeWeb = vi.fn(async () => snapshot);
-    const prompt = vi.fn(async () => snapshot);
+    const workingSnapshot = { ...idleSnapshot, phase: 'working', revision: 2 };
+    let liveWebSnapshot: any = null;
+    const executeWeb = vi.fn(async () => {
+      liveWebSnapshot = idleSnapshot;
+      return idleSnapshot;
+    });
+    const prompt = vi.fn(async () => {
+      liveWebSnapshot = workingSnapshot;
+      return workingSnapshot;
+    });
     const disposeToken = vi.fn(() => true);
-    const ensureManagerSession = vi.fn(async (input: any) => {
+    const ensureCommanderSession = vi.fn(async (input: any) => {
       const identity = {
-        resumeId: 'resume-manager-test',
+        resumeId: 'resume-commander-test',
         wsId: input.wsId,
         agent: input.agent,
       };
       if (!createdRecord) {
         const createdAt = new Date().toISOString();
         createdRecord = {
-          id: 'pi-manager-test',
+          id: 'pi-commander-test',
           resumeId: identity.resumeId,
           wsId: input.wsId,
           agent: input.agent,
@@ -1951,7 +1960,14 @@ describe('Workspace manager surface routes', () => {
       return { identity, session: createdRecord, created: true };
     });
     const svc = {
-      managerWorkspace: meta,
+      commanderWorkspace: meta,
+      commanderMailbox: {
+        pendingFor: vi.fn(() => [{ id: 'mail-1' }]),
+      },
+      orchestration: {
+        listTasks: vi.fn(() => [{ dispatchId: 'd-1', status: 'running' }, { dispatchId: 'd-2', status: 'done' }]),
+      },
+      listActiveWorkspaces: vi.fn(async () => [{ id: 'ws-1' }, { id: 'ws-2' }]),
       registry: {
         list: () => [{ id: 'ws-1' }, { id: 'ws-2' }],
         get: () => undefined,
@@ -1966,10 +1982,10 @@ describe('Workspace manager surface routes', () => {
       }),
       resumeRegistry: {
         get: vi.fn(() => null),
-        ensure: vi.fn(async () => ({ resumeId: 'resume-manager-test' })),
+        ensure: vi.fn(async () => ({ resumeId: 'resume-commander-test' })),
       },
       sessionCoordinator: {
-        ensure: ensureManagerSession,
+        ensure: ensureCommanderSession,
         transition: vi.fn(async (input: any) => {
           Object.assign(createdRecord, input);
           return createdRecord;
@@ -1978,6 +1994,7 @@ describe('Workspace manager surface routes', () => {
       sessionRegistry: {
         ensureLoaded: vi.fn(async () => undefined),
         findById: vi.fn(() => undefined),
+        findByResumeId: vi.fn(() => createdRecord ?? undefined),
         nextName: vi.fn(() => 'p1'),
         create: vi.fn(async (record: any) => { createdRecord = record; }),
         get: vi.fn(() => createdRecord),
@@ -2001,41 +2018,67 @@ describe('Workspace manager surface routes', () => {
       },
       isResumeActive: vi.fn(() => false),
       executeWeb,
-      web: { get: vi.fn(() => snapshot), prompt },
+      web: { get: vi.fn(() => liveWebSnapshot), prompt },
       config: { launcherRepoRoot: '/repo' },
     } as unknown as WorkspaceService;
     const app = createWorkspaceRoutes(installExecutionFixture(svc));
 
-    expect(await get(app, '/manager')).toMatchObject({
+    expect(await get(app, '/commander')).toMatchObject({
       status: 200,
-      body: { manager: { id: 'workspace-manager', activeWorkspaceCount: 2, sessions: [] } },
+      body: {
+        commander: {
+          id: 'commander',
+          tag: 'Commander',
+          initialized: false,
+          session: null,
+          unreadReports: 0,
+          activeWorkers: 0,
+          activeWorkspaceCount: 2,
+        },
+      },
     });
 
-    const result = await post(app, '/manager/quick-start', { prompt: 'Audit the floor.' });
+    const result = await post(app, '/commander/open', { prompt: 'Audit the floor.' });
     expect(result.status).toBe(201);
     expect(result.body).toMatchObject({
-      manager: { id: 'workspace-manager', activeWorkspaceCount: 2 },
-      session: { wsId: 'workspace-manager', agent: 'pi', surface: 'webpi' },
+      commander: {
+        id: 'commander',
+        tag: 'Commander',
+        initialized: true,
+        unreadReports: 1,
+        activeWorkers: 1,
+        activeWorkspaceCount: 2,
+      },
+      session: { wsId: 'commander', agent: 'pi', surface: 'webpi' },
       snapshot: { phase: 'working' },
     });
     expect(disposeToken).not.toHaveBeenCalled();
     expect(executeWeb).toHaveBeenCalledWith(
       meta,
       createdRecord,
-      { kind: 'user', entry: 'manager-quick-start' },
+      { kind: 'user', entry: 'commander-open' },
       expect.objectContaining({
         approveProject: true,
-        appendSystemPrompt: expect.stringContaining('Workspace Manager'),
-        skills: [join('/repo', 'default', 'skills', 'workspace-manager')],
+        appendSystemPrompt: expect.stringContaining('OpenAlice Commander'),
+        skills: [join('/repo', 'default', 'skills', 'commander')],
       }),
     );
     expect(prompt).toHaveBeenCalledWith(createdRecord.id, 'Audit the floor.');
+
+    // Reopening returns 200 and reuses the single persistent Commander session without creating another
+    const reopened = await post(app, '/commander/open', {});
+    expect(reopened.status).toBe(200);
+    expect(reopened.body).toMatchObject({
+      commander: { id: 'commander', initialized: true },
+      session: { id: createdRecord.id, wsId: 'commander' },
+    });
+    expect(ensureCommanderSession).toHaveBeenCalledTimes(1);
   });
 
-  it('starts any registered agent runtime in its native TUI with the manager contract', async () => {
+  it('starts a terminal-only agent runtime in its native TUI with the commander contract', async () => {
     const meta = {
-      id: 'workspace-manager',
-      tag: 'Workspace Manager',
+      id: 'commander',
+      tag: 'Commander',
       dir: '/floor/workspaces',
       createdAt: new Date(0).toISOString(),
     };
@@ -2050,15 +2093,15 @@ describe('Workspace manager surface routes', () => {
     let spawnedContext: any = null;
     let liveSession: any = null;
     const executeWeb = vi.fn();
-    const ensureManagerSession = vi.fn(async (input: any) => {
+    const ensureCommanderSession = vi.fn(async (input: any) => {
       const identity = {
-        resumeId: 'resume-manager-codex',
+        resumeId: 'resume-commander-codex',
         wsId: input.wsId,
         agent: input.agent,
       };
       const createdAt = new Date().toISOString();
-      const record = records.get('codex-manager-test') ?? {
-        id: 'codex-manager-test',
+      const record = records.get('codex-commander-test') ?? {
+        id: 'codex-commander-test',
         resumeId: identity.resumeId,
         wsId: input.wsId,
         agent: input.agent,
@@ -2073,7 +2116,7 @@ describe('Workspace manager surface routes', () => {
       return { identity, session: record, created: true };
     });
     const svc = {
-      managerWorkspace: meta,
+      commanderWorkspace: meta,
       registry: { list: () => [{ id: 'ws-1' }], get: () => undefined },
       adapters: {
         get: (id: string) => id === 'codex'
@@ -2089,12 +2132,12 @@ describe('Workspace manager surface routes', () => {
       }),
       resumeRegistry: {
         get: vi.fn(() => null),
-        ensure: vi.fn(async () => ({ resumeId: 'resume-manager-codex' })),
+        ensure: vi.fn(async () => ({ resumeId: 'resume-commander-codex' })),
       },
       sessionCoordinator: {
-        ensure: ensureManagerSession,
+        ensure: ensureCommanderSession,
         transition: vi.fn(async (input: any) => {
-          const record = records.get('codex-manager-test');
+          const record = records.get('codex-commander-test');
           Object.assign(record, input);
           return record;
         }),
@@ -2102,6 +2145,7 @@ describe('Workspace manager surface routes', () => {
       sessionRegistry: {
         ensureLoaded: vi.fn(async () => undefined),
         findById: vi.fn((id: string) => records.get(id)),
+        findByResumeId: vi.fn((_wsId: string, rid: string) => [...records.values()].find((r) => r.resumeId === rid)),
         nextName: vi.fn(() => 'x1'),
         create: vi.fn(async (record: any) => { records.set(record.id, record); }),
         get: vi.fn((_wsId: string, id: string) => records.get(id)),
@@ -2134,7 +2178,7 @@ describe('Workspace manager surface routes', () => {
     } as unknown as WorkspaceService;
     const app = createWorkspaceRoutes(installExecutionFixture(svc));
 
-    const result = await post(app, '/manager/quick-start', {
+    const result = await post(app, '/commander/open', {
       prompt: 'Map ownership.',
       agent: 'codex',
       model: 'gpt-5.6-terra',
@@ -2142,7 +2186,7 @@ describe('Workspace manager surface routes', () => {
     });
     expect(result.status).toBe(201);
     expect(result.body).toMatchObject({
-      session: { wsId: 'workspace-manager', agent: 'codex', surface: 'terminal' },
+      session: { wsId: 'commander', agent: 'codex', surface: 'terminal' },
       snapshot: null,
     });
     expect(spawnedContext).toMatchObject({
@@ -2160,11 +2204,17 @@ describe('Workspace manager surface routes', () => {
       },
     });
     expect(result.body).toMatchObject({ session: { title: 'Map ownership.' } });
-    expect(spawnedContext.initialPrompt).toContain('OpenAlice Workspace Manager');
+    expect(spawnedContext.initialPrompt).toContain('OpenAlice Commander');
     expect(spawnedContext.initialPrompt).toContain('User request:\nMap ownership.');
     expect(executeWeb).not.toHaveBeenCalled();
 
-    const unsupported = await post(app, '/manager/quick-start', {
+    // Non-agent runtime rejected when uninitialized
+    const svcFresh = {
+      ...svc,
+      sessionRegistry: { ...svc.sessionRegistry, listFor: vi.fn(() => []), findByResumeId: vi.fn(() => undefined) },
+    } as unknown as WorkspaceService;
+    const appFresh = createWorkspaceRoutes(installExecutionFixture(svcFresh));
+    const unsupported = await post(appFresh, '/commander/open', {
       prompt: 'Open a shell.',
       agent: 'shell',
     });

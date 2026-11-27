@@ -39,6 +39,7 @@ import type { Logger } from '../logger.js'
 import type { WorkspaceMeta, WorkspaceRegistry } from '../workspace-registry.js'
 import type { HeadlessTaskInquiry, HeadlessTaskTrigger } from '../headless-task-registry.js'
 import type { SessionCreatedBy } from '../session-metadata.js'
+import { THREAD_REPORTING_CONVENTION_NOTE } from '../commander-workspace.js'
 
 import {
   isFireable,
@@ -63,6 +64,17 @@ import {
   type ScheduleSnapshotTask,
   type ScheduleSnapshotWorkspace,
 } from './declaration.js'
+
+/**
+ * Append the Commander reporting-line convention note to scheduled Issue
+ * execution prompts (idempotent so repeated composition never duplicates it).
+ */
+export function composeScheduledIssuePrompt(what: string): string {
+  const trimmed = what.trim()
+  if (!trimmed) return THREAD_REPORTING_CONVENTION_NOTE
+  if (trimmed.includes(THREAD_REPORTING_CONVENTION_NOTE)) return trimmed
+  return `${trimmed}\n\n${THREAD_REPORTING_CONVENTION_NOTE}`
+}
 
 export const DEFAULT_INTERVAL_MS = 60_000
 
@@ -899,15 +911,16 @@ export class ScheduleScanner {
         ...(trigger?.metadata ? { connectorId: trigger.metadata.connectorId } : {}),
         ...(commentSource?.kind === 'session' ? { resumeId: commentSource.resumeId } : {}),
       }
+      const dispatchPrompt = commentId ? what : composeScheduledIssuePrompt(what)
       const result = inquiry
-        ? await this.deps.dispatch(executionWorkspace, adapter, what, origin, timeoutMs, undefined,
+        ? await this.deps.dispatch(executionWorkspace, adapter, dispatchPrompt, origin, timeoutMs, undefined,
             resumeId, inquiry, selection, conversation, createdBy)
         : resumeId
         ? selection
           ? await this.deps.dispatch(
               executionWorkspace,
               adapter,
-              what,
+              dispatchPrompt,
               origin,
               timeoutMs,
               trigger,
@@ -918,7 +931,7 @@ export class ScheduleScanner {
           : await this.deps.dispatch(
               executionWorkspace,
               adapter,
-              what,
+              dispatchPrompt,
               origin,
               timeoutMs,
               trigger,
@@ -928,7 +941,7 @@ export class ScheduleScanner {
           ? await this.deps.dispatch(
               executionWorkspace,
               adapter,
-              what,
+              dispatchPrompt,
               origin,
               timeoutMs,
               trigger,
@@ -941,7 +954,7 @@ export class ScheduleScanner {
           : await this.deps.dispatch(
               executionWorkspace,
               adapter,
-              what,
+              dispatchPrompt,
               origin,
               timeoutMs,
               trigger,

@@ -65,6 +65,26 @@ describe('formatSessionWakePointer', () => {
     )
     expect(formatSessionWakePointer(3, RESUME)).not.toContain('\n')
   })
+
+  it('renders a task/schedule triage pointer when pending messages include scheduled-issue reports', async () => {
+    deps.web.mockResolvedValue('delivered')
+    await delivery.notifyTaskCompleted(taskInput({
+      recipientWorkspaceId: 'commander',
+      reportSource: {
+        kind: 'scheduled-issue',
+        workspaceId: 'ws-quant',
+        workspaceTag: 'Auto Quant',
+        issueId: 'daily-brief',
+        issueTitle: 'Daily Brief',
+        fire: 'schedule',
+      },
+    }))
+
+    expect(deps.web).toHaveBeenCalledWith(
+      RESUME,
+      'You have 1 pending task/schedule report from active Workspaces. Run `alice conversation check` to review and triage them.',
+    )
+  })
 })
 
 describe('SessionWakeDelivery', () => {

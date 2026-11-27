@@ -157,6 +157,14 @@ export interface WorkspaceConversationMailboxItem {
   readonly assistantText: string | null
   readonly error?: string
   readonly durationMs?: number
+  readonly reportSource?: {
+    readonly kind: 'scheduled-issue'
+    readonly workspaceId: string
+    readonly workspaceTag?: string
+    readonly issueId: string
+    readonly issueTitle?: string
+    readonly fire?: 'schedule' | 'manual' | 'retry'
+  }
   readonly createdAt: number
 }
 
@@ -392,6 +400,7 @@ export class WorkspaceToolCenter {
  *  needs — kept structural so core/ doesn't depend on the workspaces/ module. */
 interface WorkspaceRegistryLike {
   registry: { get(id: string): { id: string; dir: string; tag: string } | undefined }
+  resolveRuntimeWorkspace?: (id: string) => { id: string; dir: string; tag: string } | undefined
 }
 
 interface InboxOriginRegistryLike {
@@ -413,7 +422,8 @@ export function makeWorkspaceResolver(
   getService: () => WorkspaceRegistryLike | null,
 ): NonNullable<WorkspaceToolContext['resolveWorkspace']> {
   return (id) => {
-    const meta = getService()?.registry.get(id)
+    const svc = getService()
+    const meta = svc?.resolveRuntimeWorkspace?.(id) ?? svc?.registry.get(id)
     return meta ? { id: meta.id, dir: meta.dir, tag: meta.tag } : null
   }
 }

@@ -498,10 +498,10 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
     });
     const { app } = build({
       runtimeWorkspace: {
-        id: 'workspace-manager',
-        dir: '/manager',
-        template: 'workspace-manager',
-        tag: 'Workspace Manager',
+        id: 'commander',
+        dir: '/commander',
+        template: 'commander',
+        tag: 'Commander',
         createdAt: '2026-07-16T00:00:00.000Z',
       },
       opencodeConfig: {
@@ -512,8 +512,8 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
       },
     });
 
-    const credential = await get(app, '/workspace-manager/agent-config/opencode/credential');
-    const readiness = await get(app, '/workspace-manager/agent-readiness');
+    const credential = await get(app, '/commander/agent-config/opencode/credential');
+    const readiness = await get(app, '/commander/agent-readiness');
 
     expect(credential).toEqual({
       status: 200,
@@ -535,14 +535,14 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
     });
   });
 
-  it('writes AI adjustments to the reserved Manager runtime workspace', async () => {
+  it('writes AI adjustments to the reserved Commander runtime workspace', async () => {
     vi.mocked(readCredentials).mockResolvedValue({});
     const { app, opencode } = build({
       runtimeWorkspace: {
-        id: 'workspace-manager',
-        dir: '/manager',
-        template: 'workspace-manager',
-        tag: 'Workspace Manager',
+        id: 'commander',
+        dir: '/commander',
+        template: 'commander',
+        tag: 'Commander',
         createdAt: '2026-07-16T00:00:00.000Z',
       },
     });
@@ -553,14 +553,14 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
       wireShape: 'google-generative-ai',
     };
 
-    const response = await app.request('/workspace-manager/agent-config/opencode', {
+    const response = await app.request('/commander/agent-config/opencode', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(config),
     });
 
     expect(response.status).toBe(200);
-    expect(opencode.writeAiConfig).toHaveBeenCalledWith('/manager', {
+    expect(opencode.writeAiConfig).toHaveBeenCalledWith('/commander', {
       ...config,
       reasoning: true,
     });

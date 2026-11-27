@@ -12,6 +12,15 @@ import { dirname } from 'node:path'
 
 export type SessionMailboxMessageStatus = 'unread' | 'notified' | 'acked'
 
+export interface SessionMailboxReportSource {
+  readonly kind: 'scheduled-issue'
+  readonly workspaceId: string
+  readonly workspaceTag?: string
+  readonly issueId: string
+  readonly issueTitle?: string
+  readonly fire?: 'schedule' | 'manual' | 'retry'
+}
+
 export interface SessionMailboxMessage {
   readonly id: string // e.g. `mail-${taskId}`
   readonly recipientResumeId: string
@@ -24,6 +33,7 @@ export interface SessionMailboxMessage {
   readonly assistantPreview: string | null
   readonly error?: string
   readonly durationMs?: number
+  readonly reportSource?: SessionMailboxReportSource
   readonly createdAt: number
   status: SessionMailboxMessageStatus
   notifiedAt?: number
@@ -109,6 +119,29 @@ export class SessionMailbox {
   unreadFor(recipientResumeId: string): SessionMailboxMessage[] {
     return this.messages
       .filter((m) => m.recipientResumeId === recipientResumeId && m.status === 'unread')
+      .sort((a, b) => a.createdAt - b.createdAt)
+  }
+
+  /**
+   * Recent messages including `acked`, sorted oldest-first, for read-only
+   * observability projections (e.g. Dispatch Board causal reporting edges).
+   */
+  listRecent(opts?: {
+    sinceMs?: number
+    recipientResumeId?: string
+  }): SessionMailboxMessage[] {
+    const sinceMs = opts?.sinceMs
+    const recipientResumeId = opts?.recipientResumeId
+    return this.messages
+      .filter((m) => {
+        if (recipientResumeId !== undefined && m.recipientResumeId !== recipientResumeId) return false
+        if (sinceMs !== undefined && m.createdAt < sinceMs) return false
+        return true
+      })
+      .map((m) => ({
+        ...m,
+        ...(m.reportSource ? { reportSource: { ...m.reportSource } } : {}),
+      }))
       .sort((a, b) => a.createdAt - b.createdAt)
   }
 
