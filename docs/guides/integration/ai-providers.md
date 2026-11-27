@@ -404,22 +404,22 @@ agentic default; **Gemini 3.5 Flash-Lite** is the faster, economical choice.
 These defaults initialize a new credential form only. Existing saved
 credentials keep their selected model.
 
-### Codex GPT-5.6 identities
+### Codex GPT identities
 
-Codex uses explicit GPT-5.6 model ids rather than the bare `gpt-5.6` family
-alias. A ChatGPT-authenticated Codex Session defaults to `gpt-5.6-sol`; current
-creation flows and documentation write that explicit id. Persisted records from
-before the 0.89.2 baseline are not automatically rewritten.
+Codex uses explicit model ids. New ChatGPT-authenticated and OpenAI API-backed
+Codex selections default to `gpt-6.2-sol`; current creation flows and
+documentation write that exact id. Existing Workspace and Session bindings are
+not rewritten, so a running or resumed Session keeps the model it originally
+captured.
 
 | Codex access | Models and context | Published effort metadata |
 |---|---|---|
-| ChatGPT / Codex login | Sol, Terra, and Luna; 272,000-token context | Sol: `low`–`ultra`, default `low`; Terra: `low`–`ultra`, default `medium`; Luna: `low`–`max`, default `medium` |
-| OpenAI API key | Sol and Terra: 1,050,000-token context; Luna: 400,000 | Optional `none`, `low`, `medium`, `high`, `xhigh`, or `max`; default `medium` |
+| ChatGPT / Codex login | GPT-6.2 Sol: 500,000-token current runtime context; prior native models retain their runtime-reported limits | GPT-6.2 Sol: `low`–`ultra`, default `low` |
+| OpenAI API key | GPT-6.2 Sol: 1,050,000-token context and 128,000 max output | Required `low`, `medium`, `high`, `xhigh`, or `max` |
 
-Sol is the power/default tier, Terra is balanced, and Luna favors faster or
-cost-efficient work. Subscription capabilities stay separate from OpenAI API
-capabilities: in particular, `ultra` is a native Codex option for Sol and Terra,
-not an API effort tier.
+GPT-6.2 Sol is the recommended everyday-work default. Subscription capabilities
+stay separate from OpenAI API capabilities: in particular, `ultra` is a native
+Codex option, not an API effort tier.
 
 When effort remains **Not specified**, OpenAlice may show the provider's
 published default as help, but it does not persist or project that value. The

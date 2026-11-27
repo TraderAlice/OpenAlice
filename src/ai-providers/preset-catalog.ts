@@ -35,13 +35,17 @@ const CODEX_SUBSCRIPTION_CONTEXT_WINDOW = 272_000
 function codexSubscriptionModel(
   id: string,
   label: string,
-  input: { efforts: ModelReasoningEffort[]; defaultEffort: ModelReasoningEffort },
+  input: {
+    efforts: ModelReasoningEffort[]
+    defaultEffort: ModelReasoningEffort
+    contextWindow?: number
+  },
 ): ModelOption {
   return {
     id,
     label,
     semantics: {
-      contextWindow: CODEX_SUBSCRIPTION_CONTEXT_WINDOW,
+      contextWindow: input.contextWindow ?? CODEX_SUBSCRIPTION_CONTEXT_WINDOW,
       reasoning: {
         mode: 'required',
         efforts: input.efforts,
@@ -177,9 +181,14 @@ export const CODEX_OAUTH: PresetDef = {
   zodSchema: z.object({
     backend: z.literal('codex'),
     loginMethod: z.literal('codex-oauth'),
-    model: z.string().default('gpt-6-astra').describe('Model'),
+    model: z.string().default('gpt-6.2-sol').describe('Model'),
   }),
   models: [
+    codexSubscriptionModel('gpt-6.2-sol', 'GPT 6.2 Sol (Recommended)', {
+      efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
+      defaultEffort: 'low',
+      contextWindow: 500_000,
+    }),
     codexSubscriptionModel('gpt-6-astra', 'GPT 6 Astra (Highest capability)', {
       efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
       defaultEffort: 'medium',
@@ -206,10 +215,11 @@ export const CODEX_API: PresetDef = {
   zodSchema: z.object({
     backend: z.literal('codex'),
     loginMethod: z.literal('api-key'),
-    model: z.string().default('gpt-6-astra').describe('Model'),
+    model: z.string().default('gpt-6.2-sol').describe('Model'),
     apiKey: z.string().min(1).describe('OpenAI API key'),
   }),
   models: withModelSemantics('openai', [
+    { id: 'gpt-6.2-sol', label: 'GPT 6.2 Sol (Recommended)' },
     { id: 'gpt-6-astra', label: 'GPT 6 Astra (Highest capability)' },
     { id: 'gpt-5.6-sol', label: 'GPT 5.6 Sol (Power)' },
     { id: 'gpt-5.6-terra', label: 'GPT 5.6 Terra (Balanced)' },
@@ -639,7 +649,7 @@ export const PRESET_CATALOG: PresetDef[] = [
  */
 export const DEFAULT_MODEL_BY_VENDOR: Record<string, string> = {
   anthropic: 'claude-opus-5',
-  openai: 'gpt-6-astra',
+  openai: 'gpt-6.2-sol',
   xai: 'grok-4.6',
   google: 'gemini-3.8-flash',
   minimax: 'MiniMax-M3',

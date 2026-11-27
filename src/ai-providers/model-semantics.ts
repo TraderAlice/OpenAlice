@@ -75,6 +75,11 @@ const OPENAI_56_REASONING: ModelReasoningSemantics = {
   defaultEffort: 'medium',
 }
 
+const OPENAI_62_REASONING: ModelReasoningSemantics = {
+  mode: 'required',
+  efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+}
+
 const GEMINI_3_CONTEXT = 1_048_576
 
 /**
@@ -88,6 +93,7 @@ const GEMINI_3_CONTEXT = 1_048_576
  * - Kimi K3/reasoning effort: https://www.kimi.com/help/kimi-api/api-model-selection
  * - DeepSeek models/limits: https://api-docs.deepseek.com/quick_start/pricing
  * - September 2026 refresh: https://developers.openai.com/api/docs/models/gpt-6-astra
+ * - GPT-6.2 Sol: https://developers.openai.com/api/docs/models/gpt-6.2-sol
  * - Claude Fable 5.1: https://platform.claude.com/docs/en/models/fable-5-1/overview
  * - Gemini 3.8: https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash
  * - GLM 5.3: https://docs.z.ai/guides/llm/glm-5.3
@@ -163,6 +169,11 @@ export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
     },
   },
   openai: {
+    'gpt-6.2-sol': {
+      contextWindow: 1_050_000,
+      maxOutputTokens: 128_000,
+      reasoning: OPENAI_62_REASONING,
+    },
     'gpt-6-astra': {
       contextWindow: 1_050_000,
       maxOutputTokens: 128_000,

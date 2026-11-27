@@ -48,6 +48,27 @@ describe('codexAdapter.sessionRuntime.project', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  it('passes GPT-6.2 Sol through unchanged for native Codex', () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const runtime: ResolvedSessionRuntimeBinding = {
+      binding: {
+        version: 1,
+        credential: { source: 'native' },
+        model: 'gpt-6.2-sol',
+        reasoningEffort: 'medium',
+      },
+      ai: { model: 'gpt-6.2-sol', reasoningEffort: 'medium' },
+    };
+
+    const projected = codexAdapter.sessionRuntime!.project(ctx, runtime);
+    expect(projected.interactiveArgs).toEqual([
+      '--model', 'gpt-6.2-sol', '-c', 'model_reasoning_effort="medium"',
+    ]);
+    expect(projected.headlessArgs).toEqual(projected.interactiveArgs);
+    expect(projected.webArgs).toEqual(projected.interactiveArgs);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('drops stale gpt-5.6-sol with a warning on native Codex OAuth so CLI uses account default', () => {
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const runtime: ResolvedSessionRuntimeBinding = {

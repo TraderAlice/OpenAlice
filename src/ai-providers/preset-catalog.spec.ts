@@ -98,12 +98,24 @@ describe('credential form catalog', () => {
       });
   });
 
-  it('offers Astra and supported GPT 5.6 models to Codex subscriptions and OpenAI API keys', () => {
-    const expectedSubscription = ['gpt-6-astra', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4'];
-    const expectedApi = ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4'];
+  it('offers GPT-6.2 Sol and supported prior models to Codex subscriptions and OpenAI API keys', () => {
+    const expectedSubscription = ['gpt-6.2-sol', 'gpt-6-astra', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4'];
+    const expectedApi = ['gpt-6.2-sol', 'gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4'];
     expect(CODEX_OAUTH.models?.map((model) => model.id)).toEqual(expectedSubscription);
     expect(CODEX_API.models?.map((model) => model.id)).toEqual(expectedApi);
-    expect(DEFAULT_MODEL_BY_VENDOR['openai']).toBe('gpt-6-astra');
+    expect(DEFAULT_MODEL_BY_VENDOR['openai']).toBe('gpt-6.2-sol');
+    expect(CODEX_OAUTH.zodSchema.parse({
+      backend: 'codex',
+      loginMethod: 'codex-oauth',
+    })).toMatchObject({ model: 'gpt-6.2-sol' });
+    expect(CODEX_OAUTH.models?.find((model) => model.id === 'gpt-6.2-sol')?.semantics)
+      .toMatchObject({
+        contextWindow: 500_000,
+        reasoning: {
+          efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
+          defaultEffort: 'low',
+        },
+      });
     expect(CODEX_OAUTH.models?.find((model) => model.id === 'gpt-5.6-sol')).toBeUndefined();
     expect(CODEX_OAUTH.models?.find((model) => model.id === 'gpt-5.6-terra')?.semantics)
       .toMatchObject({
@@ -205,7 +217,7 @@ describe('credential form catalog', () => {
   it('pins the audited flagship default for every built-in API-key provider', () => {
     expect(DEFAULT_MODEL_BY_VENDOR).toEqual({
       anthropic: 'claude-opus-5',
-      openai: 'gpt-6-astra',
+      openai: 'gpt-6.2-sol',
       xai: 'grok-4.6',
       google: 'gemini-3.8-flash',
       minimax: 'MiniMax-M3',
@@ -279,12 +291,18 @@ describe('credential form catalog', () => {
 
   it('serializes rich semantics beside the backwards-compatible model oneOf', () => {
     const openai = BUILTIN_PRESETS.find((preset) => preset.id === 'codex-api')!;
+    expect(openai.models?.find((model) => model.id === 'gpt-6.2-sol')?.semantics).toMatchObject({
+      contextWindow: 1_050_000,
+      maxOutputTokens: 128_000,
+      reasoning: { mode: 'required', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+    });
     expect(openai.models?.find((model) => model.id === 'gpt-5.6-sol')?.semantics).toMatchObject({
       contextWindow: 1_050_000,
       reasoning: { mode: 'optional', defaultEffort: 'medium' },
     });
     const properties = openai.schema['properties'] as Record<string, Record<string, unknown>>;
     expect(properties['model']?.['oneOf']).toEqual(expect.arrayContaining([
+      expect.objectContaining({ const: 'gpt-6.2-sol' }),
       expect.objectContaining({ const: 'gpt-5.6-sol' }),
     ]));
   });

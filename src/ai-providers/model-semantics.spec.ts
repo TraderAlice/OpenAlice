@@ -9,6 +9,17 @@ import {
 import { DEFAULT_MODEL_BY_VENDOR } from './preset-catalog.js'
 
 describe('model semantics registry', () => {
+  it('records GPT-6.2 Sol API limits and required reasoning tiers', () => {
+    expect(resolveModelSemantics('openai', 'gpt-6.2-sol')).toEqual({
+      contextWindow: 1_050_000,
+      maxOutputTokens: 128_000,
+      reasoning: {
+        mode: 'required',
+        efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+      },
+    })
+  })
+
   it('keeps exact known facts distinct from unknown models and aliases', () => {
     expect(resolveModelSemantics('openai', 'gpt-5.6-sol')).toMatchObject({
       contextWindow: 1_050_000,

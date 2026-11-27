@@ -537,7 +537,7 @@ describe('resolveInjectionModel', () => {
 
   it('falls back to the vendor recommendation when no lastModel', () => {
     expect(resolveInjectionModel({ vendor: 'anthropic' })).toBe('claude-opus-5')
-    expect(resolveInjectionModel({ vendor: 'openai' })).toBe('gpt-6-astra')
+    expect(resolveInjectionModel({ vendor: 'openai' })).toBe('gpt-6.2-sol')
     expect(resolveInjectionModel({ vendor: 'xai' })).toBe('grok-4.6')
     expect(resolveInjectionModel({ vendor: 'google' })).toBe('gemini-3.8-flash')
     expect(resolveInjectionModel({ vendor: 'glm' })).toBe('glm-5.3')
