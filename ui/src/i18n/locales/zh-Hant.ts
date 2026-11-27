@@ -468,6 +468,7 @@ export const zhHant: Resources = {
       clusterTitle: '{{count}} 次執行（{{status}}）',
       feedTitle: '調度動態',
       feedCount: '{{count}} 項',
+      feedCountOne: '{{count}} 項',
       episodeOrchestration: '多 Agent 編排',
       coordinatorFallback: '編排主控',
       showRuns: '展開 {{count}} 次執行',

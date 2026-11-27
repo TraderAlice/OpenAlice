@@ -461,6 +461,7 @@ export const ja: Resources = {
       clusterTitle: '{{count}} 件実行（{{status}}）',
       feedTitle: 'アクティビティ',
       feedCount: '{{count}} 件',
+      feedCountOne: '{{count}} 件',
       episodeOrchestration: 'オーケストレーション',
       coordinatorFallback: 'コーディネーター',
       showRuns: '{{count}} 件の実行を表示',

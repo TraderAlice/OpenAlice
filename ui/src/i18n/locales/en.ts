@@ -479,6 +479,7 @@ export const en = {
       clusterTitle: '{{count}} runs ({{status}})',
       feedTitle: 'Activity feed',
       feedCount: '{{count}} episodes',
+      feedCountOne: '{{count}} episode',
       episodeOrchestration: 'Orchestration',
       coordinatorFallback: 'Orchestration Coordinator',
       showRuns: 'Show {{count}} runs',

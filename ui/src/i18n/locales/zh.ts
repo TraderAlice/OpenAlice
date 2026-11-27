@@ -464,6 +464,7 @@ export const zh: Resources = {
       clusterTitle: '{{count}} 次运行（{{status}}）',
       feedTitle: '调度动态',
       feedCount: '{{count}} 项',
+      feedCountOne: '{{count}} 项',
       episodeOrchestration: '多 Agent 编排',
       coordinatorFallback: '编排主控',
       showRuns: '展开 {{count}} 次运行',

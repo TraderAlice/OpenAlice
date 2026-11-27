@@ -54,7 +54,7 @@ import {
 
 export type DispatchSelectedItem =
   | { readonly kind: 'span'; readonly item: DispatchSpan; readonly siblings?: readonly DispatchSpan[] }
-  | { readonly kind: 'edge'; readonly item: DispatchEdge }
+  | { readonly kind: 'edge'; readonly item: DispatchEdge; readonly siblings?: readonly DispatchEdge[] }
   | { readonly kind: 'artifact'; readonly item: DispatchArtifact }
   | { readonly kind: 'schedule'; readonly item: DispatchScheduleMarker }
   | null
@@ -226,6 +226,8 @@ export function DispatchInspectorSheet({
               {selected.kind === 'edge' && (
                 <EdgeDetail
                   edge={selected.item}
+                  siblings={selected.siblings}
+                  onSelect={onSelect}
                   laneLabel={laneLabel}
                   promptTab={promptTab}
                   onPromptTab={setPromptTab}
@@ -645,6 +647,8 @@ function SpanDetail({
 
 function EdgeDetail({
   edge,
+  siblings,
+  onSelect,
   laneLabel,
   promptTab,
   onPromptTab,
@@ -652,6 +656,8 @@ function EdgeDetail({
   onOpenReport,
 }: {
   edge: DispatchEdge
+  siblings?: readonly DispatchEdge[]
+  onSelect: (next: DispatchSelectedItem) => void
   laneLabel: (wsId: string) => string
   promptTab: 'delivered' | 'original'
   onPromptTab: (tab: 'delivered' | 'original') => void
@@ -659,6 +665,9 @@ function EdgeDetail({
   onOpenReport: (wsId: string, path: string) => void
 }) {
   const { t } = useTranslation()
+  const siblingIndex = siblings && siblings.length > 1
+    ? siblings.findIndex((candidate) => candidate.id === edge.id)
+    : -1
 
   const deliveryLabel = edge.deliveryStatus === 'unread'
     ? t('issues.dispatch.mailboxUnread')
@@ -672,6 +681,48 @@ function EdgeDetail({
 
   return (
     <>
+      {siblings && siblings.length > 1 && siblingIndex >= 0 && (
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-border/70 bg-muted/30 px-3 py-2">
+          <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+            {edgeDisplayLabel(edge, t, true)} {siblingIndex + 1} / {siblings.length}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-6 px-2 text-[11px]"
+              disabled={siblingIndex <= 0}
+              onClick={() =>
+                onSelect({
+                  kind: 'edge',
+                  item: siblings[siblingIndex - 1]!,
+                  siblings,
+                })
+              }
+            >
+              {t('issues.dispatch.previousRun')}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-6 px-2 text-[11px]"
+              disabled={siblingIndex >= siblings.length - 1}
+              onClick={() =>
+                onSelect({
+                  kind: 'edge',
+                  item: siblings[siblingIndex + 1]!,
+                  siblings,
+                })
+              }
+            >
+              {t('issues.dispatch.nextRun')}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-0.5 text-[11px] font-medium text-foreground">
           <MessageSquare size={11} className="text-primary" aria-hidden="true" />

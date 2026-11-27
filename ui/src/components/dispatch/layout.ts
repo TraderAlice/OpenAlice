@@ -1176,109 +1176,199 @@ export interface RawDispatchEdgeEndpoint {
 }
 
 export interface ComputedDispatchEdgeGeometry extends RawDispatchEdgeEndpoint {
+  readonly edges: readonly DispatchEdge[]
+  readonly count: number
   readonly ctrlX1: number
+  readonly ctrlY1: number
   readonly ctrlX2: number
+  readonly ctrlY2: number
   readonly mx: number
   readonly my: number
 }
 
+function edgePriorityScore(edge: DispatchEdge): number {
+  let score = 0
+  if (edge.kind === 'escalation' || edge.outcome === 'failed') score += 8
+  if (edge.deliveryStatus === 'unread' || edge.deliveryStatus === 'leased') score += 4
+  if (edge.kind === 'question') score += 2
+  return score
+}
+
 /**
- * Distributes Bezier control-point bows and pill midpoints across parallel
- * or temporally close edges sharing the same lane pair so pills never pile up.
+ * Coalesces temporally close edges sharing the same directed lane pair + kind
+ * into single clean S-curves (`Report ×4`) and distributes distinct parallel
+ * bundles gently along the lane divider so pills never stack or loop wildly.
  */
 export function layoutEdgeGeometries(
   endpoints: readonly RawDispatchEdgeEndpoint[],
   canvasWidth: number,
 ): ComputedDispatchEdgeGeometry[] {
-  const byPair = new Map<string, RawDispatchEdgeEndpoint[]>()
+  const bundleGapPx = 56
+  const byDirectedKind = new Map<string, RawDispatchEdgeEndpoint[]>()
   for (const ep of endpoints) {
-    const key = [ep.edge.fromWorkspaceId, ep.edge.toWorkspaceId].sort().join('\0')
-    const list = byPair.get(key)
+    const key = [
+      ep.edge.fromWorkspaceId,
+      ep.edge.toWorkspaceId,
+      ep.edge.kind,
+      ep.edge.messageKind ?? '',
+    ].join('\0')
+    const list = byDirectedKind.get(key)
     if (list) list.push(ep)
-    else byPair.set(key, [ep])
+    else byDirectedKind.set(key, [ep])
   }
 
-  const resultById = new Map<string, ComputedDispatchEdgeGeometry>()
-  const clusterGapPx = 72
+  interface BundledEndpoint extends RawDispatchEdgeEndpoint {
+    readonly edges: readonly DispatchEdge[]
+    readonly count: number
+    readonly orderIndex: number
+  }
 
-  for (const group of byPair.values()) {
+  const orderById = new Map<string, number>()
+  endpoints.forEach((ep, idx) => orderById.set(ep.edge.id, idx))
+
+  const bundled: BundledEndpoint[] = []
+  for (const group of byDirectedKind.values()) {
     const sorted = [...group].sort((a, b) => {
       const ax = (a.x1 + a.x2) / 2
       const bx = (b.x1 + b.x2) / 2
       return ax - bx || a.edge.at - b.edge.at || a.edge.id.localeCompare(b.edge.id)
     })
 
-    let clusterStart = 0
-    while (clusterStart < sorted.length) {
-      let clusterEnd = clusterStart + 1
-      while (clusterEnd < sorted.length) {
-        const prevX = (sorted[clusterEnd - 1]!.x1 + sorted[clusterEnd - 1]!.x2) / 2
-        const currX = (sorted[clusterEnd]!.x1 + sorted[clusterEnd]!.x2) / 2
-        if (currX - prevX > clusterGapPx) break
-        clusterEnd += 1
+    let start = 0
+    while (start < sorted.length) {
+      let end = start + 1
+      while (end < sorted.length) {
+        const prevX = (sorted[end - 1]!.x1 + sorted[end - 1]!.x2) / 2
+        const currX = (sorted[end]!.x1 + sorted[end]!.x2) / 2
+        if (currX - prevX > bundleGapPx) break
+        end += 1
       }
-
-      const cluster = sorted.slice(clusterStart, clusterEnd)
-      const pillSafePad = 38
-      if (cluster.length === 1) {
-        const item = cluster[0]!
-        const avgX = (item.x1 + item.x2) / 2
-        const dx = Math.max(24, Math.abs(item.y2 - item.y1) * 0.25)
-        const nearRight = canvasWidth > 160 && avgX > canvasWidth - 96
-        const nearLeft = canvasWidth > 160 && avgX < 96
-        const dir = nearRight
-          ? -1
-          : nearLeft
-            ? 1
-            : item.edge.kind === 'question' || item.edge.kind === 'worker_done'
-              ? -1
-              : 1
-        const ctrlX1 = item.x1 + dir * dx
-        const ctrlX2 = item.x2 + dir * dx
-        const rawMx = 0.125 * item.x1 + 0.375 * ctrlX1 + 0.375 * ctrlX2 + 0.125 * item.x2
-        const mx = canvasWidth > pillSafePad * 2
-          ? Math.max(pillSafePad, Math.min(canvasWidth - pillSafePad, rawMx))
-          : rawMx
-        const my = (item.y1 + item.y2) / 2
-        resultById.set(item.edge.id, { ...item, ctrlX1, ctrlX2, mx, my })
-      } else {
-        // Fan parallel curves; near canvas edges bow inward so pills never pile onto the clamp rail
-        const tCycle = [0.28, 0.52, 0.74, 0.4] as const
-        for (let i = 0; i < cluster.length; i += 1) {
-          const item = cluster[i]!
-          const avgX = (item.x1 + item.x2) / 2
-          const nearRight = canvasWidth > 220 && avgX > canvasWidth - 120
-          const nearLeft = canvasWidth > 220 && avgX < 120
-          const side = nearRight ? -1 : nearLeft ? 1 : i % 2 === 0 ? -1 : 1
-          const band = nearRight || nearLeft ? i + 1 : Math.floor(i / 2) + 1
-          const baseBow = Math.max(36, Math.abs(item.y2 - item.y1) * 0.34)
-          const offset = side * band * baseBow
-          const ctrlX1 = item.x1 + offset
-          const ctrlX2 = item.x2 + offset
-          const t = tCycle[i % tCycle.length]!
-          const mt = 1 - t
-          const rawMx =
-            mt * mt * mt * item.x1
-            + 3 * mt * mt * t * ctrlX1
-            + 3 * mt * t * t * ctrlX2
-            + t * t * t * item.x2
-          const my =
-            mt * mt * mt * item.y1
-            + 3 * mt * mt * t * item.y1
-            + 3 * mt * t * t * item.y2
-            + t * t * t * item.y2
-          const mx = canvasWidth > pillSafePad * 2
-            ? Math.max(pillSafePad, Math.min(canvasWidth - pillSafePad, rawMx))
-            : rawMx
-          resultById.set(item.edge.id, { ...item, ctrlX1, ctrlX2, mx, my })
-        }
-      }
-
-      clusterStart = clusterEnd
+      const slice = sorted.slice(start, end)
+      const edgesNewestFirst = [...slice]
+        .map((s) => s.edge)
+        .sort((a, b) => b.at - a.at || a.id.localeCompare(b.id))
+      const primary = [...edgesNewestFirst].sort(
+        (a, b) => edgePriorityScore(b) - edgePriorityScore(a) || b.at - a.at,
+      )[0]!
+      const avgX1 = slice.reduce((acc, s) => acc + s.x1, 0) / slice.length
+      const avgY1 = slice.reduce((acc, s) => acc + s.y1, 0) / slice.length
+      const avgX2 = slice.reduce((acc, s) => acc + s.x2, 0) / slice.length
+      const avgY2 = slice.reduce((acc, s) => acc + s.y2, 0) / slice.length
+      const minOrder = Math.min(...slice.map((s) => orderById.get(s.edge.id) ?? 0))
+      bundled.push({
+        edge: primary,
+        edges: edgesNewestFirst,
+        count: slice.length,
+        x1: avgX1,
+        y1: avgY1,
+        x2: avgX2,
+        y2: avgY2,
+        orderIndex: minOrder,
+      })
+      start = end
     }
   }
 
-  return endpoints
-    .map((ep) => resultById.get(ep.edge.id))
-    .filter((item): item is ComputedDispatchEdgeGeometry => Boolean(item))
+  const byUndirectedPair = new Map<string, BundledEndpoint[]>()
+  for (const item of bundled) {
+    const pairKey = [item.edge.fromWorkspaceId, item.edge.toWorkspaceId].sort().join('\0')
+    const list = byUndirectedPair.get(pairKey)
+    if (list) list.push(item)
+    else byUndirectedPair.set(pairKey, [item])
+  }
+
+  const out: { orderIndex: number; geom: ComputedDispatchEdgeGeometry }[] = []
+  const pillSafePad = 40
+
+  for (const pairGroup of byUndirectedPair.values()) {
+    const sorted = [...pairGroup].sort((a, b) => {
+      const ax = (a.x1 + a.x2) / 2
+      const bx = (b.x1 + b.x2) / 2
+      return ax - bx || a.orderIndex - b.orderIndex
+    })
+
+    let cStart = 0
+    while (cStart < sorted.length) {
+      let cEnd = cStart + 1
+      while (cEnd < sorted.length) {
+        const prevX = (sorted[cEnd - 1]!.x1 + sorted[cEnd - 1]!.x2) / 2
+        const currX = (sorted[cEnd]!.x1 + sorted[cEnd]!.x2) / 2
+        if (currX - prevX > 64) break
+        cEnd += 1
+      }
+
+      const overlapGroup = sorted.slice(cStart, cEnd)
+      for (let i = 0; i < overlapGroup.length; i += 1) {
+        const item = overlapGroup[i]!
+        const avgX = (item.x1 + item.x2) / 2
+        const midY = (item.y1 + item.y2) / 2
+        let ctrlX1 = item.x1
+        let ctrlY1 = midY
+        let ctrlX2 = item.x2
+        let ctrlY2 = midY
+        let t = 0.5
+
+        if (overlapGroup.length === 1) {
+          if (Math.abs(item.x2 - item.x1) < 10) {
+            const gentleArc = canvasWidth > 160 && avgX > canvasWidth - 88 ? -12 : 12
+            ctrlX1 = item.x1 + gentleArc
+            ctrlX2 = item.x2 + gentleArc
+            ctrlY1 = item.y1 + (item.y2 - item.y1) * 0.35
+            ctrlY2 = item.y1 + (item.y2 - item.y1) * 0.65
+          }
+        } else {
+          const nearRight = canvasWidth > 200 && avgX > canvasWidth - 96
+          const nearLeft = canvasWidth > 200 && avgX < 96
+          const spread = (i - (overlapGroup.length - 1) / 2) * 44
+          const shift = nearRight
+            ? -Math.abs(spread) - i * 28
+            : nearLeft
+              ? Math.abs(spread) + i * 28
+              : spread
+          ctrlX1 = item.x1 + shift
+          ctrlX2 = item.x2 + shift
+          const tSteps = [0.44, 0.58, 0.36, 0.64] as const
+          t = tSteps[i % tSteps.length]!
+        }
+
+        const mt = 1 - t
+        const rawMx =
+          mt * mt * mt * item.x1
+          + 3 * mt * mt * t * ctrlX1
+          + 3 * mt * t * t * ctrlX2
+          + t * t * t * item.x2
+        const my =
+          mt * mt * mt * item.y1
+          + 3 * mt * mt * t * ctrlY1
+          + 3 * mt * t * t * ctrlY2
+          + t * t * t * item.y2
+        const mx = canvasWidth > pillSafePad * 2
+          ? Math.max(pillSafePad, Math.min(canvasWidth - pillSafePad, rawMx))
+          : rawMx
+
+        out.push({
+          orderIndex: item.orderIndex,
+          geom: {
+            edge: item.edge,
+            edges: item.edges,
+            count: item.count,
+            x1: item.x1,
+            y1: item.y1,
+            x2: item.x2,
+            y2: item.y2,
+            ctrlX1,
+            ctrlY1,
+            ctrlX2,
+            ctrlY2,
+            mx,
+            my,
+          },
+        })
+      }
+
+      cStart = cEnd
+    }
+  }
+
+  return out.sort((a, b) => a.orderIndex - b.orderIndex).map((entry) => entry.geom)
 }

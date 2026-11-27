@@ -666,6 +666,27 @@ describe('dispatch layout helpers', () => {
         expect(dist).toBeGreaterThanOrEqual(24)
       }
     }
+
+    // Concurrent same-direction scheduled_report edges bundle into a single curve (`Report ×4`)
+    const reportBurst = [0, 1, 2, 3].map((i) => ({
+      edge: {
+        ...baseEdge,
+        id: `rep-${i}`,
+        kind: 'conversation' as const,
+        messageKind: 'scheduled_report' as const,
+        fromWorkspaceId: 'ws-chat',
+        toWorkspaceId: 'commander',
+        at: FROM + 700_000 + i * 1_000,
+      },
+      x1: 720 + i * 2,
+      y1: 92,
+      x2: 740,
+      y2: 38,
+    }))
+    const bundledReports = layoutEdgeGeometries(reportBurst, 800)
+    expect(bundledReports).toHaveLength(1)
+    expect(bundledReports[0]!.count).toBe(4)
+    expect(bundledReports[0]!.edges).toHaveLength(4)
   })
 })
 

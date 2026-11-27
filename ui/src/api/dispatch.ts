@@ -1,7 +1,7 @@
 import { fetchJson } from './client'
 import type { ScheduleSkipState } from './schedule'
 
-export type DispatchTemplateKind = 'chat' | 'auto-quant' | 'prediction' | 'custom'
+export type DispatchTemplateKind = 'commander' | 'chat' | 'auto-quant' | 'prediction' | 'custom'
 
 export interface DispatchLane {
   workspaceId: string
@@ -107,6 +107,7 @@ export interface DispatchEdgeMetadata {
 export interface DispatchEdge {
   id: string
   kind: DispatchEdgeKind
+  messageKind?: 'scheduled_report'
   fromWorkspaceId: string
   fromResumeId?: string
   toWorkspaceId: string
