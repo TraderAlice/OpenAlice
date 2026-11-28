@@ -211,6 +211,101 @@ describe('WebSessionHost with the pi-rpc transport', () => {
     expect(host.has('record-1')).toBe(false)
     expect(onExit).toHaveBeenCalledWith('record-1', expect.objectContaining({ intentional: false, code: 1 }))
   })
+
+  it('falls back to get_messages_page with adaptive page-size backoff when get_messages exceeds transport limit', async () => {
+    const history = [
+      { role: 'user', content: 'turn 1' },
+      { role: 'assistant', content: [{ type: 'text', text: 'reply 1' }] },
+      { role: 'user', content: 'turn 2' },
+      { role: 'assistant', content: [{ type: 'text', text: 'reply 2' }] },
+    ]
+    const seenLimits: number[] = []
+    const proc = new FakeProcess((command, self) => {
+      const id = command['id']
+      const type = command['type']
+      if (type === 'get_state') {
+        self.line({ type: 'response', id, command: type, success: true, data: { sessionId: 'omp-long', isStreaming: false, isCompacting: false } })
+        return
+      }
+      if (type === 'get_messages') {
+        self.line({ type: 'response', id, command: type, success: false, error: 'RPC response exceeded the transport limit' })
+        return
+      }
+      if (type === 'get_messages_page') {
+        const limit = typeof command['limit'] === 'number' ? command['limit'] : 64
+        seenLimits.push(limit)
+        if (limit > 2) {
+          self.line({ type: 'response', id, command: type, success: false, error: 'RPC response exceeded the transport limit' })
+          return
+        }
+        const offset = typeof command['cursor'] === 'string' ? Number(command['cursor']) : 0
+        const slice = history.slice(offset, offset + limit)
+        const nextOffset = offset + slice.length
+        self.line({
+          type: 'response',
+          id,
+          command: type,
+          success: true,
+          data: {
+            messages: slice,
+            totalMessages: history.length,
+            ...(nextOffset < history.length ? { nextCursor: String(nextOffset) } : {}),
+          },
+        })
+      }
+    })
+
+    const host = new WebSessionHost(logger, {}, () => proc as never)
+    const started = await host.start(input({ agent: 'omp', command: ['omp', '--mode', 'rpc'] }))
+    expect(started.phase).toBe('idle')
+    expect(started.error).toBeNull()
+    expect(texts(started)).toEqual(['user:turn 1', 'assistant:reply 1', 'user:turn 2', 'assistant:reply 2'])
+    expect(seenLimits).toContain(64)
+    expect(seenLimits).toContain(2)
+    await host.stopAll()
+  })
+
+  it('uses get_messages_page immediately when OMP announces ready v2 and keeps session idle if a single frame exceeds limit', async () => {
+    const proc = new FakeProcess((command, self) => {
+      const id = command['id']
+      const type = command['type']
+      if (type === 'get_state') {
+        self.line({ type: 'response', id, command: type, success: true, data: { sessionId: 'omp-giant', isStreaming: false, isCompacting: false } })
+        return
+      }
+      if (type === 'get_messages') {
+        throw new Error('get_messages should not be called when ready announced v2 paging')
+      }
+      if (type === 'get_messages_page') {
+        self.line({ type: 'response', id, command: type, success: false, error: 'RPC response exceeded the transport limit' })
+        return
+      }
+      if (type === 'prompt') {
+        self.line({ type: 'response', id, command: type, success: true })
+        self.line({ type: 'agent_start' })
+        self.line({ type: 'message_end', message: { role: 'assistant', content: [{ type: 'text', text: 'still alive' }] } })
+        self.line({ type: 'agent_end', willRetry: false })
+      }
+    })
+    proc.line({ type: 'ready', protocolVersion: 1, supportedProtocolVersions: [1, 2], maxFrameBytes: 1_048_576 })
+
+    const host = new WebSessionHost(logger, {}, () => proc as never)
+    const started = await host.start(input({ agent: 'omp', command: ['omp', '--mode', 'rpc'] }))
+    expect(started.phase).toBe('idle')
+    expect(started.error).toBeNull()
+    expect(texts(started)).toEqual([
+      'notice:Older transcript history exceeded the RPC frame limit (RPC response exceeded the transport limit); live turns continue normally.',
+    ])
+
+    await host.prompt('record-1', 'triage pending')
+    await settle(80)
+    const after = host.get('record-1')
+    expect(after?.phase).toBe('idle')
+    expect(after?.error).toBeNull()
+    expect(texts(after)).toContain('user:triage pending')
+    expect(texts(after)).toContain('assistant:still alive')
+    await host.stopAll()
+  })
 })
 
 // ── acp ────────────────────────────────────────────────────────────────────
