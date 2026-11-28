@@ -2,6 +2,7 @@
  * Read-only Web UI projection for the active-Workspace Agent Dispatch board.
  */
 import { Hono } from 'hono'
+import { compress } from 'hono/compress'
 
 import { buildDispatchBoardSnapshot } from '../../workspaces/dispatch-board.js'
 import type { WorkspaceService } from '../../workspaces/service.js'
@@ -15,6 +16,7 @@ function parseTimestampParam(raw: string | undefined): { ok: true; value?: numbe
 
 export function createDispatchRoutes(svc: WorkspaceService): Hono {
   const app = new Hono()
+  app.use('*', compress())
 
   app.get('/', async (c) => {
     const fromParsed = parseTimestampParam(c.req.query('from'))

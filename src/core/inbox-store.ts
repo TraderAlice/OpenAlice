@@ -2,7 +2,7 @@
  * Read state lives separately in read-state.json. */
 
 import { randomUUID } from 'node:crypto'
-import { readFile, appendFile, mkdir, writeFile, rename } from 'node:fs/promises'
+import { readFile, appendFile, mkdir, writeFile, rename, stat } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { dataPath } from '@/core/paths.js'
 import { EventEmitter } from 'node:events'
@@ -101,6 +101,8 @@ export interface IInboxStore {
   onAppended(listener: (entry: InboxEntry) => void): () => void
   /** Subscribe to live removals. Returns a dispose function. */
   onRemoved(listener: (id: string) => void): () => void
+  /** Lightweight content/read-state revision token for HTTP ETag/304 checks. */
+  fingerprint?(): Promise<string>
 }
 
 const INBOX_FILE = dataPath('inbox', 'entries.jsonl')
@@ -131,12 +133,39 @@ export interface InboxStoreOptions {
   readStatePath?: string
 }
 
+interface FileStatSig {
+  mtimeMs: number
+  size: number
+  ino: number
+}
+
+function sameFileStat(a: FileStatSig | null, b: FileStatSig | null): boolean {
+  if (!a || !b) return false
+  return a.mtimeMs === b.mtimeMs && a.size === b.size && a.ino === b.ino
+}
+
+async function statSig(path: string): Promise<FileStatSig | null> {
+  try {
+    const info = await stat(path)
+    return { mtimeMs: info.mtimeMs, size: info.size, ino: info.ino }
+  } catch (err: unknown) {
+    if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null
+    }
+    throw err
+  }
+}
+
 export function createInboxStore(opts: InboxStoreOptions = {}): IInboxStore {
   const filePath = opts.filePath ?? INBOX_FILE
   const readStatePath = opts.readStatePath ?? INBOX_READ_STATE_FILE
   const emitter = new EventEmitter()
   emitter.setMaxListeners(50)
   let readStateQueue: Promise<void> = Promise.resolve()
+
+  let localVersion = 0
+  let entriesCache: { sig: FileStatSig; entries: InboxEntry[]; byId: Map<string, InboxEntry>; hasMalformed: boolean } | null = null
+  let readStateCache: { sig: FileStatSig; state: InboxReadStateFile } | null = null
 
   function withReadStateLock<T>(fn: () => Promise<T>): Promise<T> {
     const run = readStateQueue.then(fn, fn)
@@ -148,20 +177,37 @@ export function createInboxStore(opts: InboxStoreOptions = {}): IInboxStore {
   }
 
   async function readReadState(): Promise<InboxReadStateFile> {
+    if (readStateCache) {
+      const currentSig = await statSig(readStatePath)
+      if (sameFileStat(readStateCache.sig, currentSig)) {
+        return { version: 1, read: { ...readStateCache.state.read } }
+      }
+      if (!currentSig) {
+        readStateCache = null
+        return { ...EMPTY_READ_STATE, read: {} }
+      }
+    }
+
     let raw: string
     try {
       raw = await readFile(readStatePath, 'utf-8')
     } catch (err: unknown) {
       if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
+        readStateCache = null
         return { ...EMPTY_READ_STATE, read: {} }
       }
       throw err
     }
     const parsed = JSON.parse(raw) as Partial<InboxReadStateFile>
-    return {
+    const state: InboxReadStateFile = {
       version: 1,
-      read: parsed.read && typeof parsed.read === 'object' ? parsed.read : {},
+      read: parsed.read && typeof parsed.read === 'object' ? { ...parsed.read } : {},
     }
+    const sig = await statSig(readStatePath)
+    if (sig) {
+      readStateCache = { sig, state: { version: 1, read: { ...state.read } } }
+    }
+    return state
   }
 
   async function writeReadState(state: InboxReadStateFile): Promise<void> {
@@ -169,29 +215,59 @@ export function createInboxStore(opts: InboxStoreOptions = {}): IInboxStore {
     const tmp = `${readStatePath}.tmp`
     await writeFile(tmp, JSON.stringify(state, null, 2) + '\n', 'utf-8')
     await rename(tmp, readStatePath)
+    localVersion++
+    const sig = await statSig(readStatePath)
+    readStateCache = sig ? { sig, state: { version: 1, read: { ...state.read } } } : null
   }
 
-  async function entryExists(id: string): Promise<boolean> {
+  async function loadEntries(tolerateMalformed: boolean): Promise<{ entries: InboxEntry[]; byId: Map<string, InboxEntry> } | null> {
+    if (entriesCache && (tolerateMalformed || !entriesCache.hasMalformed)) {
+      const currentSig = await statSig(filePath)
+      if (sameFileStat(entriesCache.sig, currentSig)) {
+        return { entries: entriesCache.entries, byId: entriesCache.byId }
+      }
+      if (!currentSig) {
+        entriesCache = null
+        return null
+      }
+    }
+
     let raw: string
     try {
       raw = await readFile(filePath, 'utf-8')
     } catch (err: unknown) {
       if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
-        return false
+        entriesCache = null
+        return null
       }
       throw err
     }
+
+    const entries: InboxEntry[] = []
+    const byId = new Map<string, InboxEntry>()
+    let hasMalformed = false
     for (const line of raw.split('\n')) {
       if (!line.trim()) continue
       try {
         const entry = JSON.parse(line) as InboxEntry
-        if (entry.id === id) return true
-      } catch {
-        // Ignore malformed lines here; read/delete preserve or surface them
-        // according to their own contracts.
+        entries.push(entry)
+        if (!byId.has(entry.id)) byId.set(entry.id, entry)
+      } catch (err) {
+        if (!tolerateMalformed) throw err
+        hasMalformed = true
       }
     }
-    return false
+
+    const sig = await statSig(filePath)
+    if (sig) {
+      entriesCache = { sig, entries, byId, hasMalformed }
+    }
+    return { entries, byId }
+  }
+
+  async function entryExists(id: string): Promise<boolean> {
+    const loaded = await loadEntries(true)
+    return loaded ? loaded.byId.has(id) : false
   }
 
   async function append(input: InboxInput): Promise<InboxEntry> {
@@ -203,32 +279,26 @@ export function createInboxStore(opts: InboxStoreOptions = {}): IInboxStore {
     }
     await mkdir(dirname(filePath), { recursive: true })
     await appendFile(filePath, JSON.stringify(entry) + '\n')
+    localVersion++
+    // Invalidate so the next read observes any concurrent external writes too.
+    entriesCache = null
     emitter.emit('appended', entry)
     return entry
   }
 
   async function read(opts: InboxReadOpts = {}): Promise<{ entries: InboxEntry[]; hasMore: boolean; unreadCount: number }> {
-    let raw: string
-    try {
-      raw = await readFile(filePath, 'utf-8')
-    } catch (err: unknown) {
-      if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
-        return { entries: [], hasMore: false, unreadCount: 0 }
-      }
-      throw err
+    const loaded = await loadEntries(false)
+    if (!loaded) {
+      return { entries: [], hasMore: false, unreadCount: 0 }
     }
 
     const readState = await readReadState()
-    let all = raw
-      .split('\n')
-      .filter((l) => l.trim())
-      .map((l) => {
-        const entry = JSON.parse(l) as InboxEntry
-        const readAt = readState.read[entry.id]
-        return typeof readAt === 'number' && Number.isFinite(readAt) && readAt > 0
-          ? { ...entry, readAt }
-          : entry
-      })
+    let all = loaded.entries.map((entry) => {
+      const readAt = readState.read[entry.id]
+      return typeof readAt === 'number' && Number.isFinite(readAt) && readAt > 0
+        ? { ...entry, readAt }
+        : entry
+    })
 
     const unreadCount = all.filter((entry) => !entry.readAt).length
 
@@ -253,33 +323,14 @@ export function createInboxStore(opts: InboxStoreOptions = {}): IInboxStore {
   }
 
   async function get(id: string): Promise<InboxEntry | null> {
-    let raw: string
-    try {
-      raw = await readFile(filePath, 'utf-8')
-    } catch (err: unknown) {
-      if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
-        return null
-      }
-      throw err
-    }
-    for (const line of raw.split('\n')) {
-      if (!line.trim()) continue
-      let entry: InboxEntry
-      try {
-        entry = JSON.parse(line) as InboxEntry
-      } catch {
-        // A malformed sibling entry must not hide a later valid id.
-        continue
-      }
-      if (entry.id === id) {
-        const readState = await readReadState()
-        const readAt = readState.read[id]
-        return typeof readAt === 'number' && Number.isFinite(readAt) && readAt > 0
-          ? { ...entry, readAt }
-          : entry
-      }
-    }
-    return null
+    const loaded = await loadEntries(true)
+    const entry = loaded?.byId.get(id)
+    if (!entry) return null
+    const readState = await readReadState()
+    const readAt = readState.read[id]
+    return typeof readAt === 'number' && Number.isFinite(readAt) && readAt > 0
+      ? { ...entry, readAt }
+      : entry
   }
 
   async function markRead(id: string, readAt = Date.now()): Promise<boolean> {
@@ -359,6 +410,8 @@ export function createInboxStore(opts: InboxStoreOptions = {}): IInboxStore {
     const body = kept.length > 0 ? kept.join('\n') + '\n' : ''
     await writeFile(tmp, body, 'utf-8')
     await rename(tmp, filePath)
+    localVersion++
+    entriesCache = null
     await withReadStateLock(async () => {
       const state = await readReadState()
       if (!(id in state.read)) return
@@ -367,6 +420,13 @@ export function createInboxStore(opts: InboxStoreOptions = {}): IInboxStore {
     })
     emitter.emit('removed', id)
     return true
+  }
+
+  async function fingerprint(): Promise<string> {
+    const [entriesSig, readSig] = await Promise.all([statSig(filePath), statSig(readStatePath)])
+    const ePart = entriesSig ? `${entriesSig.ino}:${entriesSig.size}:${entriesSig.mtimeMs}` : 'none'
+    const rPart = readSig ? `${readSig.ino}:${readSig.size}:${readSig.mtimeMs}` : 'none'
+    return `${localVersion}|${ePart}|${rPart}`
   }
 
   function onAppended(listener: (entry: InboxEntry) => void): () => void {
@@ -383,7 +443,7 @@ export function createInboxStore(opts: InboxStoreOptions = {}): IInboxStore {
     }
   }
 
-  return { append, read, get, markRead, markAllRead, markUnread, delete: deleteEntry, onAppended, onRemoved }
+  return { append, read, get, markRead, markAllRead, markUnread, delete: deleteEntry, onAppended, onRemoved, fingerprint }
 }
 
 // ==================== In-memory store (tests) ====================
@@ -392,6 +452,7 @@ export function createMemoryInboxStore(): IInboxStore {
   const entries: InboxEntry[] = []
   const emitter = new EventEmitter()
   emitter.setMaxListeners(50)
+  let version = 0
 
   async function append(input: InboxInput): Promise<InboxEntry> {
     validateInput(input)
@@ -401,6 +462,7 @@ export function createMemoryInboxStore(): IInboxStore {
       ts: Date.now(),
     }
     entries.push(entry)
+    version++
     emitter.emit('appended', entry)
     return entry
   }
@@ -425,6 +487,7 @@ export function createMemoryInboxStore(): IInboxStore {
     const idx = entries.findIndex((e) => e.id === id)
     if (idx < 0) return false
     entries.splice(idx, 1)
+    version++
     emitter.emit('removed', id)
     return true
   }
@@ -433,6 +496,7 @@ export function createMemoryInboxStore(): IInboxStore {
     const entry = entries.find((e) => e.id === id)
     if (!entry) return false
     entry.readAt = readAt
+    version++
     return true
   }
 
@@ -441,6 +505,7 @@ export function createMemoryInboxStore(): IInboxStore {
     const unread = entries.filter((entry) => !entry.readAt && !excluded.has(entry.id))
     const readAt = Date.now()
     for (const entry of unread) entry.readAt = readAt
+    if (unread.length > 0) version++
     return { ids: unread.map((entry) => entry.id), readAt, unreadCount: entries.filter((entry) => !entry.readAt).length }
   }
 
@@ -448,7 +513,12 @@ export function createMemoryInboxStore(): IInboxStore {
     const entry = entries.find((e) => e.id === id)
     if (!entry) return false
     delete entry.readAt
+    version++
     return true
+  }
+
+  async function fingerprint(): Promise<string> {
+    return `mem:${version}`
   }
 
   function onAppended(listener: (entry: InboxEntry) => void): () => void {
@@ -465,5 +535,5 @@ export function createMemoryInboxStore(): IInboxStore {
     }
   }
 
-  return { append, read, get, markRead, markAllRead, markUnread, delete: deleteEntry, onAppended, onRemoved }
+  return { append, read, get, markRead, markAllRead, markUnread, delete: deleteEntry, onAppended, onRemoved, fingerprint }
 }

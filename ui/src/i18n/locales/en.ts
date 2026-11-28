@@ -3433,6 +3433,8 @@ export const en = {
     markAllReadError: 'Could not mark updates as read. Please try again.',
 
     noMessages: 'No inbox messages.',
+    loadOlder: 'Load older messages',
+    loadingOlder: 'Loading older…',
     emptyHint: 'Workspaces will push status updates here.',
     untitledUpdate: 'Update without a summary',
     unread: 'Unread',

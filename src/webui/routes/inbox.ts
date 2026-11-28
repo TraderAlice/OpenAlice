@@ -1,5 +1,6 @@
 import { inboxFiles } from '@traderalice/connector-protocol'
 import { resolveInboxFile } from '../../core/inbox-files.js'
+import { createHash } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 /**
  * Inbox HTTP route — read history + dev-only seed.
@@ -9,12 +10,28 @@ import { readFile, stat } from 'node:fs/promises'
  *   DELETE /:id/read                            mark one entry unread
  *   POST   /seed                                dev-only: append an entry
  *
- * UI polls /history every 20s. Production writes still come from workspace
- * tools (`inbox_push` via MCP/CLI gateway); `/seed` is only for manual/dev
- * appends. Read/unread writes are user actions and stay in this HTTP surface.
+ * UI polls /history every 20s with conditional If-None-Match (ETag) so
+ * unchanged ticks return 304 Not Modified with zero payload bytes. Production
+ * writes still come from workspace tools (`inbox_push` via MCP/CLI gateway);
+ * `/seed` is only for manual/dev appends.
  */
 import { Hono } from 'hono'
+import { compress } from 'hono/compress'
 import type { IInboxStore } from '../../core/inbox-store.js'
+
+function weakEtag(input: string): string {
+  const hash = createHash('sha1').update(input).digest('base64url').slice(0, 20)
+  return `W/"${hash}"`
+}
+
+function matchesIfNoneMatch(header: string | undefined, etag: string): boolean {
+  if (!header) return false
+  const normalizedTarget = etag.replace(/^W\//, '')
+  return header
+    .split(',')
+    .map((part) => part.trim())
+    .some((tag) => tag === '*' || tag === etag || tag.replace(/^W\//, '') === normalizedTarget)
+}
 
 export interface InboxRoutesDeps {
   resolveWorkspace?: (id: string) => { dir: string } | undefined
@@ -23,11 +40,21 @@ export interface InboxRoutesDeps {
 
 export function createInboxRoutes(deps: InboxRoutesDeps) {
   const app = new Hono()
+  app.use('*', compress())
 
   app.get('/history', async (c) => {
     const limit = Number(c.req.query('limit')) || 100
     const before = c.req.query('before') || undefined
     const workspaceId = c.req.query('workspaceId') || undefined
+    const fp = deps.inboxStore.fingerprint ? await deps.inboxStore.fingerprint() : null
+    if (fp !== null) {
+      const etag = weakEtag(`history|${fp}|${limit}|${before ?? ''}|${workspaceId ?? ''}`)
+      c.header('ETag', etag)
+      c.header('Cache-Control', 'private, no-cache')
+      if (matchesIfNoneMatch(c.req.header('if-none-match'), etag)) {
+        return c.body(null, 304)
+      }
+    }
     const result = await deps.inboxStore.read({ limit, before, workspaceId })
     return c.json(result)
   })
@@ -47,11 +74,36 @@ export function createInboxRoutes(deps: InboxRoutesDeps) {
     const entry = await deps.inboxStore.get(c.req.param('id'))
     if (!entry) return c.json({ error: 'not_found' }, 404)
     const root = deps.resolveWorkspace?.(entry.workspaceId)?.dir
-    const files = await Promise.all(inboxFiles(entry).map(async (file, index) => ({
-      ...file, available: Boolean(await resolveInboxFile(root, file.path)),
-      href: `/api/inbox/${encodeURIComponent(entry.id)}/files/${index}`,
-    })))
-    return c.json({ files })
+    const resolved = await Promise.all(inboxFiles(entry).map(async (file, index) => {
+      const resolvedPath = await resolveInboxFile(root, file.path)
+      let statPart = 'missing'
+      let size: number | undefined
+      if (resolvedPath) {
+        try {
+          const info = await stat(resolvedPath)
+          statPart = `${info.size}:${info.mtimeMs}`
+          size = info.size
+        } catch {
+          statPart = 'missing'
+        }
+      }
+      return {
+        file: {
+          ...file,
+          available: statPart !== 'missing',
+          ...(size !== undefined ? { size } : {}),
+          href: `/api/inbox/${encodeURIComponent(entry.id)}/files/${index}`,
+        },
+        sig: `${file.path}:${file.revision ?? ''}:${statPart}`,
+      }
+    }))
+    const etag = weakEtag(`files|${entry.id}|${resolved.map((r) => r.sig).join('|')}`)
+    c.header('ETag', etag)
+    c.header('Cache-Control', 'private, no-cache')
+    if (matchesIfNoneMatch(c.req.header('if-none-match'), etag)) {
+      return c.body(null, 304)
+    }
+    return c.json({ files: resolved.map((r) => r.file) })
   })
 
   app.get('/:id/files/:index', async c => {
@@ -63,13 +115,19 @@ export function createInboxRoutes(deps: InboxRoutesDeps) {
     if (!path) return c.json({ error: 'file_not_found' }, 404)
     const info = await stat(path)
     if (info.size > 16 * 1024 * 1024) return c.json({ error: 'file_too_large' }, 413)
+    const etag = weakEtag(`file|${entry.id}|${index}|${info.ino}:${info.size}:${info.mtimeMs}`)
+    c.header('ETag', etag)
+    c.header('Cache-Control', 'private, no-cache')
+    if (matchesIfNoneMatch(c.req.header('if-none-match'), etag)) {
+      return c.body(null, 304)
+    }
     const bytes = await readFile(path)
     const extension = file.path.split('.').pop()?.toLowerCase() ?? ''
     const media: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', pdf: 'application/pdf' }
     c.header('Content-Type', media[extension] ?? 'application/octet-stream')
+    c.header('Content-Length', String(bytes.byteLength))
     c.header('X-Content-Type-Options', 'nosniff')
     c.header('Content-Security-Policy', "sandbox; default-src 'none'")
-    c.header('Cache-Control', 'no-store')
     c.header('Content-Disposition', `${media[extension] ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(file.path.split('/').pop()!)}`)
     return c.body(bytes)
   })

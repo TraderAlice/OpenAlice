@@ -99,3 +99,55 @@ it('rejects malformed bulk requests without changing read state', async () => {
   }
   expect((await inboxStore.read()).unreadCount).toBe(1)
 })
+
+it('supports ETag / 304 Not Modified on history, files, and file bytes and invalidates on updates', async () => {
+  const { mkdtemp, mkdir, writeFile, rm } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const home = await mkdtemp(join(tmpdir(), 'inbox-http-etag-'))
+  try {
+    const source = join(home, 'source')
+    await mkdir(source)
+    await writeFile(join(source, 'report.md'), '# v1')
+    const inboxStore = createMemoryInboxStore()
+    const entry = await inboxStore.append({ workspaceId: 'ws', body: 'See [[report.md]]' })
+    const app = createInboxRoutes({ inboxStore, resolveWorkspace: () => ({ dir: source }) })
+
+    // /history ETag -> 304 -> mutated -> 200 with new ETag (also works with gzip Accept-Encoding)
+    const h1 = await app.request('/history?limit=20', { headers: { 'Accept-Encoding': 'gzip' } })
+    expect(h1.status).toBe(200)
+    const hEtag = h1.headers.get('etag')
+    expect(hEtag).toBeTruthy()
+    const h304 = await app.request('/history?limit=20', {
+      headers: { 'If-None-Match': hEtag!, 'Accept-Encoding': 'gzip' },
+    })
+    expect(h304.status).toBe(304)
+
+    await inboxStore.markRead(entry.id)
+    const h2 = await app.request('/history?limit=20', { headers: { 'If-None-Match': hEtag! } })
+    expect(h2.status).toBe(200)
+    expect(h2.headers.get('etag')).not.toBe(hEtag)
+
+    // /:id/files ETag -> 304 + includes file size
+    const f1 = await app.request(`/${entry.id}/files`)
+    expect(f1.status).toBe(200)
+    const fEtag = f1.headers.get('etag')
+    const fBody = await f1.json() as { files: Array<{ path: string; size?: number }> }
+    expect(fBody.files[0]?.size).toBe(4)
+    expect((await app.request(`/${entry.id}/files`, { headers: { 'If-None-Match': fEtag! } })).status).toBe(304)
+
+    // /:id/files/0 ETag -> 304 -> file modified -> 200
+    const b1 = await app.request(`/${entry.id}/files/0`)
+    expect(b1.status).toBe(200)
+    expect(b1.headers.get('cache-control')).toBe('private, no-cache')
+    const bEtag = b1.headers.get('etag')
+    expect((await app.request(`/${entry.id}/files/0`, { headers: { 'If-None-Match': bEtag! } })).status).toBe(304)
+
+    await writeFile(join(source, 'report.md'), '# v2 updated')
+    const b2 = await app.request(`/${entry.id}/files/0`, { headers: { 'If-None-Match': bEtag! } })
+    expect(b2.status).toBe(200)
+    expect(await b2.text()).toBe('# v2 updated')
+  } finally {
+    await rm(home, { recursive: true, force: true })
+  }
+})

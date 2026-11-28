@@ -1,4 +1,4 @@
-import { fetchJson } from './client'
+import { fetchJson, type FetchRequestInit } from './client'
 
 export interface InboxDoc {
   path: string
@@ -60,6 +60,8 @@ export interface InboxHistoryResponse {
   entries: InboxEntry[]
   hasMore: boolean
   unreadCount?: number
+  etag?: string
+  notModified?: boolean
 }
 
 export interface InboxSeedBody {
@@ -72,21 +74,80 @@ export interface InboxFile {
   path: string
   revision?: string
   available: boolean
+  /** File byte size on disk when available. Used to skip heavy files during prefetch. */
+  size?: number
   href: string
 }
 
+export interface InboxFilesResponse {
+  files: InboxFile[]
+  etag?: string
+  notModified?: boolean
+}
+
 export const inboxApi = {
-  files(id: string): Promise<{ files: InboxFile[] }> {
-    return fetchJson(`/api/inbox/${encodeURIComponent(id)}/files`)
+  async files(
+    id: string,
+    opts: { ifNoneMatch?: string; priority?: 'high' | 'low' } = {},
+  ): Promise<InboxFilesResponse> {
+    const reqHeaders: Record<string, string> = {}
+    if (opts.ifNoneMatch) reqHeaders['If-None-Match'] = opts.ifNoneMatch
+    const init: FetchRequestInit = {
+      ...(opts.ifNoneMatch ? { headers: reqHeaders } : {}),
+      ...(opts.priority ? { priority: opts.priority } : {}),
+    }
+    const res = await fetch(`/api/inbox/${encodeURIComponent(id)}/files`, init)
+    if (res.status === 401) {
+      window.dispatchEvent(new CustomEvent('app:unauthorized'))
+      throw new Error('Unauthorized')
+    }
+    const etag = res.headers.get('etag') ?? opts.ifNoneMatch
+    if (res.status === 304) {
+      return { files: [], etag, notModified: true }
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }))
+      throw new Error(err.message || err.error || res.statusText)
+    }
+    const body = await res.json() as { files: InboxFile[] }
+    return etag ? { files: body.files, etag } : { files: body.files }
   },
+
   async history(
-    opts: { limit?: number; before?: string; workspaceId?: string } = {},
+    opts: {
+      limit?: number
+      before?: string
+      workspaceId?: string
+      ifNoneMatch?: string
+      priority?: 'high' | 'low'
+    } = {},
   ): Promise<InboxHistoryResponse> {
     const qs = new URLSearchParams()
     if (opts.limit != null) qs.set('limit', String(opts.limit))
     if (opts.before) qs.set('before', opts.before)
     if (opts.workspaceId) qs.set('workspaceId', opts.workspaceId)
-    return fetchJson(`/api/inbox/history?${qs}`)
+    const url = `/api/inbox/history?${qs}`
+    const reqHeaders: Record<string, string> = {}
+    if (opts.ifNoneMatch) reqHeaders['If-None-Match'] = opts.ifNoneMatch
+    const init: FetchRequestInit = {
+      ...(opts.ifNoneMatch ? { headers: reqHeaders } : {}),
+      ...(opts.priority ? { priority: opts.priority } : {}),
+    }
+    const res = await fetch(url, init)
+    if (res.status === 401) {
+      window.dispatchEvent(new CustomEvent('app:unauthorized'))
+      throw new Error('Unauthorized')
+    }
+    const etag = res.headers.get('etag') ?? opts.ifNoneMatch
+    if (res.status === 304) {
+      return { entries: [], hasMore: false, etag, notModified: true }
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }))
+      throw new Error(err.message || err.error || res.statusText)
+    }
+    const body = await res.json() as InboxHistoryResponse
+    return etag ? { ...body, etag } : body
   },
 
   /** Dev-only — append an inbox entry. */

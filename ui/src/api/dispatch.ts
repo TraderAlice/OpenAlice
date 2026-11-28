@@ -1,4 +1,4 @@
-import { fetchJson } from './client'
+import { fetchJson, type FetchRequestInit } from './client'
 import type { ScheduleSkipState } from './schedule'
 
 export type DispatchTemplateKind = 'commander' | 'chat' | 'auto-quant' | 'prediction' | 'custom'
@@ -198,11 +198,12 @@ export interface DispatchBoardSnapshot {
 }
 
 export const dispatchApi = {
-  get: (opts?: { from?: number; to?: number }) => {
+  get: (opts?: { from?: number; to?: number; priority?: 'high' | 'low' }) => {
     const params = new URLSearchParams()
     if (opts?.from !== undefined) params.set('from', String(Math.floor(opts.from)))
     if (opts?.to !== undefined) params.set('to', String(Math.floor(opts.to)))
     const qs = params.toString()
-    return fetchJson<DispatchBoardSnapshot>(qs ? `/api/dispatch?${qs}` : '/api/dispatch')
+    const init: FetchRequestInit | undefined = opts?.priority ? { priority: opts.priority } : undefined
+    return fetchJson<DispatchBoardSnapshot>(qs ? `/api/dispatch?${qs}` : '/api/dispatch', init)
   },
 }

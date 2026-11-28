@@ -3401,6 +3401,8 @@ export const zhHant: Resources = {
     markAllReadError: '無法標為已讀，請重試。',
 
     noMessages: '收件匣是空的。',
+    loadOlder: '載入更早訊息',
+    loadingOlder: '正在載入…',
     emptyHint: '工作區會將狀態更新推送到這裡。',
     untitledUpdate: '沒有摘要的更新',
     unread: '未讀',

@@ -3397,6 +3397,8 @@ export const zh: Resources = {
     markAllReadError: '无法标为已读，请重试。',
 
     noMessages: '收件箱为空。',
+    loadOlder: '加载更早消息',
+    loadingOlder: '正在加载…',
     emptyHint: '工作区会把状态更新推送到这里。',
     untitledUpdate: '没有摘要的更新',
     unread: '未读',

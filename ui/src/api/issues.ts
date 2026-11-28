@@ -1,4 +1,4 @@
-import { fetchJson, headers } from './client'
+import { fetchJson, headers, type FetchRequestInit } from './client'
 import type { Entity } from './entities'
 import type { HeadlessTaskRecord, HeadlessTurnProgress } from './headless'
 import type { InboxEntry } from './inbox'
@@ -343,8 +343,8 @@ export interface IssuePatch {
 
 export const issuesApi = {
   /** Read-only board: every workspace's issues, scanned across all workspaces. */
-  async get(): Promise<IssueSnapshot> {
-    return fetchJson<IssueSnapshot>('/api/issues')
+  async get(init?: FetchRequestInit): Promise<IssueSnapshot> {
+    return fetchJson<IssueSnapshot>('/api/issues', init)
   },
 
   /** Read-only detail: one issue's full fields + canonical What + its run feed. */
