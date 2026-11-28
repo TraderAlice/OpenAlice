@@ -14,14 +14,16 @@ export function InboxReplyThread({
   hasExactSender,
   load,
   ask,
+  cacheKey,
 }: {
   sender: string
   hasExactSender: boolean
   load: () => Promise<InquiryRecord[]>
   ask: (prompt: string) => Promise<unknown>
+  cacheKey?: string
 }) {
   const { t } = useTranslation()
-  const thread = useInquiryThread({ load, ask })
+  const thread = useInquiryThread({ load, ask, cacheKey })
   // The registry API is newest-first; a reply thread reads chronologically.
   const records = useMemo(() => [...thread.records].reverse(), [thread.records])
 

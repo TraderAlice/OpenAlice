@@ -7,6 +7,7 @@ import {
   type DispatchLane as ApiDispatchLane,
   type DispatchTemplateKind as ApiDispatchTemplateKind,
 } from '../../api'
+import { resourceCache } from '../../lib/resource-cache'
 
 export const COMMANDER_LANE_ID = 'commander'
 
@@ -34,6 +35,28 @@ const PRESET_MS: Record<DispatchWindowPreset, number> = {
 }
 
 const POLL_MS = 4_000
+const PREFETCH_STALE_MS = 15_000
+
+export function dispatchSnapshotCacheKey(preset: DispatchWindowPreset): string {
+  return `dispatch:live:${preset}`
+}
+
+/**
+ * Low-priority background warm-up for the Dispatch board default window.
+ * Seeds `resourceCache` so switching to the Dispatch tab paints immediately
+ * while live polling catches up.
+ */
+export function prefetchDispatchSnapshot(preset: DispatchWindowPreset = '1h'): Promise<DispatchBoardSnapshot> {
+  return resourceCache.fetch<DispatchBoardSnapshot>(
+    dispatchSnapshotCacheKey(preset),
+    async ({ priority }) => {
+      const to = Date.now()
+      const from = to - PRESET_MS[preset]
+      return api.dispatch.get({ from, to, priority })
+    },
+    { priority: 'low', staleTimeMs: PREFETCH_STALE_MS },
+  )
+}
 
 export interface UseDispatchBoardResult {
   snapshot: DispatchBoardSnapshot | null
@@ -53,7 +76,9 @@ export function useDispatchBoard(enabled: boolean): UseDispatchBoardResult {
   const [preset, setPresetState] = useState<DispatchWindowPreset>('1h')
   const [live, setLiveState] = useState(true)
   const [anchorEndMs, setAnchorEndMs] = useState<number>(() => Date.now())
-  const [snapshot, setSnapshot] = useState<DispatchBoardSnapshot | null>(null)
+  const [snapshot, setSnapshot] = useState<DispatchBoardSnapshot | null>(
+    () => resourceCache.peek<DispatchBoardSnapshot>(dispatchSnapshotCacheKey('1h')) ?? null,
+  )
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const requestSeqRef = useRef(0)
@@ -62,12 +87,20 @@ export function useDispatchBoard(enabled: boolean): UseDispatchBoardResult {
   const toMs = live ? anchorEndMs : anchorEndMs
   const fromMs = toMs - durationMs
 
-  const fetchWindow = useCallback(async (from: number, to: number, initial = false) => {
+  const fetchWindow = useCallback(async (
+    from: number,
+    to: number,
+    initial = false,
+    cachePreset?: DispatchWindowPreset,
+  ) => {
     const seq = ++requestSeqRef.current
     if (initial) setLoading(true)
     try {
       const next = await api.dispatch.get({ from, to })
       if (seq !== requestSeqRef.current) return
+      if (cachePreset) {
+        resourceCache.set(dispatchSnapshotCacheKey(cachePreset), next)
+      }
       setSnapshot(next)
       setError(null)
     } catch (err) {
@@ -80,9 +113,13 @@ export function useDispatchBoard(enabled: boolean): UseDispatchBoardResult {
 
   useEffect(() => {
     if (!enabled) return
+    const cached = live ? resourceCache.peek<DispatchBoardSnapshot>(dispatchSnapshotCacheKey(preset)) : undefined
+    if (cached) {
+      setSnapshot(cached)
+    }
     const end = live ? Date.now() : anchorEndMs
     if (live) setAnchorEndMs(end)
-    void fetchWindow(end - durationMs, end, snapshot === null)
+    void fetchWindow(end - durationMs, end, !cached && snapshot === null, live ? preset : undefined)
   }, [enabled, preset, live, durationMs]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -96,7 +133,7 @@ export function useDispatchBoard(enabled: boolean): UseDispatchBoardResult {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
       const now = Date.now()
       setAnchorEndMs(now)
-      void fetchWindow(now - durationMs, now, false)
+      void fetchWindow(now - durationMs, now, false, preset)
     }
     const timer = window.setInterval(tick, POLL_MS)
     const onVisibility = () => {
@@ -107,11 +144,13 @@ export function useDispatchBoard(enabled: boolean): UseDispatchBoardResult {
       window.clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [enabled, live, durationMs, fetchWindow])
+  }, [enabled, live, durationMs, preset, fetchWindow])
 
   const setPreset = useCallback((next: DispatchWindowPreset) => {
     setPresetState(next)
     if (live) {
+      const cached = resourceCache.peek<DispatchBoardSnapshot>(dispatchSnapshotCacheKey(next))
+      if (cached) setSnapshot(cached)
       setAnchorEndMs(Date.now())
     }
   }, [live])
@@ -144,8 +183,8 @@ export function useDispatchBoard(enabled: boolean): UseDispatchBoardResult {
   const refresh = useCallback(async () => {
     const end = live ? Date.now() : anchorEndMs
     if (live) setAnchorEndMs(end)
-    await fetchWindow(end - durationMs, end, false)
-  }, [live, anchorEndMs, durationMs, fetchWindow])
+    await fetchWindow(end - durationMs, end, false, live ? preset : undefined)
+  }, [live, anchorEndMs, durationMs, preset, fetchWindow])
 
   return {
     snapshot,

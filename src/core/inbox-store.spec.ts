@@ -515,3 +515,39 @@ it('does not mark arrivals appended while the bulk snapshot is waiting on read s
     expect((await store.read()).unreadCount).toBe(1)
   } finally { spy?.mockRestore(); await rm(dir, { recursive: true, force: true }) }
 })
+
+it('serves repeated reads from cache and invalidates on external file appends or edits', async () => {
+  const fs = await import('node:fs/promises')
+  const dir = await mkdtemp(join(tmpdir(), 'inbox-cache-'))
+  try {
+    const filePath = join(dir, 'entries.jsonl')
+    const readStatePath = join(dir, 'read-state.json')
+    const store = createInboxStore({ filePath, readStatePath })
+    const a = await store.append({ workspaceId: 'ws', body: 'first' })
+    await store.markRead(a.id, 100)
+
+    // Warm the cache with one read.
+    const first = await store.read()
+    expect(first.entries).toHaveLength(1)
+    expect(first.entries[0]?.readAt).toBe(100)
+    const fp1 = await store.fingerprint!()
+
+    // Repeated read + get should hit the stat-validated cache without calling readFile.
+    const readSpy = vi.spyOn(fs, 'readFile')
+    try {
+      const cachedRead = await store.read()
+      const cachedGet = await store.get(a.id)
+      expect(cachedRead.entries[0]?.id).toBe(a.id)
+      expect(cachedGet?.readAt).toBe(100)
+      expect(readSpy).not.toHaveBeenCalled()
+    } finally {
+      readSpy.mockRestore()
+    }
+
+    // External process appends directly to entries.jsonl -> cache must observe it.
+    await fs.appendFile(filePath, JSON.stringify({ id: 'ext-1', ts: 2, workspaceId: 'ws', body: 'external' }) + '\n')
+    const afterExt = await store.read()
+    expect(afterExt.entries.map((e) => e.id)).toEqual(['ext-1', a.id])
+    expect(await store.fingerprint!()).not.toBe(fp1)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})

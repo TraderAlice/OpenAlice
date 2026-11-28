@@ -21,6 +21,7 @@ import {
 } from './contexts/MobilePageNavigationContext'
 import { UrlAdopter } from './tabs/UrlAdopter'
 import { useLocale } from './i18n/useLocale'
+import { useGlobalResourcePrefetch } from './live/prefetch'
 import { useActivityRailState } from './hooks/useActivityRailState'
 import { PrimaryNavigationContext } from './contexts/PrimaryNavigationContext'
 import { PrimaryNavigationToggle, useNavigationToggleFocus } from './components/PrimaryNavigationToggle'
@@ -94,6 +95,8 @@ function AppShellContent() {
   // Re-render the shell on a language switch so formatter-only subtrees
   // (charts, money/date labels that don't call t()) refresh too.
   useLocale()
+  // Warm high-frequency tabs (Issues, Dispatch) at low priority after initial paint.
+  useGlobalResourcePrefetch()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const mobileRailMenuButtonRef = useRef<HTMLButtonElement>(null)
   const isDesktop = useIsDesktop() // ≥768 — rail is a static column

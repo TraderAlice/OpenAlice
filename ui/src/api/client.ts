@@ -1,8 +1,10 @@
 /** Shared fetch headers for JSON requests. */
 export const headers = { 'Content-Type': 'application/json' }
 
+export type FetchRequestInit = RequestInit & { priority?: 'high' | 'low' | 'auto' }
+
 /** Fetch helper that throws on non-OK responses. */
-export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+export async function fetchJson<T>(url: string, init?: FetchRequestInit): Promise<T> {
   const res = await fetch(url, init)
   if (res.status === 401) {
     // Global "session died / never had one" signal. AuthContext listens

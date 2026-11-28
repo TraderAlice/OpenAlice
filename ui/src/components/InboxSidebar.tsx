@@ -1,10 +1,11 @@
 import { inboxFiles } from '@traderalice/connector-protocol'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CheckCheck, Clock, Layers, Search, X } from 'lucide-react'
+import { CheckCheck, Clock, Layers, LoaderCircle, Search, X } from 'lucide-react'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { formatRelativeTime } from '../lib/intl'
-import { inboxLive } from '../live/inbox'
+import { inboxLive, loadOlderInbox } from '../live/inbox'
+import { warmInboxEntry } from '../live/inbox-cache'
 import { useInboxRead, useUnreadInboxCount } from '../live/inbox-read'
 import { useInboxSelection } from '../live/inbox-selection'
 import { useInboxViewMode } from '../live/inbox-view-mode'
@@ -46,6 +47,8 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const toast = useToast()
   const entries = inboxLive.useStore((s) => s.entries)
   const loading = inboxLive.useStore((s) => s.loading)
+  const hasMore = inboxLive.useStore((s) => Boolean(s.hasMore))
+  const loadingMore = inboxLive.useStore((s) => Boolean(s.loadingMore))
   const selectedId = useInboxSelection((s) => s.selectedEntryId)
   const select = useInboxSelection((s) => s.select)
   const markRead = useInboxRead((s) => s.markRead)
@@ -88,6 +91,20 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
     () => (mode === 'workspace' ? threads.flatMap((th) => th.entries) : filteredEntries),
     [mode, threads, filteredEntries],
   )
+
+  // Debounced hover/focus warming so rapid scrolling never spams background
+  // requests, while hovering an entry primes its files & replies before click.
+  const hoverTimerRef = useRef<number | null>(null)
+  const scheduleWarmEntry = useCallback((entry: InboxEntry) => {
+    if (hoverTimerRef.current !== null) window.clearTimeout(hoverTimerRef.current)
+    hoverTimerRef.current = window.setTimeout(() => {
+      hoverTimerRef.current = null
+      warmInboxEntry(entry, 'low')
+    }, 120)
+  }, [])
+  useEffect(() => () => {
+    if (hoverTimerRef.current !== null) window.clearTimeout(hoverTimerRef.current)
+  }, [])
 
   /** Select one row and apply ordinary Inbox read semantics. Office review
    *  targets stay unread until their dossier records a disposition. */
@@ -243,6 +260,7 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
             readIds={readIds}
             workspaceLabels={workspaceLabels}
             onSelect={selectAndRead}
+            onWarm={scheduleWarmEntry}
           />
         ) : (
           <TimeView
@@ -251,7 +269,23 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
             readIds={readIds}
             workspaceLabels={workspaceLabels}
             onSelect={selectAndRead}
+            onWarm={scheduleWarmEntry}
           />
+        )}
+        {hasMore && !loading && (
+          <div className="px-3 py-2.5">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={loadingMore}
+              onClick={() => { void loadOlderInbox() }}
+              className="w-full justify-center text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              {loadingMore && <LoaderCircle size={12} className="animate-spin" aria-hidden />}
+              {loadingMore ? t('inbox.loadingOlder') : t('inbox.loadOlder')}
+            </Button>
+          </div>
         )}
       </div>
     </div>
@@ -342,13 +376,14 @@ function ToggleBtn({
 // ==================== Workspace (clustered) view ====================
 
 function WorkspaceView({
-  threads, selectedId, readIds, workspaceLabels, onSelect,
+  threads, selectedId, readIds, workspaceLabels, onSelect, onWarm,
 }: {
   threads: ReturnType<typeof groupThreads>
   selectedId: string | null
   readIds: Record<string, true>
   workspaceLabels: ReadonlyMap<string, string>
   onSelect: (id: string) => void
+  onWarm: (entry: InboxEntry) => void
 }) {
   return (
     <>
@@ -383,6 +418,7 @@ function WorkspaceView({
                   unread={!readIds[entry.id]}
                   source={workspaceLabel}
                   onClick={() => onSelect(entry.id)}
+                  onWarm={() => onWarm(entry)}
                 />
               ))}
             </div>
@@ -396,13 +432,14 @@ function WorkspaceView({
 /** Row inside a workspace cluster — the workspace label lives in the
  *  header, so the row leads with the scan subject. */
 function ClusterRow({
-  entry, active, unread, source, onClick,
+  entry, active, unread, source, onClick, onWarm,
 }: {
   entry: InboxEntry
   active: boolean
   unread: boolean
   source: string
   onClick: () => void
+  onWarm: () => void
 }) {
   const { t } = useTranslation()
   const time = formatRelativeTime(entry.ts)
@@ -420,6 +457,8 @@ function ClusterRow({
       aria-label={rowLabel}
       aria-current={active || undefined}
       onClick={onClick}
+      onPointerEnter={onWarm}
+      onFocus={onWarm}
       className={`group relative grid min-h-11 w-full grid-cols-[auto_minmax(0,1fr)] gap-x-1.5 gap-y-0.5 pl-3 pr-3 py-1.5 text-left cursor-pointer transition-colors outline-none focus-visible:bg-muted/70 ${
         active ? 'bg-muted' : 'hover:bg-muted/50'
       }`}
@@ -453,13 +492,14 @@ function ClusterRow({
 // ==================== Time (flat chronological) view ====================
 
 function TimeView({
-  entries, selectedId, readIds, workspaceLabels, onSelect,
+  entries, selectedId, readIds, workspaceLabels, onSelect, onWarm,
 }: {
   entries: readonly InboxEntry[]
   selectedId: string | null
   readIds: Record<string, true>
   workspaceLabels: ReadonlyMap<string, string>
   onSelect: (id: string) => void
+  onWarm: (entry: InboxEntry) => void
 }) {
   const { t } = useTranslation()
   const groups = useMemo(() => groupByBucket(entries), [entries])
@@ -480,6 +520,7 @@ function TimeView({
                 unread={!readIds[entry.id]}
                 workspaceLabel={workspaceLabels.get(entry.workspaceId)}
                 onClick={() => onSelect(entry.id)}
+                onWarm={() => onWarm(entry)}
               />
             ))}
           </div>
@@ -492,13 +533,14 @@ function TimeView({
 /** Row in the flat time feed — carries the workspace label (no cluster
  *  header to provide it). */
 function TimeRow({
-  entry, active, unread, workspaceLabel, onClick,
+  entry, active, unread, workspaceLabel, onClick, onWarm,
 }: {
   entry: InboxEntry
   active: boolean
   unread: boolean
   workspaceLabel?: string
   onClick: () => void
+  onWarm: () => void
 }) {
   const { t } = useTranslation()
   const source = workspaceLabel ?? entry.workspaceLabel ?? entry.workspaceId
@@ -517,6 +559,8 @@ function TimeRow({
       aria-label={rowLabel}
       aria-current={active || undefined}
       onClick={onClick}
+      onPointerEnter={onWarm}
+      onFocus={onWarm}
       className={`group relative flex min-h-14 w-full flex-col justify-center gap-1 px-3 py-2 text-left cursor-pointer transition-colors outline-none focus-visible:bg-muted/70 ${
         active ? 'bg-muted' : 'hover:bg-muted/50'
       }`}

@@ -28,6 +28,7 @@
  * validate → registry.get → write → json shape + logging.
  */
 import { Hono } from 'hono'
+import { compress } from 'hono/compress'
 
 import {
   MODEL_REASONING_EFFORTS,
@@ -85,6 +86,7 @@ export interface IssueRoutesDeps {
 
 export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps = {}): Hono {
   const app = new Hono()
+  app.use('*', compress())
   const conversation = deps.conversation ?? createWorkspaceConversationControl(svc)
 
   // GET /api/issues → { workspaces: [{ wsId, tag, status, error?, issues: [...] }] }

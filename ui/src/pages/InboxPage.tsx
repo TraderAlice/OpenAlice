@@ -20,6 +20,7 @@ import { FileContentView } from '../components/FileContentView'
 import { InboxReplyThread } from '../components/InboxReplyThread'
 import { api } from '../api'
 import { inboxLive, refreshInbox, removeInboxAfterDelete } from '../live/inbox'
+import { inboxInquiriesCacheKey, warmAdjacentInboxEntries } from '../live/inbox-cache'
 import { useInboxSelection } from '../live/inbox-selection'
 import { useInboxRead } from '../live/inbox-read'
 import { useIssues } from '../hooks/useIssues'
@@ -82,6 +83,13 @@ export function InboxPage({ visible }: InboxPageProps) {
     if (!visible || selectedId !== null || !capturedOfficeEntryId) return
     select(capturedOfficeEntryId)
   }, [capturedOfficeEntryId, select, selectedId, visible])
+
+  // Warm adjacent (±1) entries at low priority so j/k or next-item clicks
+  // render files, replies, and small text previews immediately.
+  useEffect(() => {
+    if (!visible || !selectedId) return
+    warmAdjacentInboxEntries(entries, selectedId)
+  }, [visible, selectedId, entries])
 
   /** Hard-delete an entry. The durable DELETE must succeed before the UI
    *  removes anything: a failed destructive action should keep both the
@@ -539,6 +547,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void 
           hasExactSender={hasSenderIdentity}
           load={loadInquiries}
           ask={askInbox}
+          cacheKey={inboxInquiriesCacheKey(entry.id)}
         />
       ) : (
         <div className="mt-10 border-t border-border/60 pt-6 text-[12px] italic text-muted-foreground/60">

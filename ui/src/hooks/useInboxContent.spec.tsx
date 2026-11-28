@@ -2,10 +2,12 @@
 import { act, renderHook, waitFor, cleanup } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { inboxApi, type InboxEntry, type InboxFile } from '../api/inbox'
+import { resourceCache } from '../lib/resource-cache'
+import { inboxFilesCacheKey } from '../live/inbox-cache'
 import { useInboxContent } from './useInboxContent'
 
 const entry = (id: string, workspaceId = 'source'): InboxEntry => ({ id, workspaceId, ts: 1, body: 'Before [[report/A.md]] after `[[literal.md]]` [[report/A.md]]' })
-afterEach(() => { cleanup(); vi.restoreAllMocks() })
+afterEach(() => { cleanup(); vi.restoreAllMocks(); resourceCache.clear() })
 describe('useInboxContent', () => {
   it('derives an ordered unique file index without fetching for summary consumers', () => {
     const request = vi.spyOn(inboxApi, 'files')
@@ -32,5 +34,13 @@ describe('useInboxContent', () => {
     act(() => result.current.retry())
     await waitFor(() => expect(result.current.fileHrefs['report/A.md']).toBe('/one'))
     expect(result.current.preview).toBeNull()
+  })
+  it('renders warmed file metadata synchronously from resourceCache without refetching while fresh', () => {
+    resourceCache.set(inboxFilesCacheKey('warm'), [{ path: 'report/A.md', available: true, href: '/warm/0' }])
+    const spy = vi.spyOn(inboxApi, 'files')
+    const { result } = renderHook(() => useInboxContent(entry('warm')))
+    expect(result.current.loading).toBe(false)
+    expect(result.current.fileHrefs['report/A.md']).toBe('/warm/0')
+    expect(spy).not.toHaveBeenCalled()
   })
 })

@@ -3394,6 +3394,8 @@ export const ja: Resources = {
     markAllReadError: '既読にできませんでした。もう一度お試しください。',
 
     noMessages: '受信トレイにメッセージがありません。',
+    loadOlder: '以前のメッセージを読み込む',
+    loadingOlder: '読み込み中…',
     emptyHint: 'ワークスペースがステータス更新をここに送ります。',
     untitledUpdate: '要約のない更新',
     unread: '未読',

@@ -2,19 +2,25 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { api } from '../api'
 import { issuesApi, omitTelegramConnectorIssues, type IssuePatch, type IssueSnapshot } from '../api/issues'
+import { resourceCache } from '../lib/resource-cache'
 
-/**
- * Process-level cache of the last snapshot. It survives unmount, so reopening
- * the Issues tab (or mounting any future consumer) shows data instantly
- * instead of flashing "Loading…" while a fresh fetch round-trips. The backend
- * serves this from the launcher scanner's warm cache, so the refresh is cheap.
- *
- * Mirrors hooks/useSchedules.ts — same poll cadence + warm-cache shape, but
- * reads the full issue board (scheduled + unscheduled work items).
- */
-let cached: IssueSnapshot | null = null
+export const ISSUES_SNAPSHOT_CACHE_KEY = 'issues:snapshot'
 
 const POLL_MS = 15_000
+const PREFETCH_STALE_MS = 15_000
+
+/**
+ * Low-priority background warm-up for the global Issue board. Populates
+ * `resourceCache` so switching to the Issues tab renders immediately instead
+ * of waiting on a remote round-trip.
+ */
+export function prefetchIssuesSnapshot(): Promise<IssueSnapshot> {
+  return resourceCache.fetch<IssueSnapshot>(
+    ISSUES_SNAPSHOT_CACHE_KEY,
+    async ({ priority }) => omitTelegramConnectorIssues(await api.issues.get({ priority })),
+    { priority: 'low', staleTimeMs: PREFETCH_STALE_MS },
+  )
+}
 
 export interface UseIssues {
   data: IssueSnapshot | null
@@ -30,11 +36,13 @@ export interface UseIssues {
 
 /**
  * Shared data source for the global Issue board (GET /api/issues). Polls while
- * mounted and keeps a process-level cache so the data is already on screen when
- * a consumer mounts.
+ * mounted and reads/writes through `resourceCache` so the data is already on
+ * screen when a consumer mounts (including after global warm-up).
  */
 export function useIssues(): UseIssues & { updateIssue: (wsId: string, id: string, patch: IssuePatch) => Promise<void> } {
-  const [data, setData] = useState<IssueSnapshot | null>(cached)
+  const [data, setData] = useState<IssueSnapshot | null>(
+    () => resourceCache.peek<IssueSnapshot>(ISSUES_SNAPSHOT_CACHE_KEY) ?? null,
+  )
   const [error, setError] = useState<string | null>(null)
   const [requestEpoch, setRequestEpoch] = useState(0)
   const [successEpoch, setSuccessEpoch] = useState(0)
@@ -49,7 +57,7 @@ export function useIssues(): UseIssues & { updateIssue: (wsId: string, id: strin
       try {
         const next = omitTelegramConnectorIssues(await api.issues.get())
         if (!mounted.current || request !== requestEpochRef.current) return
-        cached = next
+        resourceCache.set(ISSUES_SNAPSHOT_CACHE_KEY, next)
         setData(next)
         setError(null)
         setSuccessEpoch(request)
@@ -77,7 +85,7 @@ export function useIssues(): UseIssues & { updateIssue: (wsId: string, id: strin
       const updated = { ...current, workspaces: current.workspaces.map((workspace) => workspace.wsId !== wsId ? workspace : {
         ...workspace, issues: workspace.issues.map((issue) => issue.id === id ? { ...issue, ...next.issue } : issue),
       }) }
-      cached = updated
+      resourceCache.set(ISSUES_SNAPSHOT_CACHE_KEY, updated)
       return updated
     })
   }, [])

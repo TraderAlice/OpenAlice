@@ -1,4 +1,4 @@
-import { fetchJson, headers } from './client'
+import { fetchJson, headers, type FetchRequestInit } from './client'
 import type { HeadlessTaskStatus, HeadlessTurnProgress } from './headless'
 
 export type InquirySubject =
@@ -41,9 +41,10 @@ export interface InquiryDispatch {
 }
 
 export const inquiriesApi = {
-  async forInbox(entryId: string): Promise<InquiryRecord[]> {
+  async forInbox(entryId: string, init?: FetchRequestInit): Promise<InquiryRecord[]> {
     return (await fetchJson<{ inquiries: InquiryRecord[] }>(
       `/api/inquiries/inbox/${encodeURIComponent(entryId)}`,
+      init,
     )).inquiries
   },
 
